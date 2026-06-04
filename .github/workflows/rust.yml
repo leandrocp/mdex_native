@@ -1,0 +1,25 @@
+name: Rust
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "native/**"
+  pull_request:
+    paths:
+      - "native/**"
+  workflow_dispatch:
+
+jobs:
+  test:
+    uses: leandrocp/github-actions/.github/workflows/rust-test.yml@main
+    with:
+      manifest-path: "native/mdex_native_nif/Cargo.toml"
+      msrv: "1.91"
+
+  lint:
+    uses: leandrocp/github-actions/.github/workflows/rust-lint.yml@main
+    with:
+      manifest-path: "native/mdex_native_nif/Cargo.toml"
+      msrv: "1.91"
