@@ -14,7 +14,7 @@ jobs:
   nif-release:
     uses: leandrocp/github-actions/.github/workflows/nif-release.yml@main
     with:
-      project-name: mdex_native
+      project-name: mdex_native_nif
       project-dir: native/mdex_native_nif
 
   hex-publish:
