@@ -215,27 +215,24 @@ fn do_safe_html(
     let html = match escape_curly_braces_in_code {
         true => rewrite_str(
             &html,
-            RewriteStrSettings {
-                element_content_handlers: vec![text!("code", |chunk| {
-                    chunk.replace(
-                        &chunk
-                            .as_str()
-                            .replace('{', "&lbrace;")
-                            .replace('}', "&rbrace;"),
-                        ContentType::Html,
-                    );
+            RewriteStrSettings::new().append_element_content_handler(text!("code", |chunk| {
+                chunk.replace(
+                    &chunk
+                        .as_str()
+                        .replace('{', "&lbrace;")
+                        .replace('}', "&rbrace;"),
+                    ContentType::Html,
+                );
 
-                    Ok(())
-                })],
-                ..RewriteStrSettings::new()
-            },
+                Ok(())
+            })),
         )
         .unwrap_or(html),
         false => html,
     };
 
     let html = match escape_content {
-        true => v_htmlescape::escape(&html).to_string(),
+        true => v_htmlescape::escape_fmt(&html).to_string(),
         false => html,
     };
 
