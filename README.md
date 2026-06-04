@@ -65,6 +65,8 @@ MDExNative.Ammonia.safe_html(html)
 ### MDExNative.Lumis
 
 Syntax highlighting options for Comrak rendering.
+The native Rust `LumisAdapter` implements Comrak's `SyntaxHighlighterAdapter`
+and is installed when `:syntax_highlight` options are passed to `MDExNative.Comrak`.
 
 ````elixir
 markdown = """

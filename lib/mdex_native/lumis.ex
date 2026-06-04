@@ -1,6 +1,9 @@
 defmodule MDExNative.Lumis do
   @moduledoc """
   Syntax highlighting option helpers powered by the Rust `lumis` crate.
+
+  These options configure the native Rust `LumisAdapter`, which implements
+  Comrak's `SyntaxHighlighterAdapter` trait for fenced code block rendering.
   """
 
   @doc """

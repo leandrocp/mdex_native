@@ -102,6 +102,9 @@ defmodule MDExNative.Comrak do
   - `:render` - MDExNative.Comrak
     [`RenderOptions`](https://docs.rs/comrak/latest/comrak/struct.RenderOptions.html)
     options, for example `unsafe: true`, `hardbreaks: true`, or `sourcepos: true`.
+  - `:syntax_highlight` - syntax highlighting options produced by `MDExNative.Lumis`.
+    When present, the native Rust `LumisAdapter` is installed as Comrak's
+    `SyntaxHighlighterAdapter` for fenced code blocks.
 
   The accepted option keys are defined by `t:options/0`, `t:extension_options/0`,
   `t:parse_options/0`, and `t:render_options/0`.
