@@ -23,23 +23,27 @@ pub struct ExSourcepos {
     pub end: (usize, usize),
 }
 
-fn sourcepos_to_ex(sp: &Sourcepos) -> ExSourcepos {
-    ExSourcepos {
-        start: (sp.start.line, sp.start.column),
-        end: (sp.end.line, sp.end.column),
+impl From<Sourcepos> for ExSourcepos {
+    fn from(sourcepos: Sourcepos) -> Self {
+        Self {
+            start: (sourcepos.start.line, sourcepos.start.column),
+            end: (sourcepos.end.line, sourcepos.end.column),
+        }
     }
 }
 
-fn ex_to_sourcepos(ex: &ExSourcepos) -> Sourcepos {
-    Sourcepos {
-        start: LineColumn {
-            line: ex.start.0,
-            column: ex.start.1,
-        },
-        end: LineColumn {
-            line: ex.end.0,
-            column: ex.end.1,
-        },
+impl From<ExSourcepos> for Sourcepos {
+    fn from(sourcepos: ExSourcepos) -> Self {
+        Self {
+            start: LineColumn {
+                line: sourcepos.start.0,
+                column: sourcepos.start.1,
+            },
+            end: LineColumn {
+                line: sourcepos.end.0,
+                column: sourcepos.end.1,
+            },
+        }
     }
 }
 
@@ -1088,7 +1092,7 @@ pub fn ex_document_to_comrak_ast<'a>(
         }) => (sourcepos, Some(nodes)),
     };
 
-    node_arena.data_mut().sourcepos = ex_to_sourcepos(&sourcepos);
+    node_arena.data_mut().sourcepos = sourcepos.into();
 
     if let Some(nodes) = children {
         for node in nodes {
@@ -1103,7 +1107,7 @@ pub fn ex_document_to_comrak_ast<'a>(
 pub fn comrak_ast_to_ex_document<'a>(node: &'a AstNode<'a>) -> NewNode {
     let children: Vec<NewNode> = node.children().map(comrak_ast_to_ex_document).collect();
     let node_data = node.data();
-    let sourcepos = sourcepos_to_ex(&node_data.sourcepos);
+    let sourcepos = node_data.sourcepos.into();
 
     match &node_data.value {
         NodeValue::Document => NewNode::Document(ExDocument {
