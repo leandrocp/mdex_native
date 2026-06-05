@@ -3,6 +3,8 @@ defmodule MDExNative.MixProject do
 
   @source_url "https://github.com/leandrocp/mdex_native"
   @version "0.1.0"
+  @force_build? System.get_env("MDEX_NATIVE_BUILD") in ["1", "true"]
+
   def project do
     [
       app: :mdex_native,
@@ -49,7 +51,7 @@ defmodule MDExNative.MixProject do
 
   defp deps do
     [
-      {:rustler, "~> 0.32"},
+      {:rustler, "~> 0.32", optional: not @force_build?},
       {:rustler_precompiled, "~> 0.7"}
     ]
   end
