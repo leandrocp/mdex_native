@@ -22,8 +22,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     uses: leandrocp/github-actions/.github/workflows/hex-publish.yml@main
     with:
-      env-vars: '{"MDEX_NATIVE_BUILD":"1"}'
       install-rust: true
-      pre-publish-command: mix rustler_precompiled.download MDExNative.Native --all --print && mix escript.install hex ex_doc --force
+      pre-publish-command: MDEX_NATIVE_BUILD=1 mix rustler_precompiled.download MDExNative.Native --all --print && mix escript.install hex ex_doc --force
     secrets:
       HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
