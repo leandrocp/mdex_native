@@ -79,7 +79,7 @@ defmodule MDExNative.MixProject do
     end
 
     args = ["MDExNative", @version, Mix.Project.compile_path()]
-    opts = ~w[--main MDExNative.Comrak --source-ref v#{@version} --source-url #{@source_url}]
+    opts = ~w[--main MDExNative --source-ref v#{@version} --source-url #{@source_url}]
 
     System.cmd(ex_doc, args ++ opts)
   end
