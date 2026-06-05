@@ -24,6 +24,6 @@ jobs:
     with:
       env-vars: '{"MDEX_NATIVE_BUILD":"1"}'
       install-rust: true
-      pre-publish-command: mix rustler_precompiled.download MDExNative.Native --all --print
+      pre-publish-command: mix rustler_precompiled.download MDExNative.Native --all --print && mix escript.install hex ex_doc --force
     secrets:
       HEX_API_KEY: ${{ secrets.HEX_API_KEY }}

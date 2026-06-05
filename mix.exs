@@ -38,6 +38,7 @@ defmodule MDExNative.MixProject do
         native/mdex_native_nif/.cargo
         native/mdex_native_nif/Cargo.*
         native/mdex_native_nif/Cross.toml
+        docs.exs
         mix.exs
         README.md
         LICENSE.md
@@ -56,6 +57,7 @@ defmodule MDExNative.MixProject do
 
   defp aliases do
     [
+      docs: &build_docs/1,
       setup: ["deps.get", "compile"],
       "gen.checksum": "rustler_precompiled.download MDExNative.Native --all --print",
       "format.all": ["format", "rust.fmt"],
@@ -64,5 +66,20 @@ defmodule MDExNative.MixProject do
       ],
       "rust.fmt": ["cmd cargo fmt --manifest-path=native/mdex_native_nif/Cargo.toml --all"]
     ]
+  end
+
+  defp build_docs(_) do
+    Mix.Task.run("compile")
+    ex_doc = Path.join(Mix.path_for(:escripts), "ex_doc")
+
+    unless File.exists?(ex_doc) do
+      raise "cannot build docs because the ex_doc escript is not installed, " <>
+              "make sure to run `mix escript.install hex ex_doc` before"
+    end
+
+    args = ["MDExNative", @version, Mix.Project.compile_path()]
+    opts = ~w[--config docs.exs --source-ref v#{@version} --source-url #{@source_url}]
+
+    System.cmd(ex_doc, args ++ opts)
   end
 end
