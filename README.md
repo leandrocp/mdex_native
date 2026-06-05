@@ -8,7 +8,9 @@ It wraps the following Rust crates:
 - [`ammonia`](https://github.com/rust-ammonia/ammonia) for HTML sanitization
 - [`lumis`](https://lumis.sh) for syntax highlighting
 
-Most applications should use `MDEx` directly. Use `MDExNative` when you only need the native pieces.
+Most applications should use `MDEx` directly to benefit from Plugins, Document AST, Phoenix LiveView integration, additional syntax highlighting features, extra formats, MD sigil, and more.
+
+This project offers direct access to underlying Rust projects.
 
 ## Installation
 
