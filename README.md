@@ -10,7 +10,7 @@ It wraps the following Rust crates:
 
 Most applications should use `MDEx` directly to benefit from plugins, Document AST, Phoenix LiveView integration, streaming, additional syntax highlighting features, extra formats, MD sigil, and more.
 
-But this project offers direct access to underlying Rust crates when you don't need all those features, or need a bit more performance, or need to reduce risks.
+But this project offers direct access to underlying Rust crates when you don't need all those features, or need a bit more performance, or less dependencies.
 
 ## Installation
 
