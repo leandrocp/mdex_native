@@ -38,7 +38,6 @@ defmodule MDExNative.MixProject do
         native/mdex_native_nif/.cargo
         native/mdex_native_nif/Cargo.*
         native/mdex_native_nif/Cross.toml
-        docs.exs
         mix.exs
         README.md
         LICENSE.md
@@ -78,7 +77,7 @@ defmodule MDExNative.MixProject do
     end
 
     args = ["MDExNative", @version, Mix.Project.compile_path()]
-    opts = ~w[--config docs.exs --source-ref v#{@version} --source-url #{@source_url}]
+    opts = ~w[--main MDExNative.Comrak --source-ref v#{@version} --source-url #{@source_url}]
 
     System.cmd(ex_doc, args ++ opts)
   end
