@@ -3,16 +3,41 @@ mod sanitize;
 use super::elixir_types::ExFormatterOption;
 use comrak::options::{Extension, ListStyleType, Options, Parse, Render};
 use rustler::types::atom::Atom;
-use rustler::{Decoder, NifResult, Term};
+use rustler::{Decoder, Error, NifResult, NifUnitEnum, Term};
 pub use sanitize::*;
 use std::sync::Arc;
+
+fn is_atom(term: Term, name: &str) -> NifResult<bool> {
+    Ok(Atom::decode(term).is_ok_and(|atom| {
+        Atom::from_str(term.get_env(), name).is_ok_and(|expected| atom == expected)
+    }))
+}
 
 fn optional_field<'a, T>(term: Term<'a>, key: &str) -> NifResult<Option<T>>
 where
     T: Decoder<'a>,
 {
     match term.map_get(Atom::from_str(term.get_env(), key)?) {
-        Ok(value) => value.decode(),
+        Ok(value) => {
+            if is_atom(value, "nil")? {
+                Ok(None)
+            } else {
+                value.decode()
+            }
+        }
+        Err(_) => Ok(None),
+    }
+}
+
+fn syntax_highlight_field(term: Term) -> NifResult<Option<ExSyntaxHighlightOptions>> {
+    match term.map_get(Atom::from_str(term.get_env(), "syntax_highlight")?) {
+        Ok(value) => {
+            if is_atom(value, "nil")? || is_atom(value, "false")? {
+                Ok(None)
+            } else {
+                value.decode().map(Some)
+            }
+        }
         Err(_) => Ok(None),
     }
 }
@@ -389,7 +414,7 @@ impl<'a> Decoder<'a> for ExOptions {
             extension: optional_field(term, "extension")?,
             parse: optional_field(term, "parse")?,
             render: optional_field(term, "render")?,
-            syntax_highlight: optional_field(term, "syntax_highlight")?,
+            syntax_highlight: syntax_highlight_field(term)?,
             sanitize: optional_field(term, "sanitize")?,
         })
     }
@@ -427,8 +452,45 @@ impl ExSanitizeOption {
     }
 }
 
-#[derive(Debug, Default, NifMap)]
-pub struct ExSyntaxHighlightOptions {
+#[derive(Debug, Default, NifUnitEnum)]
+pub enum ExSyntaxHighlightEngine {
+    #[default]
+    Lumis,
+}
+
+#[derive(Debug, Default)]
+pub struct ExLumisOptions {
     pub formatter: ExFormatterOption,
+    #[allow(dead_code)]
     pub language: Option<String>,
+}
+
+impl<'a> Decoder<'a> for ExLumisOptions {
+    fn decode(term: Term<'a>) -> NifResult<Self> {
+        Ok(Self {
+            formatter: optional_field(term, "formatter")?.unwrap_or_default(),
+            language: optional_field(term, "language")?,
+        })
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct ExSyntaxHighlightOptions {
+    pub engine: ExSyntaxHighlightEngine,
+    pub opts: ExLumisOptions,
+}
+
+impl<'a> Decoder<'a> for ExSyntaxHighlightOptions {
+    fn decode(term: Term<'a>) -> NifResult<Self> {
+        if let Some(opts) = optional_field(term, "opts")? {
+            let engine = optional_field(term, "engine")?.ok_or(Error::BadArg)?;
+            return Ok(Self { engine, opts });
+        }
+
+        // Legacy shape: syntax_highlight: [formatter: ...]
+        Ok(Self {
+            engine: ExSyntaxHighlightEngine::Lumis,
+            opts: term.decode()?,
+        })
+    }
 }

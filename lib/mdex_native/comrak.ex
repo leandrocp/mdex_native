@@ -43,19 +43,16 @@ defmodule MDExNative.Comrak do
   @typedoc "Parsed MDExNative.Comrak AST node."
   @type ast_node :: struct()
 
-  @typedoc "MDExNative.Comrak extension options."
+  @typedoc "Comrak [`Extension`](https://docs.rs/comrak/latest/comrak/options/struct.Extension.html) options."
   @type extension_options :: keyword()
 
-  @typedoc "MDExNative.Comrak parse options."
+  @typedoc "Comrak [`Parse`](https://docs.rs/comrak/latest/comrak/options/struct.Parse.html) options."
   @type parse_options :: keyword()
 
-  @typedoc "MDExNative.Comrak list marker style used by CommonMark rendering."
-  @type list_style :: :dash | :plus | :star
-
-  @typedoc "MDExNative.Comrak render options."
+  @typedoc "Comrak [`Render`](https://docs.rs/comrak/latest/comrak/options/struct.Render.html) options."
   @type render_options :: keyword()
 
-  @typedoc "Comrak options accepted by `markdown_to_html/2` and `markdown_to_xml/2`."
+  @typedoc "Comrak [`Options`](https://docs.rs/comrak/latest/comrak/options/struct.Options.html) accepted by `markdown_to_html/2` and `markdown_to_xml/2`, plus the `:syntax_highlight` convenience option."
   @type options :: keyword()
 
   @doc ~S"""
@@ -102,12 +99,11 @@ defmodule MDExNative.Comrak do
   - `:render` - mapper to Comrak's
     [`Render` options](https://docs.rs/comrak/latest/comrak/options/struct.Render.html),
     for example `unsafe: true`, `hardbreaks: true`, or `sourcepos: true`.
-  - `:syntax_highlight` - syntax highlighting options produced by `MDExNative.Lumis`.
-    When present, the native Rust `LumisAdapter` is installed as Comrak's
-    `SyntaxHighlighterAdapter` for fenced code blocks.
-
-  The accepted option keys are defined by `t:options/0`, `t:extension_options/0`,
-  `t:parse_options/0`, and `t:render_options/0`.
+  - `:syntax_highlight` - syntax highlighting options with an `:engine` and
+    engine-specific `:opts`. Currently `:lumis` is the only supported engine, and
+    its options are passed to the native Rust `LumisAdapter` for fenced code
+    blocks. See the [`Lumis.formatter/0`](https://lumis.hexdocs.pm/Lumis.html#t:formatter/0)
+    type for formatter options.
 
   ## Examples
 
@@ -116,6 +112,10 @@ defmodule MDExNative.Comrak do
 
       iex> MDExNative.Comrak.markdown_to_html("- [x] done", extension: [tasklist: true])
       "<ul>\n<li><input type=\"checkbox\" checked=\"\" disabled=\"\" /> done</li>\n</ul>\n"
+
+      iex> html = MDExNative.Comrak.markdown_to_html("```elixir\nIO.puts(\"Hello\")\n```", syntax_highlight: [engine: :lumis, opts: [formatter: {:html_inline, theme: "github_light", pre_class: "code-example"}]])
+      iex> html =~ ~s(<pre class="lumis code-example")
+      true
   """
   @spec markdown_to_html(markdown(), options()) :: html()
   def markdown_to_html(markdown, options \\ []) when is_binary(markdown) do
@@ -233,8 +233,25 @@ defmodule MDExNative.Comrak do
       {key, value} when key in [:extension, :parse, :render] and is_list(value) ->
         {key, Map.new(value)}
 
+      {:syntax_highlight, value} when is_list(value) ->
+        {:syntax_highlight, syntax_highlight_options(value)}
+
       {key, value} ->
         {key, value}
     end)
   end
+
+  defp syntax_highlight_options(options) do
+    options
+    |> Map.new(fn
+      {:opts, opts} when is_list(opts) -> {:opts, Map.new(opts, &lumis_option/1)}
+      option -> lumis_option(option)
+    end)
+  end
+
+  defp lumis_option({:formatter, {formatter, opts}}) when is_list(opts) do
+    {:formatter, {formatter, Map.new(opts)}}
+  end
+
+  defp lumis_option(option), do: option
 end

@@ -1,6 +1,12 @@
 defmodule MDExNative.ComrakTest do
   use ExUnit.Case
 
+  @code_block_markdown """
+  ```elixir
+  IO.puts("Hello")
+  ```
+  """
+
   doctest MDExNative.Comrak
 
   test "anchorizes text" do
@@ -16,5 +22,46 @@ defmodule MDExNative.ComrakTest do
   test "render functions return rendered strings" do
     assert MDExNative.Comrak.markdown_to_html("**bold**") == "<p><strong>bold</strong></p>\n"
     assert MDExNative.Comrak.markdown_to_xml("# Hello") =~ ~s(<heading level="1">)
+  end
+
+  test "renders fenced code with syntax highlighting options" do
+    html =
+      MDExNative.Comrak.markdown_to_html(@code_block_markdown,
+        syntax_highlight: [
+          engine: :lumis,
+          opts: [
+            formatter: {:html_inline, theme: "github_light", pre_class: "code-block-example"}
+          ]
+        ]
+      )
+
+    assert html =~ ~s(<pre class="lumis code-block-example")
+    assert html =~ "IO"
+  end
+
+  test "supports legacy syntax highlighting options" do
+    html =
+      MDExNative.Comrak.markdown_to_html(@code_block_markdown,
+        syntax_highlight: [
+          formatter: {:html_inline, theme: "github_light", pre_class: "code-block-example"}
+        ]
+      )
+
+    assert html =~ ~s(<pre class="lumis code-block-example")
+  end
+
+  test "does not syntax highlight when syntax_highlight is absent" do
+    assert MDExNative.Comrak.markdown_to_html(@code_block_markdown) ==
+             "<pre><code class=\"language-elixir\">IO.puts(&quot;Hello&quot;)\n</code></pre>\n"
+  end
+
+  test "does not syntax highlight when syntax_highlight is nil" do
+    assert MDExNative.Comrak.markdown_to_html(@code_block_markdown, syntax_highlight: nil) ==
+             "<pre><code class=\"language-elixir\">IO.puts(&quot;Hello&quot;)\n</code></pre>\n"
+  end
+
+  test "does not syntax highlight when syntax_highlight is false" do
+    assert MDExNative.Comrak.markdown_to_html(@code_block_markdown, syntax_highlight: false) ==
+             "<pre><code class=\"language-elixir\">IO.puts(&quot;Hello&quot;)\n</code></pre>\n"
   end
 end
