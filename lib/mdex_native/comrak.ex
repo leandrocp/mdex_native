@@ -92,16 +92,16 @@ defmodule MDExNative.Comrak do
   [`comrak::Options`](https://docs.rs/comrak/latest/comrak/struct.Options.html),
   with any of these top-level keys:
 
-  - `:extension` - MDExNative.Comrak
-    [`ExtensionOptions`](https://docs.rs/comrak/latest/comrak/struct.ExtensionOptions.html)
-    options, for example `tasklist: true`, `table: true`, `autolink: true`, or
+  - `:extension` - mapper to Comrak's
+    [`Extension` options](https://docs.rs/comrak/latest/comrak/options/struct.Extension.html),
+    for example `tasklist: true`, `table: true`, `autolink: true`, or
     `header_id_prefix: "prefix-"`.
-  - `:parse` - MDExNative.Comrak
-    [`ParseOptions`](https://docs.rs/comrak/latest/comrak/struct.ParseOptions.html)
-    options, for example `smart: true`.
-  - `:render` - MDExNative.Comrak
-    [`RenderOptions`](https://docs.rs/comrak/latest/comrak/struct.RenderOptions.html)
-    options, for example `unsafe: true`, `hardbreaks: true`, or `sourcepos: true`.
+  - `:parse` - mapper to Comrak's
+    [`Parse` options](https://docs.rs/comrak/latest/comrak/options/struct.Parse.html),
+    for example `smart: true`.
+  - `:render` - mapper to Comrak's
+    [`Render` options](https://docs.rs/comrak/latest/comrak/options/struct.Render.html),
+    for example `unsafe: true`, `hardbreaks: true`, or `sourcepos: true`.
   - `:syntax_highlight` - syntax highlighting options produced by `MDExNative.Lumis`.
     When present, the native Rust `LumisAdapter` is installed as Comrak's
     `SyntaxHighlighterAdapter` for fenced code blocks.
