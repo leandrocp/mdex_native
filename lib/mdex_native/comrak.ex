@@ -89,24 +89,21 @@ defmodule MDExNative.Comrak do
   [`comrak::Options`](https://docs.rs/comrak/latest/comrak/struct.Options.html),
   with any of these top-level keys:
 
-  - `:extension` - MDExNative.Comrak
-    [`ExtensionOptions`](https://docs.rs/comrak/latest/comrak/struct.ExtensionOptions.html)
-    options, for example `tasklist: true`, `table: true`, `autolink: true`, or
+  - `:extension` - mapper to Comrak's
+    [`Extension` options](https://docs.rs/comrak/latest/comrak/options/struct.Extension.html),
+    for example `tasklist: true`, `table: true`, `autolink: true`, or
     `header_id_prefix: "prefix-"`.
-  - `:parse` - MDExNative.Comrak
-    [`ParseOptions`](https://docs.rs/comrak/latest/comrak/struct.ParseOptions.html)
-    options, for example `smart: true`.
-  - `:render` - MDExNative.Comrak
-    [`RenderOptions`](https://docs.rs/comrak/latest/comrak/struct.RenderOptions.html)
-    options, for example `unsafe: true`, `hardbreaks: true`, or `sourcepos: true`.
+  - `:parse` - mapper to Comrak's
+    [`Parse` options](https://docs.rs/comrak/latest/comrak/options/struct.Parse.html),
+    for example `smart: true`.
+  - `:render` - mapper to Comrak's
+    [`Render` options](https://docs.rs/comrak/latest/comrak/options/struct.Render.html),
+    for example `unsafe: true`, `hardbreaks: true`, or `sourcepos: true`.
   - `:syntax_highlight` - syntax highlighting options with an `:engine` and
     engine-specific `:opts`. Currently `:lumis` is the only supported engine, and
     its options are passed to the native Rust `LumisAdapter` for fenced code
     blocks. See the [`Lumis.formatter/0`](https://lumis.hexdocs.pm/Lumis.html#t:formatter/0)
     type for formatter options.
-
-  The accepted option keys are defined by `t:options/0`, `t:extension_options/0`,
-  `t:parse_options/0`, and `t:render_options/0`.
 
   ## Examples
 
