@@ -244,50 +244,14 @@ defmodule MDExNative.Comrak do
   defp syntax_highlight_options(options) do
     options
     |> Map.new(fn
-      {:opts, opts} when is_list(opts) -> {:opts, lumis_options(opts)}
-      {:formatter, formatter} -> {:formatter, formatter_options(formatter)}
-      option -> option
+      {:opts, opts} when is_list(opts) -> {:opts, Map.new(opts, &lumis_option/1)}
+      option -> lumis_option(option)
     end)
   end
 
-  defp lumis_options(options) do
-    Map.new(options, fn
-      {:formatter, formatter} -> {:formatter, formatter_options(formatter)}
-      option -> option
-    end)
+  defp lumis_option({:formatter, {formatter, opts}}) when is_list(opts) do
+    {:formatter, {formatter, Map.new(opts)}}
   end
 
-  defp formatter_options({:html_inline, opts}) when is_map(opts) do
-    {:html_inline, opts}
-  end
-
-  defp formatter_options({:html_inline, opts}) when is_list(opts) do
-    {:html_inline, Map.new(opts)}
-  end
-
-  defp formatter_options({:html_linked, opts}) when is_list(opts) do
-    {:html_linked, Map.new(opts)}
-  end
-
-  defp formatter_options({:html_multi_themes, opts}) when is_map(opts) do
-    {:html_multi_themes, opts}
-  end
-
-  defp formatter_options({:html_multi_themes, opts}) when is_list(opts) do
-    {:html_multi_themes, Map.new(opts)}
-  end
-
-  defp formatter_options({:terminal, opts}) when is_map(opts) do
-    {:terminal, opts}
-  end
-
-  defp formatter_options({:terminal, opts}) when is_list(opts) do
-    {:terminal, Map.new(opts)}
-  end
-
-  defp formatter_options({:bbcode_scoped, opts}) when is_list(opts) do
-    {:bbcode_scoped, Map.new(opts)}
-  end
-
-  defp formatter_options(formatter), do: formatter
+  defp lumis_option(option), do: option
 end
