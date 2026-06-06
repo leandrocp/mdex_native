@@ -1,8 +1,12 @@
 # MDExNative
 
-Native foundation for [MDEx](https://github.com/leandrocp/mdex)
+Markdown Elixir Native.
 
-It wraps the following Rust crates:
+Used by:
+- [MDEx](https://github.com/leandrocp/mdex)
+- [NimblePublisher](https://github.com/dashbitco/nimble_publisher)
+
+It uses the following Rust crates:
 
 - [`comrak`](https://github.com/kivikakk/comrak) for Markdown parsing and rendering
 - [`ammonia`](https://github.com/rust-ammonia/ammonia) for HTML sanitization
