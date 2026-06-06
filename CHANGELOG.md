@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/leandrocp/mdex_native/compare/v0.1.3...v0.1.4) (2026-06-06)
+
+
+### Features
+
+* add syntect syntax highlighter ([#12](https://github.com/leandrocp/mdex_native/issues/12)) ([57b7619](https://github.com/leandrocp/mdex_native/commit/57b76192eee2f44642c7c968495a2a0be02cfa87))
+
 ## [0.1.3](https://github.com/leandrocp/mdex_native/compare/v0.1.2...v0.1.3) (2026-06-06)
 
 
