@@ -12,7 +12,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 ammonia = "4.1"
-comrak = { version = "0.52", features = ["shortcodes", "phoenix_heex", "syntect"] }
+comrak = { version = "0.52", default-features = false, features = ["shortcodes", "phoenix_heex", "syntect"] }
 lumis = { version = "0.9", features = ["all-languages"] }
 lol_html = "3.0"
 parking_lot = "0.12"
