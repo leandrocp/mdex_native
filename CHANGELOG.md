@@ -11,7 +11,7 @@
 ### Documentation
 
 * main page ([9ca4ae9](https://github.com/leandrocp/mdex_native/commit/9ca4ae9aa1f63c9e9ed1bdc1f2afc8e849cc9b2d))
-* Update documentation for Comrak options mapping ([#10](https://github.com/leandrocp/mdex_native/issues/10)) ([0811ce8](https://github.com/leandrocp/mdex_native/commit/0811ce8c08c0ac04b5e43ceede76c27c11262af3))
+* Update documentation for Comrak options mapping ([#10](https://github.com/leandrocp/mdex_native/issues/10)) ([0811ce8](https://github.com/leandrocp/mdex_native/commit/0811ce8c08c0ac04b5e43ceede76c27c11262af3)) by @josevalim
 
 ## [0.1.2](https://github.com/leandrocp/mdex_native/compare/v0.1.1...v0.1.2) (2026-06-05)
 
