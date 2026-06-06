@@ -481,7 +481,7 @@ impl<'a> Decoder<'a> for ExSyntectOptions {
 
 #[derive(Debug)]
 pub enum ExSyntaxHighlightEngineOptions {
-    Lumis(ExLumisOptions),
+    Lumis(Box<ExLumisOptions>),
     Syntect(ExSyntectOptions),
 }
 
@@ -505,7 +505,7 @@ impl<'a> Decoder<'a> for ExSyntaxHighlightOptions {
             let opts = match engine {
                 ExSyntaxHighlightEngine::Lumis => {
                     let opts = optional_field(term, "opts")?.unwrap_or_default();
-                    ExSyntaxHighlightEngineOptions::Lumis(opts)
+                    ExSyntaxHighlightEngineOptions::Lumis(Box::new(opts))
                 }
                 ExSyntaxHighlightEngine::Syntect => {
                     let opts = optional_field(term, "opts")?.unwrap_or_default();
@@ -518,7 +518,7 @@ impl<'a> Decoder<'a> for ExSyntaxHighlightOptions {
 
         // Legacy shape: syntax_highlight: [formatter: ...]
         Ok(Self {
-            opts: ExSyntaxHighlightEngineOptions::Lumis(term.decode()?),
+            opts: ExSyntaxHighlightEngineOptions::Lumis(Box::new(term.decode()?)),
         })
     }
 }
