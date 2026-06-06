@@ -1072,6 +1072,7 @@ dependencies = [
  "rustler",
  "serde",
  "shlex 2.0.1",
+ "two-face",
  "typed-arena",
  "v_htmlescape 0.17.0",
 ]
@@ -2634,6 +2635,17 @@ checksum = "907f7ea76070507d7a6b054b38f1475caa7db085437911352ca0f361f08f142e"
 dependencies = [
  "cc",
  "tree-sitter-language",
+]
+
+[[package]]
+name = "two-face"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b285c51f8a6ade109ed4566d33ac4fb289fb5d6cf87ed70908a5eaf65e948e34"
+dependencies = [
+ "serde",
+ "serde_derive",
+ "syntect",
 ]
 
 [[package]]

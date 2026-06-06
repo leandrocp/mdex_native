@@ -6,7 +6,8 @@ It wraps the following Rust crates:
 
 - [`comrak`](https://github.com/kivikakk/comrak) for Markdown parsing and rendering
 - [`ammonia`](https://github.com/rust-ammonia/ammonia) for HTML sanitization
-- [`lumis`](https://lumis.sh) for syntax highlighting
+- [`lumis`](https://github.com/leandrocp/lumis) and [`syntect`](https://github.com/trishume/syntect) for syntax highlighting
+- [`two-face`](https://crates.io/crates/two-face) for extra Syntect syntax and theme definitions
 
 Most applications should use `MDEx` directly to benefit from plugins, Document AST, Phoenix LiveView integration, streaming, additional syntax highlighting features, extra formats, MD sigil, and more.
 
@@ -59,37 +60,58 @@ anchor = MDExNative.Comrak.anchorize("Hello World")
 
 #### Syntax Highlighting
 
-Syntax Highlighting of code blocks is enabled by passing the `:syntax_highlight` option:
+Syntax highlighting of code blocks is enabled with the `:syntax_highlight` option. MDExNative supports two engines:
+
+- `:lumis` - uses [`lumis`](https://lumis.sh)
+- `:syntect` - uses Comrak's Syntect adapter with [`two-face`](https://crates.io/crates/two-face) syntax and theme definitions
+
+Lumis example:
 
 ````elixir
 markdown = """
-# My Example
-
-```elixir
-IO.puts("Hello from Lumis")
+```rust
+fn main() {
+    println!("Hello from Lumis");
+}
 ```
 """
 
-options = [
-  # other comrak options...
+html = MDExNative.Comrak.markdown_to_html(markdown,
   syntax_highlight: [
     engine: :lumis,
     opts: [
-      formatter:
-        {:html_inline,
-         theme: "github_light",
-         pre_class: "code-block-example"}
+      formatter: {:html_inline, theme: "catppuccin_macchiato"}
     ]
   ]
-]
-
-html = MDExNative.Comrak.markdown_to_html(markdown, options)
+)
 ````
 
-Note that `:syntax_highlight` is not a built-in Comrak option but it was added in MDExNative for convenience, and only Lumis is supported at the moment.
+All Lumis formatters and options can be found on [Lumis formatter docs](https://lumis.hexdocs.pm/Lumis.html#t:formatter/0).
 
-All Lumis formatters and its options can be found on [Lumis formatter docs](https://lumis.hexdocs.pm/Lumis.html#t:formatter/0),
-or you can just omit or pass `syntax_highlight: nil` to disable syntax highlighting.
+Syntect example:
+
+````elixir
+markdown = """
+```rust
+fn main() {
+    println!("Hello from Syntect");
+}
+```
+"""
+
+html = MDExNative.Comrak.markdown_to_html(markdown,
+  syntax_highlight: [
+    engine: :syntect,
+    opts: [theme: "Catppuccin Macchiato"]
+  ]
+)
+````
+
+Syntect theme names come from [`two-face`](https://crates.io/crates/two-face).
+
+Note that `:syntax_highlight` is not a built-in Comrak option but it was added in MDExNative for convenience.
+
+Omit or pass `syntax_highlight: nil` to disable syntax highlighting.
 
 
 ### MDExNative.Ammonia

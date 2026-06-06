@@ -4,8 +4,10 @@ extern crate rustler;
 mod lumis_adapter;
 mod types;
 
+use comrak::adapters::SyntaxHighlighterAdapter;
 use comrak::format_html_with_plugins;
 use comrak::options::Plugins;
+use comrak::plugins::syntect::{SyntectAdapter, SyntectAdapterBuilder};
 use comrak::{Anchorizer, Arena, Options};
 use lol_html::html_content::ContentType;
 use lol_html::{rewrite_str, text, RewriteStrSettings};
@@ -180,27 +182,80 @@ fn render_parts(
     options: ExOptions,
 ) -> (
     Options<'static>,
-    Option<LumisAdapter>,
+    Option<CodeFenceSyntaxHighlighter>,
     Option<ExSanitizeOption>,
 ) {
     let comrak_options = options.comrak_options();
-    let lumis_adapter =
+    let syntax_highlighter =
         options
             .syntax_highlight
-            .map(|syntax_highlight| match syntax_highlight.engine {
-                ExSyntaxHighlightEngine::Lumis => {
-                    LumisAdapter::new(syntax_highlight.opts.formatter)
+            .map(|syntax_highlight| match syntax_highlight.opts {
+                ExSyntaxHighlightEngineOptions::Lumis(opts) => {
+                    CodeFenceSyntaxHighlighter::Lumis(LumisAdapter::new(opts.formatter))
+                }
+                ExSyntaxHighlightEngineOptions::Syntect(opts) => {
+                    let builder = SyntectAdapterBuilder::new()
+                        .syntax_set(two_face::syntax::extra_newlines())
+                        .theme_set(two_face::theme::extra().into());
+
+                    let adapter = match opts.theme.as_deref() {
+                        Some(theme) => builder.theme(theme).build(),
+                        None => builder.build(),
+                    };
+
+                    CodeFenceSyntaxHighlighter::Syntect(adapter)
                 }
             });
 
-    (comrak_options, lumis_adapter, options.sanitize)
+    (comrak_options, syntax_highlighter, options.sanitize)
 }
 
-fn plugins(lumis_adapter: &Option<LumisAdapter>) -> Plugins<'_> {
+enum CodeFenceSyntaxHighlighter {
+    Lumis(LumisAdapter),
+    Syntect(SyntectAdapter),
+}
+
+impl SyntaxHighlighterAdapter for CodeFenceSyntaxHighlighter {
+    fn write_highlighted(
+        &self,
+        output: &mut dyn std::fmt::Write,
+        lang: Option<&str>,
+        code: &str,
+    ) -> std::fmt::Result {
+        match self {
+            Self::Lumis(adapter) => adapter.write_highlighted(output, lang, code),
+            Self::Syntect(adapter) => adapter.write_highlighted(output, lang, code),
+        }
+    }
+
+    fn write_pre_tag(
+        &self,
+        output: &mut dyn std::fmt::Write,
+        attributes: std::collections::HashMap<&'static str, std::borrow::Cow<'_, str>>,
+    ) -> std::fmt::Result {
+        match self {
+            Self::Lumis(adapter) => adapter.write_pre_tag(output, attributes),
+            Self::Syntect(adapter) => adapter.write_pre_tag(output, attributes),
+        }
+    }
+
+    fn write_code_tag(
+        &self,
+        output: &mut dyn std::fmt::Write,
+        attributes: std::collections::HashMap<&'static str, std::borrow::Cow<'_, str>>,
+    ) -> std::fmt::Result {
+        match self {
+            Self::Lumis(adapter) => adapter.write_code_tag(output, attributes),
+            Self::Syntect(adapter) => adapter.write_code_tag(output, attributes),
+        }
+    }
+}
+
+fn plugins(syntax_highlighter: &Option<CodeFenceSyntaxHighlighter>) -> Plugins<'_> {
     let mut plugins = Plugins::default();
 
-    if let Some(lumis_adapter) = lumis_adapter {
-        plugins.render.codefence_syntax_highlighter = Some(lumis_adapter);
+    if let Some(syntax_highlighter) = syntax_highlighter {
+        plugins.render.codefence_syntax_highlighter = Some(syntax_highlighter);
     }
 
     plugins
