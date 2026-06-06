@@ -3,8 +3,23 @@ use lumis::formatter::{
     HtmlMultiThemesBuilder, TerminalBuilder,
 };
 use lumis::{languages::Language, themes};
-use rustler::{NifStruct, NifTaggedEnum, NifUnitEnum};
+use rustler::types::atom::Atom;
+use rustler::{Decoder, Error, NifResult, NifStruct, NifTaggedEnum, NifUnitEnum, Term};
 use std::collections::HashMap;
+
+fn optional_field<'a, T>(term: Term<'a>, key: &str) -> NifResult<Option<T>>
+where
+    T: Decoder<'a>,
+{
+    match term.map_get(Atom::from_str(term.get_env(), key)?) {
+        Ok(value) => value.decode(),
+        Err(_) => Ok(None),
+    }
+}
+
+fn atom_is(term: Term, atom: Atom, name: &str) -> NifResult<bool> {
+    Ok(atom == Atom::from_str(term.get_env(), name)?)
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, NifUnitEnum)]
 pub enum ExAppearance {
@@ -13,7 +28,7 @@ pub enum ExAppearance {
     Dark,
 }
 
-#[derive(Debug, NifTaggedEnum)]
+#[derive(Debug)]
 pub enum ExFormatterOption {
     HtmlInline {
         theme: Option<ThemeOrString>,
@@ -43,6 +58,83 @@ pub enum ExFormatterOption {
     },
 }
 
+impl<'a> Decoder<'a> for ExFormatterOption {
+    fn decode(term: Term<'a>) -> NifResult<Self> {
+        if let Ok(formatter) = Atom::decode(term) {
+            if atom_is(term, formatter, "html_inline")? {
+                return Ok(Self::default());
+            }
+
+            if atom_is(term, formatter, "html_linked")? {
+                return Ok(Self::HtmlLinked {
+                    pre_class: None,
+                    highlight_lines: None,
+                    header: None,
+                });
+            }
+
+            if atom_is(term, formatter, "html_multi_themes")? {
+                return Ok(Self::HtmlMultiThemes {
+                    themes: HashMap::new(),
+                    default_theme: None,
+                    css_variable_prefix: None,
+                    pre_class: None,
+                    italic: false,
+                    include_highlights: false,
+                    highlight_lines: None,
+                    header: None,
+                });
+            }
+
+            if atom_is(term, formatter, "terminal")? {
+                return Ok(Self::Terminal { theme: None });
+            }
+        }
+
+        let (formatter, opts): (Atom, Term<'a>) = term.decode()?;
+
+        if atom_is(term, formatter, "html_inline")? {
+            return Ok(Self::HtmlInline {
+                theme: optional_field(opts, "theme")?,
+                pre_class: optional_field(opts, "pre_class")?,
+                italic: optional_field(opts, "italic")?.unwrap_or(false),
+                include_highlights: optional_field(opts, "include_highlights")?.unwrap_or(false),
+                highlight_lines: optional_field(opts, "highlight_lines")?,
+                header: optional_field(opts, "header")?,
+            });
+        }
+
+        if atom_is(term, formatter, "html_linked")? {
+            return Ok(Self::HtmlLinked {
+                pre_class: optional_field(opts, "pre_class")?,
+                highlight_lines: optional_field(opts, "highlight_lines")?,
+                header: optional_field(opts, "header")?,
+            });
+        }
+
+        if atom_is(term, formatter, "html_multi_themes")? {
+            return Ok(Self::HtmlMultiThemes {
+                themes: optional_field(opts, "themes")?.unwrap_or_default(),
+                default_theme: optional_field(opts, "default_theme")?,
+                css_variable_prefix: optional_field(opts, "css_variable_prefix")?,
+                pre_class: optional_field(opts, "pre_class")?,
+                italic: optional_field(opts, "italic")?.unwrap_or(false),
+                include_highlights: optional_field(opts, "include_highlights")?.unwrap_or(false),
+                highlight_lines: optional_field(opts, "highlight_lines")?,
+                header: optional_field(opts, "header")?,
+            });
+        }
+
+        if atom_is(term, formatter, "terminal")? {
+            return Ok(Self::Terminal {
+                theme: optional_field(opts, "theme")?,
+            });
+        }
+
+        Err(Error::BadArg)
+    }
+}
+
 impl Default for ExFormatterOption {
     fn default() -> Self {
         Self::HtmlInline {
@@ -56,10 +148,30 @@ impl Default for ExFormatterOption {
     }
 }
 
-#[derive(Debug, NifTaggedEnum)]
+#[derive(Debug)]
 pub enum ThemeOrString {
     Theme(ExTheme),
     String(String),
+}
+
+impl<'a> Decoder<'a> for ThemeOrString {
+    fn decode(term: Term<'a>) -> NifResult<Self> {
+        if let Ok(theme) = String::decode(term) {
+            return Ok(Self::String(theme));
+        }
+
+        let (kind, value): (Atom, Term<'a>) = term.decode()?;
+
+        if atom_is(term, kind, "theme")? {
+            return Ok(Self::Theme(value.decode()?));
+        }
+
+        if atom_is(term, kind, "string")? {
+            return Ok(Self::String(value.decode()?));
+        }
+
+        Err(Error::BadArg)
+    }
 }
 
 impl Default for ThemeOrString {

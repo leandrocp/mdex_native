@@ -184,9 +184,14 @@ fn render_parts(
     Option<ExSanitizeOption>,
 ) {
     let comrak_options = options.comrak_options();
-    let lumis_adapter = options
-        .syntax_highlight
-        .map(|syntax_highlight| LumisAdapter::new(syntax_highlight.formatter));
+    let lumis_adapter =
+        options
+            .syntax_highlight
+            .map(|syntax_highlight| match syntax_highlight.engine {
+                ExSyntaxHighlightEngine::Lumis => {
+                    LumisAdapter::new(syntax_highlight.opts.formatter)
+                }
+            });
 
     (comrak_options, lumis_adapter, options.sanitize)
 }

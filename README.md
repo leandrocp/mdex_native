@@ -24,10 +24,14 @@ def deps do
 end
 ```
 
-Precompiled NIFs are used by default. To build the NIF locally:
+See more in [examples](https://github.com/leandrocp/mdex_native/tree/main/examples).
+
+## Development
 
 ```sh
-MDEX_NATIVE_BUILD=1 mix compile
+export MDEX_NATIVE_BUILD=1
+mix setup
+mix test
 ```
 
 ## Packages
@@ -53,6 +57,41 @@ xml = MDExNative.Comrak.markdown_to_xml("# Hello", render: [sourcepos: true])
 anchor = MDExNative.Comrak.anchorize("Hello World")
 ```
 
+#### Syntax Highlighting
+
+Syntax Highlighting of code blocks is enabled by passing the `:syntax_highlight` option:
+
+````elixir
+markdown = """
+# My Example
+
+```elixir
+IO.puts("Hello from Lumis")
+```
+"""
+
+options = [
+  # other comrak options...
+  syntax_highlight: [
+    engine: :lumis,
+    opts: [
+      formatter:
+        {:html_inline,
+         theme: "github_light",
+         pre_class: "code-block-example"}
+    ]
+  ]
+]
+
+html = MDExNative.Comrak.markdown_to_html(markdown, options)
+````
+
+Note that `:syntax_highlight` is not a built-in Comrak option but it was added in MDExNative for convenience, and only Lumis is supported at the moment.
+
+All Lumis formatters and its options can be found on [Lumis formatter docs](https://lumis.hexdocs.pm/Lumis.html#t:formatter/0),
+or you can just omit or pass `syntax_highlight: nil` to disable syntax highlighting.
+
+
 ### MDExNative.Ammonia
 
 HTML sanitization.
@@ -62,32 +101,4 @@ html = ~s|<script>alert("xss")</script><p>Hello <strong>MDEx</strong></p>|
 
 MDExNative.Ammonia.safe_html(html)
 #=> "<p>Hello <strong>MDEx</strong></p>"
-```
-
-### MDExNative.Lumis
-
-Syntax highlighting options for Comrak rendering.
-The native Rust `LumisAdapter` implements Comrak's `SyntaxHighlighterAdapter`
-and is installed when `:syntax_highlight` options are passed to `MDExNative.Comrak`.
-
-````elixir
-markdown = """
-```elixir
-IO.puts("Hello from Lumis")
-```
-"""
-
-options = [syntax_highlight: MDExNative.Lumis.default_options()]
-
-html = MDExNative.Comrak.markdown_to_html(markdown, options)
-````
-
-## Examples
-
-Run the examples from the project root:
-
-```sh
-elixir examples/markdown_to_html.exs
-elixir examples/ammonia_safe_html.exs
-# others...
 ```
