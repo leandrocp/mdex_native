@@ -100,10 +100,11 @@ defmodule MDExNative.Comrak do
     [`Render` options](https://docs.rs/comrak/latest/comrak/options/struct.Render.html),
     for example `unsafe: true`, `hardbreaks: true`, or `sourcepos: true`.
   - `:syntax_highlight` - syntax highlighting options with an `:engine` and
-    engine-specific `:opts`. Currently `:lumis` is the only supported engine, and
-    its options are passed to the native Rust `LumisAdapter` for fenced code
+    engine-specific `:opts`. Supported engines are `:lumis` and `:syntect`.
+    Lumis options are passed to the native Rust `LumisAdapter` for fenced code
     blocks. See the [`Lumis.formatter/0`](https://lumis.hexdocs.pm/Lumis.html#t:formatter/0)
-    type for formatter options.
+    type for formatter options. Syntect uses `two-face` syntax and theme
+    definitions, and accepts `theme: String.t()` in `:opts` for inline styles.
 
   ## Examples
 
@@ -113,8 +114,12 @@ defmodule MDExNative.Comrak do
       iex> MDExNative.Comrak.markdown_to_html("- [x] done", extension: [tasklist: true])
       "<ul>\n<li><input type=\"checkbox\" checked=\"\" disabled=\"\" /> done</li>\n</ul>\n"
 
-      iex> html = MDExNative.Comrak.markdown_to_html("```elixir\nIO.puts(\"Hello\")\n```", syntax_highlight: [engine: :lumis, opts: [formatter: {:html_inline, theme: "github_light", pre_class: "code-example"}]])
+      iex> html = MDExNative.Comrak.markdown_to_html("```rust\nfn main() {}\n```", syntax_highlight: [engine: :lumis, opts: [formatter: {:html_inline, theme: "catppuccin_macchiato", pre_class: "code-example"}]])
       iex> html =~ ~s(<pre class="lumis code-example")
+      true
+
+      iex> html = MDExNative.Comrak.markdown_to_html("```rust\nfn main() {}\n```", syntax_highlight: [engine: :syntect, opts: [theme: "Catppuccin Macchiato"]])
+      iex> html =~ ~s(<pre style="background-color:)
       true
   """
   @spec markdown_to_html(markdown(), options()) :: html()
@@ -244,14 +249,14 @@ defmodule MDExNative.Comrak do
   defp syntax_highlight_options(options) do
     options
     |> Map.new(fn
-      {:opts, opts} when is_list(opts) -> {:opts, Map.new(opts, &lumis_option/1)}
-      option -> lumis_option(option)
+      {:opts, opts} when is_list(opts) -> {:opts, Map.new(opts, &syntax_highlight_option/1)}
+      option -> syntax_highlight_option(option)
     end)
   end
 
-  defp lumis_option({:formatter, {formatter, opts}}) when is_list(opts) do
+  defp syntax_highlight_option({:formatter, {formatter, opts}}) when is_list(opts) do
     {:formatter, {formatter, Map.new(opts)}}
   end
 
-  defp lumis_option(option), do: option
+  defp syntax_highlight_option(option), do: option
 end

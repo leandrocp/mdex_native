@@ -16,7 +16,7 @@ defmodule MDExNative.MixProject do
       aliases: aliases(),
       name: "MDExNative",
       homepage_url: @source_url,
-      description: "Native foundation for MDEx: Comrak, Ammonia, and Lumis"
+      description: "Native foundation for MDEx: Comrak, Ammonia, Lumis, and Syntect"
     ]
   end
 

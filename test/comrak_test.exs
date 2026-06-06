@@ -30,7 +30,8 @@ defmodule MDExNative.ComrakTest do
         syntax_highlight: [
           engine: :lumis,
           opts: [
-            formatter: {:html_inline, theme: "github_light", pre_class: "code-block-example"}
+            formatter:
+              {:html_inline, theme: "catppuccin_macchiato", pre_class: "code-block-example"}
           ]
         ]
       )
@@ -43,11 +44,32 @@ defmodule MDExNative.ComrakTest do
     html =
       MDExNative.Comrak.markdown_to_html(@code_block_markdown,
         syntax_highlight: [
-          formatter: {:html_inline, theme: "github_light", pre_class: "code-block-example"}
+          formatter:
+            {:html_inline, theme: "catppuccin_macchiato", pre_class: "code-block-example"}
         ]
       )
 
     assert html =~ ~s(<pre class="lumis code-block-example")
+  end
+
+  test "renders fenced code with syntect and no default theme" do
+    html =
+      MDExNative.Comrak.markdown_to_html("```rust\nfn main() {}\n```",
+        syntax_highlight: [engine: :syntect]
+      )
+
+    assert html =~ ~s(<pre class="syntax-highlighting"><code class="language-rust">)
+    assert html =~ ~s(<span class="source rust">)
+  end
+
+  test "renders fenced code with syntect theme" do
+    html =
+      MDExNative.Comrak.markdown_to_html("```rust\nfn main() {}\n```",
+        syntax_highlight: [engine: :syntect, opts: [theme: "Catppuccin Macchiato"]]
+      )
+
+    assert html =~ ~s(<pre style="background-color:)
+    assert html =~ ~s(<span style=)
   end
 
   test "does not syntax highlight when syntax_highlight is absent" do

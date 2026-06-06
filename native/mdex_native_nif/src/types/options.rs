@@ -3,7 +3,7 @@ mod sanitize;
 use super::elixir_types::ExFormatterOption;
 use comrak::options::{Extension, ListStyleType, Options, Parse, Render};
 use rustler::types::atom::Atom;
-use rustler::{Decoder, Error, NifResult, NifUnitEnum, Term};
+use rustler::{Decoder, NifResult, NifUnitEnum, Term};
 pub use sanitize::*;
 use std::sync::Arc;
 
@@ -456,6 +456,7 @@ impl ExSanitizeOption {
 pub enum ExSyntaxHighlightEngine {
     #[default]
     Lumis,
+    Syntect,
 }
 
 #[derive(Debug, Default)]
@@ -463,6 +464,25 @@ pub struct ExLumisOptions {
     pub formatter: ExFormatterOption,
     #[allow(dead_code)]
     pub language: Option<String>,
+}
+
+#[derive(Debug, Default)]
+pub struct ExSyntectOptions {
+    pub theme: Option<String>,
+}
+
+impl<'a> Decoder<'a> for ExSyntectOptions {
+    fn decode(term: Term<'a>) -> NifResult<Self> {
+        Ok(Self {
+            theme: optional_field(term, "theme")?,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub enum ExSyntaxHighlightEngineOptions {
+    Lumis(Box<ExLumisOptions>),
+    Syntect(ExSyntectOptions),
 }
 
 impl<'a> Decoder<'a> for ExLumisOptions {
@@ -474,23 +494,31 @@ impl<'a> Decoder<'a> for ExLumisOptions {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ExSyntaxHighlightOptions {
-    pub engine: ExSyntaxHighlightEngine,
-    pub opts: ExLumisOptions,
+    pub opts: ExSyntaxHighlightEngineOptions,
 }
 
 impl<'a> Decoder<'a> for ExSyntaxHighlightOptions {
     fn decode(term: Term<'a>) -> NifResult<Self> {
-        if let Some(opts) = optional_field(term, "opts")? {
-            let engine = optional_field(term, "engine")?.ok_or(Error::BadArg)?;
-            return Ok(Self { engine, opts });
+        if let Some(engine) = optional_field(term, "engine")? {
+            let opts = match engine {
+                ExSyntaxHighlightEngine::Lumis => {
+                    let opts = optional_field(term, "opts")?.unwrap_or_default();
+                    ExSyntaxHighlightEngineOptions::Lumis(Box::new(opts))
+                }
+                ExSyntaxHighlightEngine::Syntect => {
+                    let opts = optional_field(term, "opts")?.unwrap_or_default();
+                    ExSyntaxHighlightEngineOptions::Syntect(opts)
+                }
+            };
+
+            return Ok(Self { opts });
         }
 
         // Legacy shape: syntax_highlight: [formatter: ...]
         Ok(Self {
-            engine: ExSyntaxHighlightEngine::Lumis,
-            opts: term.decode()?,
+            opts: ExSyntaxHighlightEngineOptions::Lumis(Box::new(term.decode()?)),
         })
     }
 }
