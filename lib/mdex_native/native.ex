@@ -8,59 +8,136 @@ defmodule MDExNative.Native do
   github_url = mix_config[:package][:links][:GitHub]
   mode = if Mix.env() in [:dev, :test], do: :debug, else: :release
 
-  legacy_env =
-    System.get_env("MDEX_NATIVE_USE_LEGACY_ARTIFACTS") ||
-      System.get_env("MDEX_USE_LEGACY_ARTIFACTS")
+  syntax_highlighter = Application.compile_env(:mdex_native, :syntax_highlighter, :lumis)
+
+  unless syntax_highlighter in [:lumis, :syntect] do
+    raise ArgumentError, "invalid mdex_native syntax highlighter: #{inspect(syntax_highlighter)}"
+  end
+
+  force_build = System.get_env("MDEX_NATIVE_BUILD") in ["1", "true"]
+
+  bundle_features = %{
+    all: "lumis_all",
+    web: "lumis_web",
+    web_extra: "lumis_web_extra",
+    system: "lumis_system",
+    backend: "lumis_backend"
+  }
+
+  bundles =
+    :mdex_native
+    |> Application.compile_env(:bundles, [:all])
+    |> List.wrap()
+    |> Enum.uniq()
+    |> then(fn bundles -> if :all in bundles, do: [:all], else: Enum.sort(bundles) end)
+
+  syntax_highlighter_features =
+    case syntax_highlighter do
+      :lumis -> Enum.map(bundles, &Map.fetch!(bundle_features, &1))
+      :syntect -> ["syntect"]
+    end
+
+  cargo_features = ["nif_version_2_15" | syntax_highlighter_features]
+
+  lumis_bundle_variants = [
+    :lumis_backend,
+    :lumis_system,
+    :lumis_web,
+    :lumis_web_extra,
+    :lumis_backend_system,
+    :lumis_backend_web,
+    :lumis_backend_web_extra,
+    :lumis_system_web,
+    :lumis_system_web_extra,
+    :lumis_web_web_extra,
+    :lumis_backend_system_web,
+    :lumis_backend_system_web_extra,
+    :lumis_backend_web_web_extra,
+    :lumis_system_web_web_extra,
+    :lumis_backend_system_web_web_extra
+  ]
+
+  variants =
+    [:legacy_cpu, :syntect, :legacy_cpu_syntect] ++
+      lumis_bundle_variants ++ Enum.map(lumis_bundle_variants, &:"legacy_cpu_#{&1}")
+
+  feature_variant =
+    case {syntax_highlighter, bundles} do
+      {:lumis, [:all]} -> nil
+      {:lumis, bundles} -> :"lumis_#{Enum.join(bundles, "_")}"
+      {:syntect, _bundles} -> :syntect
+    end
+
+  legacy_env = System.get_env("MDEX_NATIVE_USE_LEGACY_ARTIFACTS")
 
   use_legacy =
     Application.compile_env(
       :mdex_native,
       :use_legacy_artifacts,
-      Application.compile_env(:mdex, :use_legacy_artifacts, legacy_env in ["true", "1"])
+      legacy_env in ["true", "1"]
     )
 
-  variants_for_linux = [
-    legacy_cpu: fn ->
-      # These are the same from the release workflow.
-      # See the meaning in: https://unix.stackexchange.com/a/43540
-      needed_caps = ~w[fxsr sse sse2 ssse3 sse4_1 sse4_2 popcnt avx fma]
+  use_legacy_for_linux = fn ->
+    # These are the same from the release workflow.
+    # See the meaning in: https://unix.stackexchange.com/a/43540
+    needed_caps = ~w[fxsr sse sse2 ssse3 sse4_1 sse4_2 popcnt avx fma]
 
-      use_legacy or
-        (is_nil(use_legacy) and
-           not MDExNative.ComptimeUtils.cpu_with_all_caps?(needed_caps))
-    end
-  ]
+    use_legacy or
+      (is_nil(use_legacy) and
+         not MDExNative.ComptimeUtils.cpu_with_all_caps?(needed_caps))
+  end
 
-  other_variants = [legacy_cpu: fn -> use_legacy end]
+  use_legacy_for_other = fn -> use_legacy == true end
+
+  legacy_variant = if feature_variant, do: :"legacy_cpu_#{feature_variant}", else: :legacy_cpu
+
+  variants_for = fn use_legacy? ->
+    Enum.map(variants, fn variant ->
+      {variant,
+       fn -> if(use_legacy?.(), do: legacy_variant, else: feature_variant) == variant end}
+    end)
+  end
+
+  targets = ~w(
+    aarch64-apple-darwin
+    aarch64-unknown-linux-gnu
+    aarch64-unknown-linux-musl
+    arm-unknown-linux-gnueabihf
+    riscv64gc-unknown-linux-gnu
+    x86_64-apple-darwin
+    x86_64-pc-windows-gnu
+    x86_64-pc-windows-msvc
+    x86_64-unknown-freebsd
+    x86_64-unknown-linux-gnu
+    x86_64-unknown-linux-musl
+  )
+
+  variants =
+    Map.new(targets, fn target ->
+      variants =
+        case target do
+          "x86_64-unknown-linux-gnu" -> variants_for.(use_legacy_for_linux)
+          "x86_64-pc-windows-msvc" -> variants_for.(use_legacy_for_other)
+          "x86_64-pc-windows-gnu" -> variants_for.(use_legacy_for_other)
+          "x86_64-unknown-freebsd" -> variants_for.(use_legacy_for_other)
+          _ -> variants_for.(fn -> false end)
+        end
+
+      {target, variants}
+    end)
 
   use RustlerPrecompiled,
     otp_app: :mdex_native,
     crate: "mdex_native_nif",
     version: version,
     base_url: "#{github_url}/releases/download/v#{version}",
-    targets: ~w(
-      aarch64-apple-darwin
-      aarch64-unknown-linux-gnu
-      aarch64-unknown-linux-musl
-      arm-unknown-linux-gnueabihf
-      riscv64gc-unknown-linux-gnu
-      x86_64-apple-darwin
-      x86_64-pc-windows-gnu
-      x86_64-pc-windows-msvc
-      x86_64-unknown-freebsd
-      x86_64-unknown-linux-gnu
-      x86_64-unknown-linux-musl
-    ),
-    variants: %{
-      "x86_64-unknown-linux-gnu" => variants_for_linux,
-      "x86_64-pc-windows-msvc" => other_variants,
-      "x86_64-pc-windows-gnu" => other_variants,
-      "x86_64-unknown-freebsd" => other_variants
-    },
+    targets: targets,
+    variants: variants,
     nif_versions: ["2.15"],
     mode: mode,
-    force_build:
-      (System.get_env("MDEX_NATIVE_BUILD") || System.get_env("MDEX_BUILD")) in ["1", "true"]
+    default_features: false,
+    features: cargo_features,
+    force_build: force_build
 
   def parse_document(_md, _opts), do: :erlang.nif_error(:nif_not_loaded)
   def markdown_to_html_with_options(_md, _opts), do: :erlang.nif_error(:nif_not_loaded)

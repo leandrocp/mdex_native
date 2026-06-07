@@ -24,5 +24,7 @@ comrak-*.tar
 
 /priv/native/
 /target/
+/.e2e/
+.expert/
 /native/comrak_nif/target/
 checksum-*.exs

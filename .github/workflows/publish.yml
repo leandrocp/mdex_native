@@ -11,14 +11,243 @@ permissions:
   id-token: write
 
 jobs:
-  nif-release:
-    uses: leandrocp/github-actions/.github/workflows/nif-release.yml@main
-    with:
-      project-name: mdex_native_nif
-      project-dir: native/mdex_native_nif
+  build-nifs:
+    name: ${{ matrix.job.os }} ${{ matrix.job.target }}, 2.15, ${{ matrix.job.variant || 'default' }}, ${{ matrix.feature.variant || 'all' }}
+    runs-on: ${{ matrix.job.os }}
+    timeout-minutes: 60
+
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        feature:
+          - { features: "", variant: "" }
+          - { features: "syntect", variant: "syntect" }
+          - { features: "lumis_backend", variant: "lumis_backend" }
+          - { features: "lumis_system", variant: "lumis_system" }
+          - { features: "lumis_web", variant: "lumis_web" }
+          - { features: "lumis_web_extra", variant: "lumis_web_extra" }
+          - { features: "lumis_backend,lumis_system", variant: "lumis_backend_system" }
+          - { features: "lumis_backend,lumis_web", variant: "lumis_backend_web" }
+          - { features: "lumis_backend,lumis_web_extra", variant: "lumis_backend_web_extra" }
+          - { features: "lumis_system,lumis_web", variant: "lumis_system_web" }
+          - { features: "lumis_system,lumis_web_extra", variant: "lumis_system_web_extra" }
+          - { features: "lumis_web,lumis_web_extra", variant: "lumis_web_web_extra" }
+          - { features: "lumis_backend,lumis_system,lumis_web", variant: "lumis_backend_system_web" }
+          - { features: "lumis_backend,lumis_system,lumis_web_extra", variant: "lumis_backend_system_web_extra" }
+          - { features: "lumis_backend,lumis_web,lumis_web_extra", variant: "lumis_backend_web_web_extra" }
+          - { features: "lumis_system,lumis_web,lumis_web_extra", variant: "lumis_system_web_web_extra" }
+          - { features: "lumis_backend,lumis_system,lumis_web,lumis_web_extra", variant: "lumis_backend_system_web_web_extra" }
+        job:
+          - { target: aarch64-apple-darwin,         os: macos-14 }
+          - { target: aarch64-unknown-linux-gnu,    os: ubuntu-22.04, use-cross: true }
+          - { target: aarch64-unknown-linux-musl,   os: ubuntu-24.04, use-cross: true }
+          - { target: arm-unknown-linux-gnueabihf,  os: ubuntu-24.04, use-cross: true }
+          - { target: riscv64gc-unknown-linux-gnu,  os: ubuntu-24.04, use-cross: true }
+          - { target: x86_64-apple-darwin,          os: macos-14 }
+          - { target: x86_64-pc-windows-gnu,        os: windows-2022,                  rustflags: "-C target-feature=+fxsr,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+popcnt,+avx,+fma" }
+          - { target: x86_64-pc-windows-msvc,       os: windows-2022,                  rustflags: "-C target-feature=+fxsr,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+popcnt,+avx,+fma" }
+          - { target: x86_64-unknown-freebsd,       os: ubuntu-22.04, use-cross: true, rustflags: "-C target-feature=+fxsr,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+popcnt,+avx,+fma" }
+          - { target: x86_64-unknown-linux-gnu,     os: ubuntu-24.04,                  rustflags: "-C target-feature=+fxsr,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+popcnt,+avx,+fma" }
+          - { target: x86_64-unknown-linux-musl,    os: ubuntu-24.04, use-cross: true }
+
+    steps:
+      - uses: actions/checkout@v6.0.3
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Extract crate information
+        shell: bash
+        run: |
+          echo "PROJECT_VERSION=$(sed -n 's/^  @version "\(.*\)"/\1/p' mix.exs | head -n1)" >> "$GITHUB_ENV"
+
+      - name: Configure feature variant
+        shell: bash
+        run: |
+          cargo_args=""
+          if [ "${{ matrix.feature.variant }}" != "" ]; then
+            cargo_args="--no-default-features --features nif_version_2_15"
+            if [ "${{ matrix.feature.features }}" != "" ]; then
+              cargo_args="$cargo_args,${{ matrix.feature.features }}"
+            fi
+          fi
+
+          variant="${{ matrix.job.variant }}"
+          if [ "$variant" != "" ] && [ "${{ matrix.feature.variant }}" != "" ]; then
+            variant="${variant}_${{ matrix.feature.variant }}"
+          elif [ "${{ matrix.feature.variant }}" != "" ]; then
+            variant="${{ matrix.feature.variant }}"
+          fi
+
+          echo "CARGO_ARGS=$cargo_args" >> "$GITHUB_ENV"
+          echo "FINAL_VARIANT=$variant" >> "$GITHUB_ENV"
+
+      - name: Maybe add Rust flags for compilation
+        shell: bash
+        run: |
+          echo "RUSTFLAGS=${{ matrix.job.rustflags }}" >> "$GITHUB_ENV"
+        if: ${{ matrix.job.rustflags }}
+
+      - name: Add target
+        shell: bash
+        run: |
+          rustup target add ${{ matrix.job.target }}
+
+      - uses: Swatinem/rust-cache@v2.9.1
+        with:
+          prefix-key: v0-precomp
+          shared-key: ${{ matrix.job.target }}-2.15-${{ matrix.job.os }}-${{ matrix.feature.variant || 'all' }}
+          workspaces: |
+            native/mdex_native_nif
+
+      - name: Build the project
+        id: build-crate
+        uses: philss/rustler-precompiled-action@v1.1.5
+        with:
+          project-name: mdex_native_nif
+          project-version: ${{ env.PROJECT_VERSION }}
+          target: ${{ matrix.job.target }}
+          nif-version: "2.15"
+          use-cross: ${{ matrix.job.use-cross }}
+          cross-version: 'from-source'
+          project-dir: native/mdex_native_nif
+          variant: ${{ env.FINAL_VARIANT }}
+          cargo-args: ${{ env.CARGO_ARGS }}
+
+      - name: Artifact attestation
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/attest-build-provenance@v4.1.0
+        with:
+          subject-path: ${{ steps.build-crate.outputs.file-path }}
+
+      - name: Artifact upload
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: ${{ steps.build-crate.outputs.file-name }}
+          path: ${{ steps.build-crate.outputs.file-path }}
+
+  build-legacy-nifs:
+    name: ${{ matrix.job.os }} ${{ matrix.job.target }}, 2.15, ${{ matrix.feature.variant }}
+    runs-on: ${{ matrix.job.os }}
+    timeout-minutes: 60
+
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        feature:
+          - { features: "", variant: "legacy_cpu" }
+          - { features: "syntect", variant: "legacy_cpu_syntect" }
+          - { features: "lumis_backend", variant: "legacy_cpu_lumis_backend" }
+          - { features: "lumis_system", variant: "legacy_cpu_lumis_system" }
+          - { features: "lumis_web", variant: "legacy_cpu_lumis_web" }
+          - { features: "lumis_web_extra", variant: "legacy_cpu_lumis_web_extra" }
+          - { features: "lumis_backend,lumis_system", variant: "legacy_cpu_lumis_backend_system" }
+          - { features: "lumis_backend,lumis_web", variant: "legacy_cpu_lumis_backend_web" }
+          - { features: "lumis_backend,lumis_web_extra", variant: "legacy_cpu_lumis_backend_web_extra" }
+          - { features: "lumis_system,lumis_web", variant: "legacy_cpu_lumis_system_web" }
+          - { features: "lumis_system,lumis_web_extra", variant: "legacy_cpu_lumis_system_web_extra" }
+          - { features: "lumis_web,lumis_web_extra", variant: "legacy_cpu_lumis_web_web_extra" }
+          - { features: "lumis_backend,lumis_system,lumis_web", variant: "legacy_cpu_lumis_backend_system_web" }
+          - { features: "lumis_backend,lumis_system,lumis_web_extra", variant: "legacy_cpu_lumis_backend_system_web_extra" }
+          - { features: "lumis_backend,lumis_web,lumis_web_extra", variant: "legacy_cpu_lumis_backend_web_web_extra" }
+          - { features: "lumis_system,lumis_web,lumis_web_extra", variant: "legacy_cpu_lumis_system_web_web_extra" }
+          - { features: "lumis_backend,lumis_system,lumis_web,lumis_web_extra", variant: "legacy_cpu_lumis_backend_system_web_web_extra" }
+        job:
+          - { target: x86_64-pc-windows-gnu,        os: windows-2022 }
+          - { target: x86_64-pc-windows-msvc,       os: windows-2022 }
+          - { target: x86_64-unknown-freebsd,       os: ubuntu-22.04, use-cross: true }
+          - { target: x86_64-unknown-linux-gnu,     os: ubuntu-24.04 }
+
+    steps:
+      - uses: actions/checkout@v6.0.3
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Extract crate information
+        shell: bash
+        run: |
+          echo "PROJECT_VERSION=$(sed -n 's/^  @version "\(.*\)"/\1/p' mix.exs | head -n1)" >> "$GITHUB_ENV"
+
+      - name: Add target
+        shell: bash
+        run: |
+          rustup target add ${{ matrix.job.target }}
+
+      - name: Configure feature variant
+        shell: bash
+        run: |
+          cargo_args=""
+          if [ "${{ matrix.feature.features }}" != "" ]; then
+            cargo_args="--no-default-features --features nif_version_2_15,${{ matrix.feature.features }}"
+          fi
+
+          echo "CARGO_ARGS=$cargo_args" >> "$GITHUB_ENV"
+
+      - uses: Swatinem/rust-cache@v2.9.1
+        with:
+          prefix-key: v0-precomp
+          shared-key: ${{ matrix.feature.variant }}-${{ matrix.job.target }}-2.15-${{ matrix.job.os }}
+          workspaces: |
+            native/mdex_native_nif
+
+      - name: Build the project
+        id: build-crate
+        uses: philss/rustler-precompiled-action@v1.1.5
+        with:
+          project-name: mdex_native_nif
+          project-version: ${{ env.PROJECT_VERSION }}
+          target: ${{ matrix.job.target }}
+          nif-version: "2.15"
+          use-cross: ${{ matrix.job.use-cross }}
+          cross-version: 'from-source'
+          project-dir: native/mdex_native_nif
+          variant: ${{ matrix.feature.variant }}
+          cargo-args: ${{ env.CARGO_ARGS }}
+
+      - name: Artifact attestation
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/attest-build-provenance@v4.1.0
+        with:
+          subject-path: ${{ steps.build-crate.outputs.file-path }}
+
+      - name: Artifact upload
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: ${{ steps.build-crate.outputs.file-name }}
+          path: ${{ steps.build-crate.outputs.file-path }}
+
+  release-nifs:
+    name: Publish NIF release
+    needs: [build-nifs, build-legacy-nifs]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download NIF artifacts
+        uses: actions/download-artifact@v8.0.1
+        with:
+          path: artifacts
+          pattern: "*mdex_native_nif*"
+          merge-multiple: true
+
+      - name: Publish to GitHub Release
+        uses: softprops/action-gh-release@v3.0.0
+        with:
+          files: artifacts/*
 
   hex-publish:
-    needs: nif-release
+    needs: release-nifs
     if: startsWith(github.ref, 'refs/tags/v')
     uses: leandrocp/github-actions/.github/workflows/hex-publish.yml@main
     with:
