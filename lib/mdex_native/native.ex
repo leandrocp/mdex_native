@@ -10,7 +10,7 @@ defmodule MDExNative.Native do
 
   syntax_highlighter = Application.compile_env(:mdex_native, :syntax_highlighter, nil)
 
-  unless syntax_highlighter in [:lumis, :syntect, nil] do
+  if syntax_highlighter not in [:lumis, :syntect, nil] do
     raise ArgumentError, "invalid mdex_native syntax highlighter: #{inspect(syntax_highlighter)}"
   end
 

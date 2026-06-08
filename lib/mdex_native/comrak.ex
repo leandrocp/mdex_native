@@ -89,27 +89,20 @@ defmodule MDExNative.Comrak do
   [`comrak::Options`](https://docs.rs/comrak/latest/comrak/struct.Options.html),
   with any of these top-level keys:
 
-  - `:extension` - mapper to Comrak's
-  [`Extension` options](https://docs.rs/comrak/latest/comrak/options/struct.Extension.html),
-  for example `tasklist: true`, `table: true`, `autolink: true`, or
-  `header_id_prefix: "prefix-"`.
-  - `:parse` - mapper to Comrak's
-  [`Parse` options](https://docs.rs/comrak/latest/comrak/options/struct.Parse.html),
-  for example `smart: true`.
-  - `:render` - mapper to Comrak's
-  [`Render` options](https://docs.rs/comrak/latest/comrak/options/struct.Render.html),
-  for example `unsafe: true`, `hardbreaks: true`, or `sourcepos: true`.
+  - `:extension` - mapper to Comrak's [`Extension` options](https://docs.rs/comrak/latest/comrak/options/struct.Extension.html).
+  - `:parse` - mapper to Comrak's [`Parse` options](https://docs.rs/comrak/latest/comrak/options/struct.Parse.html).
+  - `:render` - mapper to Comrak's [`Render` options](https://docs.rs/comrak/latest/comrak/options/struct.Render.html).
   - `:syntax_highlight` - highlights fenced code blocks.
 
-    Disabled by default, but supports Lumis or Syntect:
+    Disabled by default, but you can enable either Lumis or Syntect:
 
-  - `[engine: :lumis, opts: [formatter: ...]]`
-  - `[engine: :syntect, opts: [theme: "Catppuccin Macchiato"]]`
+      - `[engine: :lumis, opts: [formatter: ...]]`
+      - `[engine: :syntect, opts: [theme: "Catppuccin Macchiato"]]`
 
   Note that in order to highlight you must choose a build
   with either one of the dependencies, for example:
 
-      `config :mdex_native, syntax_highlighter: :lumis`
+      config :mdex_native, syntax_highlighter: :lumis
 
   ## Examples
 
@@ -119,6 +112,7 @@ defmodule MDExNative.Comrak do
       iex> MDExNative.Comrak.markdown_to_html("- [x] done", extension: [tasklist: true])
       "<ul>\n<li><input type=\"checkbox\" checked=\"\" disabled=\"\" /> done</li>\n</ul>\n"
 
+      # default disabled syntax highlighter
       iex> markdown = "```rust\nfn main() {}\n```"
       iex> MDExNative.Comrak.markdown_to_html(markdown)
       "<pre><code class=\"language-rust\">fn main() &lbrace;&rbrace;\n</code></pre>\n"
