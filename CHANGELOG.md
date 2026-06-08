@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.5](https://github.com/leandrocp/mdex_native/compare/v0.1.4...v0.1.5) (2026-06-08)
+
+
+### Features
+
+* choose syntax highlighter at compile-time ([#16](https://github.com/leandrocp/mdex_native/issues/16)) ([c4aecc2](https://github.com/leandrocp/mdex_native/commit/c4aecc2fa1288613f728a7f041a32d9669f9a67b))
+
+
+### Documentation
+
+* project description ([8a240a2](https://github.com/leandrocp/mdex_native/commit/8a240a287d9c494c5b390dffe1e73621a326bd22))
+
 ## [0.1.4](https://github.com/leandrocp/mdex_native/compare/v0.1.3...v0.1.4) (2026-06-06)
 
 
