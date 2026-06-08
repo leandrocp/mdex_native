@@ -94,34 +94,43 @@ html = MDExNative.Comrak.markdown_to_html(markdown,
 
 All Lumis formatters and options can be found on [Lumis formatter docs](https://lumis.hexdocs.pm/Lumis.html#t:formatter/0).
 
-By default precompiled NIFs use Lumis for syntax highlighting,
-but you can switch to Syntect:
+Precompiled NIFs do not include a syntax highlighter unless you opt in. This is the default:
+
+```elixir
+config :mdex_native, syntax_highlighter: nil
+```
+
+With syntax highlighting disabled, fenced code blocks still render as code blocks. The code is left unchanged, and Comrak keeps the language class from the fence.
+
+To use Lumis:
+
+```elixir
+config :mdex_native, syntax_highlighter: :lumis
+```
+
+To use Syntect instead:
 
 ```elixir
 config :mdex_native, syntax_highlighter: :syntect
 ```
 
-Accepted values are `:lumis` and `:syntect`.
+Accepted values are `:lumis`, `:syntect`, and `nil`.
 
-Lumis includes all language bundles by default. You can select a smaller set:
-
-```elixir
-config :mdex_native,
-  syntax_highlighter: :lumis,
-  bundles: [:web, :system]
-```
-
-Accepted bundles are `:all`, `:web`, `:web_extra`, `:system`, and `:backend`.
-The default is `bundles: [:all]`.
-
-Bundle size might affect which syntext highlighter to use,
-currently you can expect:
+Bundle size might affect which syntax highlighter to use. Currently you can expect:
 
 | Config | Compressed artifact size |
 | --- | ---: |
-| `syntax_highlighter: :syntect` | 3.0 MB |
-| `syntax_highlighter: :lumis, bundles: [:all]` | 15.2 MB |
-| `syntax_highlighter: :lumis, bundles: [:web]` | 2.8 MB |
+| `syntax_highlighter: :lumis` | 15 MB |
+| `syntax_highlighter: :syntect` | 3 MB |
+| `syntax_highlighter: nil` | - |
+
+### Legacy CPUs
+
+Modern CPU features are enabled by default in `:mdex_native`. If your environment has an older CPU, use legacy artifacts:
+
+```elixir
+config :mdex_native, use_legacy_artifacts: true
+```
 
 **Syntect** example:
 

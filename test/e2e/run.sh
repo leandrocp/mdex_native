@@ -16,7 +16,7 @@ trap restore_default_nif EXIT
 
 cd "$repo_root/e2e/dummy_app"
 
-for scenario in default syntect lumis_web; do
+for scenario in default lumis syntect; do
   echo "==> e2e: $scenario"
   rm -rf "$repo_root/.e2e/$scenario"
   MIX_ENV=test \

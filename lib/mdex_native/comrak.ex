@@ -99,18 +99,17 @@ defmodule MDExNative.Comrak do
   - `:render` - mapper to Comrak's
   [`Render` options](https://docs.rs/comrak/latest/comrak/options/struct.Render.html),
   for example `unsafe: true`, `hardbreaks: true`, or `sourcepos: true`.
-  - `:syntax_highlight` - highlights fenced code blocks, supports Lumis or Syntect:
+  - `:syntax_highlight` - highlights fenced code blocks.
+
+    Disabled by default, but supports Lumis or Syntect:
 
   - `[engine: :lumis, opts: [formatter: ...]]`
   - `[engine: :syntect, opts: [theme: "Catppuccin Macchiato"]]`
 
-  Pass `nil` or `false` to disable syntax highlighting.
+  Note that in order to highlight you must choose a build
+  with either one of the dependencies, for example:
 
-  The requested engine must match the engine compiled into the NIF,
-  configure with `config :mdex_native, syntax_highlighter: :lumis | :syntect`.
-
-  Lumis language bundles can be selected with `config :mdex_native, bundles: ...`,
-  defaults to `bundles: [:all]`.
+      `config :mdex_native, syntax_highlighter: :lumis`
 
   ## Examples
 
@@ -121,8 +120,8 @@ defmodule MDExNative.Comrak do
       "<ul>\n<li><input type=\"checkbox\" checked=\"\" disabled=\"\" /> done</li>\n</ul>\n"
 
       iex> markdown = "```rust\nfn main() {}\n```"
-      iex> MDExNative.Comrak.markdown_to_html(markdown, syntax_highlight: [engine: :lumis, opts: [formatter: {:html_inline, theme: "catppuccin_macchiato"}]])
-      "<pre class=\"lumis\" style=\"color: #cad3f5; background-color: #24273a;\"><code class=\"language-rust\" translate=\"no\" tabindex=\"0\"><div class=\"line\" data-line=\"1\"><span style=\"color: #c6a0f6;\">fn</span> <span style=\"color: #8aadf4;\">main</span><span style=\"color: #939ab7;\">(</span><span style=\"color: #939ab7;\">)</span> <span style=\"color: #939ab7;\">&lbrace;</span><span style=\"color: #939ab7;\">&rbrace;</span>\n</div></code></pre>\n"
+      iex> MDExNative.Comrak.markdown_to_html(markdown)
+      "<pre><code class=\"language-rust\">fn main() &lbrace;&rbrace;\n</code></pre>\n"
 
   """
   @spec markdown_to_html(markdown(), options()) :: html()
@@ -281,7 +280,7 @@ defmodule MDExNative.Comrak do
 
     Enable it in your config:
 
-        config :mdex_native, syntax_highlighter: :lumis, bundles: [:all]
+        config :mdex_native, syntax_highlighter: :lumis
 
     """
   end

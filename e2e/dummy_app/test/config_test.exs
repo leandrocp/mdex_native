@@ -2,11 +2,29 @@ defmodule MDExNativeE2E.ConfigTest do
   use ExUnit.Case
 
   @rust "```rust\nfn main() {}\n```"
-  @typescript "```typescript\nconst answer: number = 42\n```"
-
   test "compile-time syntax highlighter config is used" do
     case System.fetch_env!("MDEX_NATIVE_E2E_CASE") do
       "default" ->
+        assert MDExNative.Comrak.markdown_to_html(@rust, syntax_highlight: nil) ==
+                 "<pre><code class=\"language-rust\">fn main() &lbrace;&rbrace;\n</code></pre>\n"
+
+        lumis_error =
+          assert_raise RuntimeError, fn ->
+            lumis_html(@rust)
+          end
+
+        assert lumis_error.message ==
+                 "Lumis is not enabled.\n\nComrak tried to syntax highlight a code block with Lumis, but this NIF was not compiled with Lumis support.\n\nEnable it in your config:\n\n    config :mdex_native, syntax_highlighter: :lumis\n\n"
+
+        syntect_error =
+          assert_raise RuntimeError, fn ->
+            syntect_html(@rust)
+          end
+
+        assert syntect_error.message ==
+                 "Syntect is not enabled.\n\nComrak tried to syntax highlight a code block with Syntect, but this NIF was not compiled with Syntect support.\n\nEnable it in your config:\n\n    config :mdex_native, syntax_highlighter: :syntect\n\n"
+
+      "lumis" ->
         assert lumis_html(@rust) ==
                  "<pre class=\"lumis\" style=\"color: #cad3f5; background-color: #24273a;\"><code class=\"language-rust\" translate=\"no\" tabindex=\"0\"><div class=\"line\" data-line=\"1\"><span style=\"color: #c6a0f6;\">fn</span> <span style=\"color: #8aadf4;\">main</span><span style=\"color: #939ab7;\">(</span><span style=\"color: #939ab7;\">)</span> <span style=\"color: #939ab7;\">&lbrace;</span><span style=\"color: #939ab7;\">&rbrace;</span>\n</div></code></pre>\n"
 
@@ -28,14 +46,8 @@ defmodule MDExNativeE2E.ConfigTest do
           end
 
         assert error.message ==
-                 "Lumis is not enabled.\n\nComrak tried to syntax highlight a code block with Lumis, but this NIF was not compiled with Lumis support.\n\nEnable it in your config:\n\n    config :mdex_native, syntax_highlighter: :lumis, bundles: [:all]\n\n"
+                 "Lumis is not enabled.\n\nComrak tried to syntax highlight a code block with Lumis, but this NIF was not compiled with Lumis support.\n\nEnable it in your config:\n\n    config :mdex_native, syntax_highlighter: :lumis\n\n"
 
-      "lumis_web" ->
-        assert lumis_html(@typescript) ==
-                 "<pre class=\"lumis\" style=\"color: #cad3f5; background-color: #24273a;\"><code class=\"language-typescript\" translate=\"no\" tabindex=\"0\"><div class=\"line\" data-line=\"1\"><span style=\"color: #c6a0f6;\">const</span> <span style=\"color: #cad3f5;\">answer</span><span style=\"color: #939ab7;\">:</span> <span style=\"color: #c6a0f6;\">number</span> <span style=\"color: #91d7e3;\">=</span> <span style=\"color: #f5a97f;\">42</span>\n</div></code></pre>\n"
-
-        assert lumis_html(@rust) ==
-                 "<pre class=\"lumis\" style=\"color: #cad3f5; background-color: #24273a;\"><code class=\"language-plaintext\" translate=\"no\" tabindex=\"0\"><div class=\"line\" data-line=\"1\">fn main() &lbrace;&rbrace;\n</div></code></pre>\n"
     end
   end
 

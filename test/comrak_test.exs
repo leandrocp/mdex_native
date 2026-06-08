@@ -24,35 +24,25 @@ defmodule MDExNative.ComrakTest do
     assert MDExNative.Comrak.markdown_to_xml("# Hello") =~ ~s(<heading level="1">)
   end
 
-  test "renders fenced code with lumis syntax highlighting options" do
-    html =
-      MDExNative.Comrak.markdown_to_html(@code_block_markdown,
-        syntax_highlight: [
-          engine: :lumis,
-          opts: [
-            formatter:
-              {:html_inline, theme: "catppuccin_macchiato", pre_class: "code-block-example"}
+  test "raises when lumis is requested but no syntax highlighter is compiled" do
+    error =
+      assert_raise RuntimeError, fn ->
+        MDExNative.Comrak.markdown_to_html(@code_block_markdown,
+          syntax_highlight: [
+            engine: :lumis,
+            opts: [
+              formatter:
+                {:html_inline, theme: "catppuccin_macchiato", pre_class: "code-block-example"}
+            ]
           ]
-        ]
-      )
+        )
+      end
 
-    assert html =~ ~s(<pre class="lumis code-block-example")
-    assert html =~ "IO"
+    assert error.message =~ "Lumis is not enabled."
+    assert error.message =~ "config :mdex_native, syntax_highlighter: :lumis"
   end
 
-  test "supports legacy syntax highlighting options when lumis is compiled" do
-    html =
-      MDExNative.Comrak.markdown_to_html(@code_block_markdown,
-        syntax_highlight: [
-          formatter:
-            {:html_inline, theme: "catppuccin_macchiato", pre_class: "code-block-example"}
-        ]
-      )
-
-    assert html =~ ~s(<pre class="lumis code-block-example")
-  end
-
-  test "raises when syntect is requested but lumis is compiled" do
+  test "raises when syntect is requested but no syntax highlighter is compiled" do
     error =
       assert_raise RuntimeError, fn ->
         MDExNative.Comrak.markdown_to_html(@code_block_markdown,

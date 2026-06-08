@@ -12,7 +12,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 ammonia = "4.1"
-comrak = { version = "0.52", features = ["shortcodes", "phoenix_heex"] }
+comrak = { version = "0.52", default-features = false, features = ["shortcodes", "phoenix_heex"] }
 lumis = { version = "0.9", default-features = false, optional = true }
 lol_html = "3.0"
 parking_lot = "0.12"
@@ -28,12 +28,7 @@ v_htmlescape = "0.17"
 pretty_assertions = "1.4"
 
 [features]
-default = ["nif_version_2_15", "lumis_all"]
-lumis = ["dep:lumis"]
-lumis_all = ["lumis", "lumis/all-languages"]
-lumis_backend = ["lumis", "lumis/lang-bundle-backend"]
-lumis_system = ["lumis", "lumis/lang-bundle-system"]
-lumis_web = ["lumis", "lumis/lang-bundle-web"]
-lumis_web_extra = ["lumis", "lumis/lang-bundle-web-extra"]
+default = ["nif_version_2_15"]
+lumis = ["dep:lumis", "lumis/all-languages"]
 nif_version_2_15 = ["rustler/nif_version_2_15"]
 syntect = ["comrak/syntect", "dep:two-face"]
