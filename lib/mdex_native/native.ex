@@ -25,13 +25,8 @@ defmodule MDExNative.Native do
 
   cargo_features = ["nif_version_2_15" | syntax_highlighter_features]
 
-  variants = [
-    :legacy_cpu,
-    :lumis,
-    :legacy_cpu_lumis,
-    :syntect,
-    :legacy_cpu_syntect
-  ]
+  feature_variants = [:lumis, :syntect]
+  legacy_variants = [:legacy_cpu, :legacy_cpu_lumis, :legacy_cpu_syntect]
 
   feature_variant =
     case syntax_highlighter do
@@ -63,12 +58,14 @@ defmodule MDExNative.Native do
 
   legacy_variant = if feature_variant, do: :"legacy_cpu_#{feature_variant}", else: :legacy_cpu
 
-  variants_for = fn use_legacy? ->
+  variants_for = fn variants, use_legacy? ->
     Enum.map(variants, fn variant ->
       {variant,
        fn -> if(use_legacy?.(), do: legacy_variant, else: feature_variant) == variant end}
     end)
   end
+
+  variants_with_legacy = feature_variants ++ legacy_variants
 
   targets = ~w(
     aarch64-apple-darwin
@@ -88,11 +85,11 @@ defmodule MDExNative.Native do
     Map.new(targets, fn target ->
       variants =
         case target do
-          "x86_64-unknown-linux-gnu" -> variants_for.(use_legacy_for_linux)
-          "x86_64-pc-windows-msvc" -> variants_for.(use_legacy_for_other)
-          "x86_64-pc-windows-gnu" -> variants_for.(use_legacy_for_other)
-          "x86_64-unknown-freebsd" -> variants_for.(use_legacy_for_other)
-          _ -> variants_for.(fn -> false end)
+          "x86_64-unknown-linux-gnu" -> variants_for.(variants_with_legacy, use_legacy_for_linux)
+          "x86_64-pc-windows-msvc" -> variants_for.(variants_with_legacy, use_legacy_for_other)
+          "x86_64-pc-windows-gnu" -> variants_for.(variants_with_legacy, use_legacy_for_other)
+          "x86_64-unknown-freebsd" -> variants_for.(variants_with_legacy, use_legacy_for_other)
+          _ -> variants_for.(feature_variants, fn -> false end)
         end
 
       {target, variants}
