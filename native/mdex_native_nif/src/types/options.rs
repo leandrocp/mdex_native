@@ -1,5 +1,6 @@
 mod sanitize;
 
+#[cfg(feature = "lumis")]
 use super::elixir_types::ExFormatterOption;
 use comrak::options::{Extension, ListStyleType, Options, Parse, Render};
 use rustler::types::atom::Atom;
@@ -461,21 +462,29 @@ pub enum ExSyntaxHighlightEngine {
 
 #[derive(Debug, Default)]
 pub struct ExLumisOptions {
+    #[cfg(feature = "lumis")]
     pub formatter: ExFormatterOption,
-    #[allow(dead_code)]
-    pub language: Option<String>,
 }
 
 #[derive(Debug, Default)]
 pub struct ExSyntectOptions {
+    #[cfg(feature = "syntect")]
     pub theme: Option<String>,
 }
 
+#[cfg(feature = "syntect")]
 impl<'a> Decoder<'a> for ExSyntectOptions {
     fn decode(term: Term<'a>) -> NifResult<Self> {
         Ok(Self {
             theme: optional_field(term, "theme")?,
         })
+    }
+}
+
+#[cfg(not(feature = "syntect"))]
+impl<'a> Decoder<'a> for ExSyntectOptions {
+    fn decode(_term: Term<'a>) -> NifResult<Self> {
+        Ok(Self {})
     }
 }
 
@@ -485,12 +494,19 @@ pub enum ExSyntaxHighlightEngineOptions {
     Syntect(ExSyntectOptions),
 }
 
+#[cfg(feature = "lumis")]
 impl<'a> Decoder<'a> for ExLumisOptions {
     fn decode(term: Term<'a>) -> NifResult<Self> {
         Ok(Self {
             formatter: optional_field(term, "formatter")?.unwrap_or_default(),
-            language: optional_field(term, "language")?,
         })
+    }
+}
+
+#[cfg(not(feature = "lumis"))]
+impl<'a> Decoder<'a> for ExLumisOptions {
+    fn decode(_term: Term<'a>) -> NifResult<Self> {
+        Ok(Self {})
     }
 }
 

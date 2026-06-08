@@ -11,14 +11,15 @@ permissions:
   id-token: write
 
 jobs:
-  nif-release:
+  release-nifs:
     uses: leandrocp/github-actions/.github/workflows/nif-release.yml@main
     with:
       project-name: mdex_native_nif
       project-dir: native/mdex_native_nif
+      feature-variants: '[{"features":"lumis","variant":"lumis"},{"features":"syntect","variant":"syntect"},{"features":"","variant":""}]'
 
   hex-publish:
-    needs: nif-release
+    needs: release-nifs
     if: startsWith(github.ref, 'refs/tags/v')
     uses: leandrocp/github-actions/.github/workflows/hex-publish.yml@main
     with:

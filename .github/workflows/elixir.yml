@@ -18,3 +18,19 @@ jobs:
     uses: leandrocp/github-actions/.github/workflows/elixir-lint.yml@main
     with:
       env_vars: '{"MDEX_NATIVE_BUILD": "1"}'
+
+  e2e:
+    if: ${{ github.event_name != 'pull_request' || !startsWith(github.head_ref, 'release-please--') }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "29"
+          elixir-version: "1.20"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - run: ./test/e2e/run.sh

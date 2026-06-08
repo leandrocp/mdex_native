@@ -89,22 +89,20 @@ defmodule MDExNative.Comrak do
   [`comrak::Options`](https://docs.rs/comrak/latest/comrak/struct.Options.html),
   with any of these top-level keys:
 
-  - `:extension` - mapper to Comrak's
-    [`Extension` options](https://docs.rs/comrak/latest/comrak/options/struct.Extension.html),
-    for example `tasklist: true`, `table: true`, `autolink: true`, or
-    `header_id_prefix: "prefix-"`.
-  - `:parse` - mapper to Comrak's
-    [`Parse` options](https://docs.rs/comrak/latest/comrak/options/struct.Parse.html),
-    for example `smart: true`.
-  - `:render` - mapper to Comrak's
-    [`Render` options](https://docs.rs/comrak/latest/comrak/options/struct.Render.html),
-    for example `unsafe: true`, `hardbreaks: true`, or `sourcepos: true`.
-  - `:syntax_highlight` - syntax highlighting options with an `:engine` and
-    engine-specific `:opts`. Supported engines are `:lumis` and `:syntect`.
-    Lumis options are passed to the native Rust `LumisAdapter` for fenced code
-    blocks. See the [`Lumis.formatter/0`](https://lumis.hexdocs.pm/Lumis.html#t:formatter/0)
-    type for formatter options. Syntect uses `two-face` syntax and theme
-    definitions, and accepts `theme: String.t()` in `:opts` for inline styles.
+  - `:extension` - mapper to Comrak's [`Extension` options](https://docs.rs/comrak/latest/comrak/options/struct.Extension.html).
+  - `:parse` - mapper to Comrak's [`Parse` options](https://docs.rs/comrak/latest/comrak/options/struct.Parse.html).
+  - `:render` - mapper to Comrak's [`Render` options](https://docs.rs/comrak/latest/comrak/options/struct.Render.html).
+  - `:syntax_highlight` - highlights fenced code blocks.
+
+    Disabled by default, but you can enable either Lumis or Syntect:
+
+      - `[engine: :lumis, opts: [formatter: ...]]`
+      - `[engine: :syntect, opts: [theme: "Catppuccin Macchiato"]]`
+
+  Note that in order to highlight you must choose a build
+  with either one of the dependencies, for example:
+
+      config :mdex_native, syntax_highlighter: :lumis
 
   ## Examples
 
@@ -114,17 +112,17 @@ defmodule MDExNative.Comrak do
       iex> MDExNative.Comrak.markdown_to_html("- [x] done", extension: [tasklist: true])
       "<ul>\n<li><input type=\"checkbox\" checked=\"\" disabled=\"\" /> done</li>\n</ul>\n"
 
-      iex> html = MDExNative.Comrak.markdown_to_html("```rust\nfn main() {}\n```", syntax_highlight: [engine: :lumis, opts: [formatter: {:html_inline, theme: "catppuccin_macchiato", pre_class: "code-example"}]])
-      iex> html =~ ~s(<pre class="lumis code-example")
-      true
+      # default disabled syntax highlighter
+      iex> markdown = "```rust\nfn main() {}\n```"
+      iex> MDExNative.Comrak.markdown_to_html(markdown)
+      "<pre><code class=\"language-rust\">fn main() &lbrace;&rbrace;\n</code></pre>\n"
 
-      iex> html = MDExNative.Comrak.markdown_to_html("```rust\nfn main() {}\n```", syntax_highlight: [engine: :syntect, opts: [theme: "Catppuccin Macchiato"]])
-      iex> html =~ ~s(<pre style="background-color:)
-      true
   """
   @spec markdown_to_html(markdown(), options()) :: html()
   def markdown_to_html(markdown, options \\ []) when is_binary(markdown) do
-    MDExNative.Native.markdown_to_html_with_options(markdown, options!(options))
+    markdown
+    |> MDExNative.Native.markdown_to_html_with_options(options!(options))
+    |> check_native_output()
   end
 
   @doc ~S"""
@@ -132,7 +130,9 @@ defmodule MDExNative.Comrak do
   """
   @spec document_to_html(MDExNative.Comrak.Document.t(), options()) :: html()
   def document_to_html(%MDExNative.Comrak.Document{} = document, options \\ []) do
-    MDExNative.Native.document_to_html_with_options(document, options!(options))
+    document
+    |> MDExNative.Native.document_to_html_with_options(options!(options))
+    |> check_native_output()
   end
 
   @doc ~S"""
@@ -148,7 +148,9 @@ defmodule MDExNative.Comrak do
   """
   @spec markdown_to_xml(markdown(), options()) :: xml()
   def markdown_to_xml(markdown, options \\ []) when is_binary(markdown) do
-    MDExNative.Native.markdown_to_xml_with_options(markdown, options!(options))
+    markdown
+    |> MDExNative.Native.markdown_to_xml_with_options(options!(options))
+    |> check_native_output()
   end
 
   @doc ~S"""
@@ -156,7 +158,9 @@ defmodule MDExNative.Comrak do
   """
   @spec document_to_xml(MDExNative.Comrak.Document.t(), options()) :: xml()
   def document_to_xml(%MDExNative.Comrak.Document{} = document, options \\ []) do
-    MDExNative.Native.document_to_xml_with_options(document, options!(options))
+    document
+    |> MDExNative.Native.document_to_xml_with_options(options!(options))
+    |> check_native_output()
   end
 
   @doc ~S"""
@@ -164,7 +168,9 @@ defmodule MDExNative.Comrak do
   """
   @spec document_to_commonmark(MDExNative.Comrak.Document.t(), options()) :: markdown()
   def document_to_commonmark(%MDExNative.Comrak.Document{} = document, options \\ []) do
-    MDExNative.Native.document_to_commonmark_with_options(document, options!(options))
+    document
+    |> MDExNative.Native.document_to_commonmark_with_options(options!(options))
+    |> check_native_output()
   end
 
   @doc ~S"""
@@ -259,4 +265,32 @@ defmodule MDExNative.Comrak do
   end
 
   defp syntax_highlight_option(option), do: option
+
+  defp check_native_output(:lumis_not_enabled) do
+    raise """
+    Lumis is not enabled.
+
+    Comrak tried to syntax highlight a code block with Lumis, but this NIF was not compiled with Lumis support.
+
+    Enable it in your config:
+
+        config :mdex_native, syntax_highlighter: :lumis
+
+    """
+  end
+
+  defp check_native_output(:syntect_not_enabled) do
+    raise """
+    Syntect is not enabled.
+
+    Comrak tried to syntax highlight a code block with Syntect, but this NIF was not compiled with Syntect support.
+
+    Enable it in your config:
+
+        config :mdex_native, syntax_highlighter: :syntect
+
+    """
+  end
+
+  defp check_native_output(value), do: value
 end

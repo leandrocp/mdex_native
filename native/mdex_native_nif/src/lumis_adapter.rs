@@ -310,18 +310,20 @@ impl LumisAdapter {
         result
     }
 
-    #[allow(dead_code)]
     fn header_config(&self) -> Option<(&str, &str)> {
         match &self.formatter_config {
             ExFormatterOption::HtmlInline {
-                header: Some(h), ..
+                header: Some(header),
+                ..
             }
             | ExFormatterOption::HtmlLinked {
-                header: Some(h), ..
+                header: Some(header),
+                ..
             }
             | ExFormatterOption::HtmlMultiThemes {
-                header: Some(h), ..
-            } => Some((&h.open_tag, &h.close_tag)),
+                header: Some(header),
+                ..
+            } => Some((&header.open_tag, &header.close_tag)),
             _ => None,
         }
     }
@@ -367,6 +369,7 @@ impl SyntaxHighlighterAdapter for LumisAdapter {
         let theme = self
             .decorator_theme()
             .or_else(|| self.theme_from_formatter());
+        let _header = self.header_config();
         let pre_class = self
             .decorator_pre_class()
             .or_else(|| self.pre_class().map(|s| s.to_string()));

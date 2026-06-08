@@ -73,7 +73,7 @@ defmodule MDExNative.MixProject do
     Mix.Task.run("compile")
     ex_doc = Path.join(Mix.path_for(:escripts), "ex_doc")
 
-    unless File.exists?(ex_doc) do
+    if not File.exists?(ex_doc) do
       raise "cannot build docs because the ex_doc escript is not installed, " <>
               "make sure to run `mix escript.install hex ex_doc` before"
     end

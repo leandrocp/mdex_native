@@ -12,15 +12,15 @@ crate-type = ["cdylib"]
 
 [dependencies]
 ammonia = "4.1"
-comrak = { version = "0.52", features = ["shortcodes", "phoenix_heex", "syntect"] }
-lumis = { version = "0.9", features = ["all-languages"] }
+comrak = { version = "0.52", default-features = false, features = ["shortcodes", "phoenix_heex"] }
+lumis = { version = "0.9", default-features = false, optional = true }
 lol_html = "3.0"
 parking_lot = "0.12"
 phf = { version = "0.13", features = ["macros"] }
 rustler = "0.38"
 serde = "1.0"
 shlex = "2.0.1"
-two-face = "0.5"
+two-face = { version = "0.5", optional = true }
 typed-arena = "2.0"
 v_htmlescape = "0.17"
 
@@ -29,4 +29,6 @@ pretty_assertions = "1.4"
 
 [features]
 default = ["nif_version_2_15"]
+lumis = ["dep:lumis", "lumis/all-languages"]
 nif_version_2_15 = ["rustler/nif_version_2_15"]
+syntect = ["comrak/syntect", "dep:two-face"]
