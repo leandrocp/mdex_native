@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.0](https://github.com/leandrocp/mdex_native/compare/v0.1.5...v0.2.0) (2026-06-12)
+
+
+### ⚠ BREAKING CHANGES
+
+* adopt the `l-` prefix on token class https://github.com/leandrocp/lumis/pull/952
+
+### Features
+
+* update lumis ([#17](https://github.com/leandrocp/mdex_native/issues/17)) ([b285d88](https://github.com/leandrocp/mdex_native/commit/b285d88530d17ae3d969ae191b05f27d02826a8d))
+
 ## [0.1.5](https://github.com/leandrocp/mdex_native/compare/v0.1.4...v0.1.5) (2026-06-08)
 
 
