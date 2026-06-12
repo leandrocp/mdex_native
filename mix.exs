@@ -2,7 +2,7 @@ defmodule MDExNative.MixProject do
   use Mix.Project
 
   @source_url "https://github.com/leandrocp/mdex_native"
-  @version "0.1.5"
+  @version "0.2.0"
   @force_build? System.get_env("MDEX_NATIVE_BUILD") in ["1", "true"]
 
   def project do
