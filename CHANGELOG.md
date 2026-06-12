@@ -5,7 +5,7 @@
 
 ### ⚠ BREAKING CHANGES
 
-* update lumis ([#17](https://github.com/leandrocp/mdex_native/issues/17))
+* adopt the `l-` prefix on token class https://github.com/leandrocp/lumis/pull/952
 
 ### Features
 
