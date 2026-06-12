@@ -1,6 +1,9 @@
-Mix.install([
-  {:mdex_native, path: Path.expand("..", __DIR__)}
-], config: [mdex_native: [syntax_highlighter: :lumis]])
+Mix.install(
+  [
+    {:mdex_native, path: Path.expand("..", __DIR__)}
+  ],
+  config: [mdex_native: [syntax_highlighter: :lumis]]
+)
 
 markdown = ~S"""
 # Lumis html_linked
