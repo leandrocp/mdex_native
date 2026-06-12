@@ -26,7 +26,7 @@ defmodule MDExNativeE2E.ConfigTest do
 
       "lumis" ->
         assert lumis_html(@rust) ==
-                 "<pre class=\"lumis\" style=\"color: #cad3f5; background-color: #24273a;\"><code class=\"language-rust\" translate=\"no\" tabindex=\"0\"><div class=\"line\" data-line=\"1\"><span style=\"color: #c6a0f6;\">fn</span> <span style=\"color: #8aadf4;\">main</span><span style=\"color: #939ab7;\">(</span><span style=\"color: #939ab7;\">)</span> <span style=\"color: #939ab7;\">&lbrace;</span><span style=\"color: #939ab7;\">&rbrace;</span>\n</div></code></pre>\n"
+                 "<pre class=\"lumis\" style=\"color: #cad3f5; background-color: #24273a;\"><code class=\"language-rust\" translate=\"no\" tabindex=\"0\"><div class=\"l-line\" data-line=\"1\"><span style=\"color: #c6a0f6;\">fn</span> <span style=\"color: #8aadf4;\">main</span><span style=\"color: #939ab7;\">(</span><span style=\"color: #939ab7;\">)</span> <span style=\"color: #939ab7;\">&lbrace;</span><span style=\"color: #939ab7;\">&rbrace;</span>\n</div></code></pre>\n"
 
         error =
           assert_raise RuntimeError, fn ->
