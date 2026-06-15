@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/leandrocp/mdex_native/compare/v0.2.0...v0.2.1) (2026-06-15)
+
+
+### Features
+
+* expose sanitization options ([#19](https://github.com/leandrocp/mdex_native/issues/19)) ([45b7d0f](https://github.com/leandrocp/mdex_native/commit/45b7d0f37e95cf49caa99eca6c4630b2dcb68b6e))
+
 ## [0.2.0](https://github.com/leandrocp/mdex_native/compare/v0.1.5...v0.2.0) (2026-06-12)
 
 
