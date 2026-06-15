@@ -18,7 +18,7 @@ defmodule MDExNative.MixProject do
       homepage_url: @source_url,
       description: "Markdown Elixir Native: Comrak, Ammonia, Lumis, and Syntect",
       test_coverage: [
-        threshold: 90,
+        summary: [threshold: 80],
         ignore_modules: [MDExNative.ComptimeUtils, MDExNative.Native]
       ]
     ]

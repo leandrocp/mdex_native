@@ -12,6 +12,13 @@ jobs:
     uses: leandrocp/github-actions/.github/workflows/elixir-test.yml@main
     with:
       env_vars: '{"MDEX_NATIVE_BUILD": "1"}'
+
+  coverage:
+    if: ${{ github.event_name != 'pull_request' || !startsWith(github.head_ref, 'release-please--') }}
+    uses: leandrocp/github-actions/.github/workflows/elixir-test.yml@main
+    with:
+      pairs: '[{"name":"OTP 29, Elixir main", "elixir":"main-otp-29", "otp":"maint-29"}]'
+      env_vars: '{"MDEX_NATIVE_BUILD": "1"}'
       coverage: true
 
   lint:
