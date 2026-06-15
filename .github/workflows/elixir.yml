@@ -25,11 +25,28 @@ jobs:
     if: ${{ github.event_name != 'pull_request' || !startsWith(github.head_ref, 'release-please--') }}
     uses: leandrocp/github-actions/.github/workflows/elixir-lint.yml@main
     with:
+      pairs: '[{"name":"OTP 29, Elixir main", "elixir":"main-otp-29", "otp":"maint-29"}]'
       env_vars: '{"MDEX_NATIVE_BUILD": "1"}'
 
   e2e:
     if: ${{ github.event_name != 'pull_request' || !startsWith(github.head_ref, 'release-please--') }}
+    name: e2e (${{ matrix.name }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: default
+            target: dummy_app
+            e2e_case: default
+          - name: lumis
+            target: dummy_app
+            e2e_case: lumis
+          - name: syntect
+            target: dummy_app
+            e2e_case: syntect
+          - name: mdex
+            target: mdex
 
     steps:
       - uses: actions/checkout@v6
@@ -41,4 +58,25 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - run: ./test/e2e/run.sh
+      - name: Run dummy app E2E
+        if: ${{ matrix.target == 'dummy_app' }}
+        working-directory: e2e/dummy_app
+        env:
+          MDEX_NATIVE_BUILD: "1"
+          MDEX_NATIVE_E2E_CASE: ${{ matrix.e2e_case }}
+          MIX_BUILD_PATH: ${{ github.workspace }}/.e2e/${{ matrix.name }}/_build
+          MIX_DEPS_PATH: ${{ github.workspace }}/.e2e/${{ matrix.name }}/deps
+        run: mix do deps.get + deps.compile + test
+
+      - name: Run mdex E2E
+        if: ${{ matrix.target == 'mdex' }}
+        env:
+          MDEX_NATIVE_BUILD: "1"
+          MDEX_NATIVE_PATH: ${{ github.workspace }}
+          MIX_BUILD_PATH: ${{ github.workspace }}/.e2e/mdex/_build
+          MIX_DEPS_PATH: ${{ github.workspace }}/.e2e/mdex/deps
+        run: |
+          git clone --depth 1 https://github.com/leandrocp/mdex.git .e2e/mdex
+          cd .e2e/mdex
+          mix deps.get
+          mix test
