@@ -24,11 +24,18 @@ defmodule MDExNative.AmmoniaTest do
            ) == "Title<p>Content</p>"
   end
 
+  test "accepts normalized sanitize options" do
+    sanitize = {:custom, %{tags: %{rm: ["h1"]}}}
+
+    assert MDExNative.Ammonia.safe_html("<h1>Title</h1><p>Content</p>", sanitize: sanitize) ==
+             "Title<p>Content</p>"
+  end
+
   test "accepts sanitize atoms" do
     custom = {:custom, %{tags: %{set: ["p"]}}}
 
     assert MDExNative.Sanitize.normalize(:default) == :clean
-    assert MDExNative.Sanitize.normalize(custom) == custom
+    assert {:custom, %{tags: %{set: ["p"]}}} = MDExNative.Sanitize.normalize(custom)
 
     assert MDExNative.Ammonia.safe_html("<script>bad()</script>", sanitize: nil) ==
              "<script>bad()</script>"
