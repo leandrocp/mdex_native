@@ -2,12 +2,11 @@ defmodule MDExNative.Comrak do
   @moduledoc ~S"""
   Markdown parsing and rendering powered by the Rust `comrak` crate.
 
-  This package provides Elixir bindings for MDExNative.Comrak. It returns rendered HTML/XML
-  directly and keeps the native NIF behind the public API.
+  Elixir bindings for Comrak's parser and renderers.
 
-  Options mirror Rust [`comrak::Options`](https://docs.rs/comrak/latest/comrak/struct.Options.html)
-  and can be passed as keyword lists. Nested `:extension`, `:parse`, and
-  `:render` options are validated in Elixir before crossing the NIF boundary.
+  Options follow Rust [`comrak::Options`](https://docs.rs/comrak/latest/comrak/struct.Options.html)
+  and use keyword lists. MDExNative also accepts `:sanitize` and
+  `:syntax_highlight`.
 
   ## Examples
 
@@ -52,7 +51,7 @@ defmodule MDExNative.Comrak do
   @typedoc "Comrak [`Render`](https://docs.rs/comrak/latest/comrak/options/struct.Render.html) options."
   @type render_options :: keyword()
 
-  @typedoc "Comrak [`Options`](https://docs.rs/comrak/latest/comrak/options/struct.Options.html) accepted by `markdown_to_html/2` and `markdown_to_xml/2`, plus the `:syntax_highlight` convenience option."
+  @typedoc "Comrak [`Options`](https://docs.rs/comrak/latest/comrak/options/struct.Options.html), plus `:syntax_highlight` and `:sanitize`."
   @type options :: keyword()
 
   @doc ~S"""
@@ -85,24 +84,40 @@ defmodule MDExNative.Comrak do
 
   ## Options
 
-  Pass Comrak options as a keyword list matching Rust
-  [`comrak::Options`](https://docs.rs/comrak/latest/comrak/struct.Options.html),
-  with any of these top-level keys:
+  Pass Comrak options as keyword lists matching [`comrak::Options`](https://docs.rs/comrak/latest/comrak/struct.Options.html)
+  or the extra `:syntax_highlight` and `:sanitize` options:
+  MDExNative adds two top-level options:
 
   - `:extension` - mapper to Comrak's [`Extension` options](https://docs.rs/comrak/latest/comrak/options/struct.Extension.html).
   - `:parse` - mapper to Comrak's [`Parse` options](https://docs.rs/comrak/latest/comrak/options/struct.Parse.html).
   - `:render` - mapper to Comrak's [`Render` options](https://docs.rs/comrak/latest/comrak/options/struct.Render.html).
-  - `:syntax_highlight` - highlights fenced code blocks.
+  - `:syntax_highlight` - highlights fenced code blocks. Disabled by default.
 
-    Disabled by default, but you can enable either Lumis or Syntect:
+    Defaults to `syntax_highlight: nil`.
 
-      - `[engine: :lumis, opts: [formatter: ...]]`
-      - `[engine: :syntect, opts: [theme: "Catppuccin Macchiato"]]`
+    To highlight code, compile MDExNative with a highlighter and choose the engine:
 
-  Note that in order to highlight you must choose a build
-  with either one of the dependencies, for example:
+      **Lumis**
 
+      ```
       config :mdex_native, syntax_highlighter: :lumis
+
+      [engine: :lumis, opts: [formatter: {:html_inline, theme: "catppuccin_macchiato"}]]
+      ```
+
+      **Syntect**
+
+      ```
+      config :mdex_native, syntax_highlighter: :syntect
+
+      [engine: :syntect, opts: [theme: "Catppuccin Macchiato"]]
+      ```
+
+    See the [Syntax highlighting](syntax_highlighting.md) guide for complete examples.
+
+  - `:sanitize` - cleans rendered HTML. Defaults to `nil`.
+
+    See the [Sanitization](sanitization.md) guide for more info.
 
   ## Examples
 
@@ -111,6 +126,9 @@ defmodule MDExNative.Comrak do
 
       iex> MDExNative.Comrak.markdown_to_html("- [x] done", extension: [tasklist: true])
       "<ul>\n<li><input type=\"checkbox\" checked=\"\" disabled=\"\" /> done</li>\n</ul>\n"
+
+      iex> MDExNative.Comrak.markdown_to_html("<h1>Title</h1><p>Content</p>", render: [unsafe: true], sanitize: [rm_tags: ["h1"]])
+      "Title<p>Content</p>\n"
 
       # default disabled syntax highlighter
       iex> markdown = "```rust\nfn main() {}\n```"
@@ -246,6 +264,9 @@ defmodule MDExNative.Comrak do
 
       {:syntax_highlight, value} when is_list(value) ->
         {:syntax_highlight, syntax_highlight_options(value)}
+
+      {:sanitize, value} ->
+        {:sanitize, MDExNative.Sanitize.normalize(value)}
 
       {key, value} ->
         {key, value}

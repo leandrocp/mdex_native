@@ -16,7 +16,11 @@ defmodule MDExNative.MixProject do
       aliases: aliases(),
       name: "MDExNative",
       homepage_url: @source_url,
-      description: "Markdown Elixir Native: Comrak, Ammonia, Lumis, and Syntect"
+      description: "Markdown Elixir Native: Comrak, Ammonia, Lumis, and Syntect",
+      test_coverage: [
+        summary: [threshold: 80],
+        ignore_modules: [MDExNative.ComptimeUtils, MDExNative.Native]
+      ]
     ]
   end
 
@@ -36,11 +40,13 @@ defmodule MDExNative.MixProject do
       files: ~w[
         lib
         examples
+        guides
         native/mdex_native_nif/src
         native/mdex_native_nif/.cargo
         native/mdex_native_nif/Cargo.*
         native/mdex_native_nif/Cross.toml
         mix.exs
+        docs.exs
         README.md
         LICENSE.md
         CHANGELOG.md
@@ -79,7 +85,9 @@ defmodule MDExNative.MixProject do
     end
 
     args = ["MDExNative", @version, Mix.Project.compile_path()]
-    opts = ~w[--main MDExNative --source-ref v#{@version} --source-url #{@source_url}]
+
+    opts =
+      ~w[--main MDExNative --source-ref v#{@version} --source-url #{@source_url} --config docs.exs]
 
     System.cmd(ex_doc, args ++ opts)
   end

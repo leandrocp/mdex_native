@@ -19,9 +19,32 @@ defmodule MDExNative.ComrakTest do
     assert html =~ ~s(<input type="checkbox" checked="" disabled="" /> done)
   end
 
+  test "renders markdown with sanitize keyword options" do
+    assert MDExNative.Comrak.markdown_to_html("<h1>Title</h1><p>Content</p>",
+             render: [unsafe: true],
+             sanitize: [rm_tags: ["h1"]]
+           ) == "Title<p>Content</p>\n"
+  end
+
   test "render functions return rendered strings" do
     assert MDExNative.Comrak.markdown_to_html("**bold**") == "<p><strong>bold</strong></p>\n"
     assert MDExNative.Comrak.markdown_to_xml("# Hello") =~ ~s(<heading level="1">)
+  end
+
+  test "renders parsed documents" do
+    document = MDExNative.Comrak.parse_document("# Hello")
+
+    assert MDExNative.Comrak.document_to_html(document) == "<h1>Hello</h1>\n"
+    assert MDExNative.Comrak.document_to_xml(document) =~ ~s(<heading level="1">)
+    assert MDExNative.Comrak.document_to_commonmark(document) == "# Hello\n"
+  end
+
+  test "parses code fence info with language only" do
+    assert MDExNative.Comrak.parse_code_fence_info("elixir") == %{
+             language: "elixir",
+             metadata: "",
+             attributes: %{}
+           }
   end
 
   test "raises when lumis is requested but no syntax highlighter is compiled" do

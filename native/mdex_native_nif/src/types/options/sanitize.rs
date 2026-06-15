@@ -272,6 +272,7 @@ pub struct ExSanitizeCustom {
     pub link_rel: Option<String>,
     pub id_prefix: Option<String>,
     pub url_relative: Option<ExSanitizeCustomUrlRelative>,
+    pub filter_style_properties: Option<Vec<String>>,
     // attribute_filter is also available in ammonia.
 }
 
@@ -340,6 +341,9 @@ impl ExSanitizeCustom {
         builder.id_prefix(self.id_prefix.as_ref().map(|s| s.borrow()));
         if let Some(url_relative) = &self.url_relative {
             builder.url_relative(url_relative.to_ammonia());
+        }
+        if let Some(filter_style_properties) = &self.filter_style_properties {
+            builder.filter_style_properties(borrowed_set(filter_style_properties));
         }
 
         builder
