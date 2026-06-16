@@ -1,5 +1,6 @@
 [
   extras: [
+    {"CHANGELOG.md", title: "Changelog"},
     {"guides/sanitization.md", title: "Sanitization"},
     {"guides/syntax_highlighting.md", title: "Syntax highlighting"}
   ],
