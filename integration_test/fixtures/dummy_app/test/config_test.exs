@@ -47,7 +47,6 @@ defmodule MDExNativeE2E.ConfigTest do
 
         assert error.message ==
                  "Lumis is not enabled.\n\nComrak tried to syntax highlight a code block with Lumis, but this NIF was not compiled with Lumis support.\n\nEnable it in your config:\n\n    config :mdex_native, syntax_highlighter: :lumis\n\n"
-
     end
   end
 
