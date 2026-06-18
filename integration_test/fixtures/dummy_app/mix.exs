@@ -17,8 +17,7 @@ defmodule MDExNativeE2E.MixProject do
 
   defp deps do
     [
-      # TODO: change to `~> 0.1` after publish
-      {:mdex_native, path: "../.."}
+      {:mdex_native, path: "../../.."}
     ]
   end
 end

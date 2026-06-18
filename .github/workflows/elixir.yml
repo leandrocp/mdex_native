@@ -30,27 +30,8 @@ jobs:
 
   e2e:
     if: ${{ github.event_name != 'pull_request' || !startsWith(github.head_ref, 'release-please--') }}
-    name: e2e (${{ matrix.name }})
+    name: e2e
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: default
-            target: dummy_app
-            e2e_case: default
-            cache_key: default
-          - name: lumis
-            target: dummy_app
-            e2e_case: lumis
-            cache_key: lumis
-          - name: syntect
-            target: dummy_app
-            e2e_case: syntect
-            cache_key: syntect
-          - name: mdex
-            target: mdex
-            cache_key: lumis
 
     steps:
       - uses: actions/checkout@v6
@@ -60,50 +41,34 @@ jobs:
           otp-version: "29"
           elixir-version: "1.20"
 
-      - name: Checkout mdex E2E app
-        if: ${{ matrix.target == 'mdex' }}
-        run: git clone --depth 1 https://github.com/leandrocp/mdex.git .e2e/mdex
-
       - name: Cache Mix deps
         uses: actions/cache@v5
         with:
           path: |
             ~/.hex
             ~/.mix
-            .e2e/${{ matrix.name }}/deps
-            .e2e/${{ matrix.name }}/_build
-          key: e2e-mix-${{ runner.os }}-${{ matrix.name }}-${{ hashFiles('mix.exs', 'mix.lock', 'e2e/dummy_app/mix.exs', 'e2e/dummy_app/mix.lock', '.e2e/mdex/mix.exs', '.e2e/mdex/mix.lock') }}
+            integration_test/tmp/workspace/deps
+            integration_test/tmp/workspace/_build
+          key: e2e-mix-${{ runner.os }}-${{ hashFiles('mix.exs', 'integration_test/mix.exs', 'integration_test/fixtures/dummy_app/mix.exs') }}
           restore-keys: |
-            e2e-mix-${{ runner.os }}-${{ matrix.name }}-
+            e2e-mix-${{ runner.os }}-
 
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: native/mdex_native_nif -> target
-          shared-key: e2e-${{ matrix.cache_key }}
+          workspaces: |
+            integration_test/tmp/cargo_target/default
+            integration_test/tmp/cargo_target/lumis
+            integration_test/tmp/cargo_target/syntect
+          shared-key: e2e
 
-      - name: Run dummy app E2E
-        if: ${{ matrix.target == 'dummy_app' }}
-        working-directory: e2e/dummy_app
+      - name: Run integration tests
+        working-directory: integration_test
         env:
           MIX_ENV: test
           MDEX_NATIVE_BUILD: "1"
-          MDEX_NATIVE_E2E_CASE: ${{ matrix.e2e_case }}
-          MIX_BUILD_PATH: ${{ github.workspace }}/.e2e/${{ matrix.name }}/_build
-          MIX_DEPS_PATH: ${{ github.workspace }}/.e2e/${{ matrix.name }}/deps
-        run: mix do deps.get + deps.compile + test
-
-      - name: Run mdex E2E
-        if: ${{ matrix.target == 'mdex' }}
-        working-directory: .e2e/mdex
-        env:
-          MIX_ENV: test
-          MDEX_NATIVE_BUILD: "1"
-          MDEX_NATIVE_PATH: ${{ github.workspace }}
-          MIX_BUILD_PATH: ${{ github.workspace }}/.e2e/mdex/_build
-          MIX_DEPS_PATH: ${{ github.workspace }}/.e2e/mdex/deps
         run: |
           mix deps.get
           mix test
