@@ -73,7 +73,9 @@ defmodule MDExNative.Comrak do
   """
   @spec parse_document(markdown(), options()) :: MDExNative.Comrak.Document.t()
   def parse_document(markdown, options \\ []) when is_binary(markdown) do
-    MDExNative.Native.parse_document(markdown, options!(options))
+    markdown
+    |> MDExNative.Native.parse_document(options!(options))
+    |> check_native_output()
   end
 
   @doc ~S"""

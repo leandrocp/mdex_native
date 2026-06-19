@@ -7,6 +7,7 @@ mod types;
 
 use comrak::adapters::SyntaxHighlighterAdapter;
 use comrak::format_html_with_plugins;
+use comrak::nodes::AstNode;
 use comrak::options::Plugins;
 #[cfg(feature = "syntect")]
 use comrak::plugins::syntect::{SyntectAdapter, SyntectAdapterBuilder};
@@ -15,18 +16,167 @@ use lol_html::html_content::ContentType;
 use lol_html::{rewrite_str, text, RewriteStrSettings};
 #[cfg(feature = "lumis")]
 use lumis_adapter::LumisAdapter;
+use rustler::types::list::ListIterator;
 use rustler::{Encoder, Env, NifResult, Term};
 use types::{document::*, options::*};
 
 rustler::init!("Elixir.MDExNative.Native");
+
+mod atoms {
+    rustler::atoms! {
+        nodes
+    }
+}
+
+enum TraversalStep<'a> {
+    Enter(&'a AstNode<'a>),
+    Exit {
+        node: &'a AstNode<'a>,
+        child_count: usize,
+    },
+}
+
+fn document_term_to_comrak_ast<'a>(
+    arena: &'a Arena<'a>,
+    document: Term<'_>,
+) -> NifResult<&'a AstNode<'a>> {
+    let mut root = None;
+    let mut stack: Vec<(Term, Option<&'a AstNode<'a>>)> = Vec::new();
+    stack.try_reserve(1).map_err(|_| rustler::Error::BadArg)?;
+    stack.push((document, None));
+
+    while let Some((term, parent)) = stack.pop() {
+        let (node, children) = decode_document_node(term)?;
+        let node = ex_document_to_comrak_ast(arena, node);
+
+        if let Some(parent) = parent {
+            parent.append(node);
+        } else if root.is_none() {
+            root = Some(node);
+        } else {
+            return Err(rustler::Error::BadArg);
+        }
+
+        stack
+            .try_reserve(children.len())
+            .map_err(|_| rustler::Error::BadArg)?;
+
+        for child in children.into_iter().rev() {
+            stack.push((child, Some(node)));
+        }
+    }
+
+    root.ok_or(rustler::Error::BadArg)
+}
+
+fn decode_document_node(term: Term) -> NifResult<(NewNode, Vec<Term>)> {
+    let children = document_children_terms(term)?;
+    let term = if children.is_empty() {
+        term
+    } else {
+        document_term_with_empty_children(term)?
+    };
+
+    Ok((term.decode()?, children))
+}
+
+fn document_children_terms(term: Term) -> NifResult<Vec<Term>> {
+    match term.map_get(atoms::nodes()) {
+        Ok(nodes) => {
+            let iter: ListIterator = nodes.decode()?;
+            let mut children = Vec::new();
+
+            for child in iter {
+                children
+                    .try_reserve(1)
+                    .map_err(|_| rustler::Error::BadArg)?;
+                children.push(child);
+            }
+
+            Ok(children)
+        }
+        Err(_) => Ok(Vec::new()),
+    }
+}
+
+fn document_term_with_empty_children(term: Term) -> NifResult<Term> {
+    term.map_put(atoms::nodes(), Term::list_new_empty(term.get_env()))
+}
+
+fn pop_child_terms_as_list<'a>(
+    env: Env<'a>,
+    terms: &mut Vec<Term<'a>>,
+    count: usize,
+) -> NifResult<Term<'a>> {
+    let mut list = Term::list_new_empty(env);
+
+    for _ in 0..count {
+        let term = terms.pop().ok_or(rustler::Error::BadArg)?;
+        list = list.list_prepend(term);
+    }
+
+    Ok(list)
+}
+
+fn comrak_ast_to_document_term<'a, 'b>(env: Env<'a>, root: &'b AstNode<'b>) -> NifResult<Term<'a>> {
+    let mut stack = Vec::new();
+    let mut terms = Vec::new();
+    stack.try_reserve(1).map_err(|_| rustler::Error::BadArg)?;
+    stack.push(TraversalStep::Enter(root));
+
+    while let Some(step) = stack.pop() {
+        match step {
+            TraversalStep::Enter(node) => {
+                let exit_index = stack.len();
+                stack.try_reserve(1).map_err(|_| rustler::Error::BadArg)?;
+                stack.push(TraversalStep::Exit {
+                    node,
+                    child_count: 0,
+                });
+
+                let mut count: usize = 0;
+
+                for child in node.reverse_children() {
+                    count = count.checked_add(1).ok_or(rustler::Error::BadArg)?;
+                    stack.try_reserve(1).map_err(|_| rustler::Error::BadArg)?;
+                    stack.push(TraversalStep::Enter(child));
+                }
+
+                if let Some(TraversalStep::Exit { child_count, .. }) = stack.get_mut(exit_index) {
+                    *child_count = count;
+                } else {
+                    return Err(rustler::Error::BadArg);
+                }
+            }
+            TraversalStep::Exit { node, child_count } => {
+                let node = comrak_ast_to_ex_document_shallow(node);
+                let term = node.encode(env);
+
+                if child_count > 0 {
+                    let children = pop_child_terms_as_list(env, &mut terms, child_count)?;
+                    terms.try_reserve(1).map_err(|_| rustler::Error::BadArg)?;
+                    terms.push(term.map_put(atoms::nodes(), children)?);
+                } else {
+                    terms.try_reserve(1).map_err(|_| rustler::Error::BadArg)?;
+                    terms.push(term);
+                }
+            }
+        }
+    }
+
+    if terms.len() == 1 {
+        terms.pop().ok_or(rustler::Error::BadArg)
+    } else {
+        Err(rustler::Error::BadArg)
+    }
+}
 
 #[rustler::nif(schedule = "DirtyCpu")]
 fn parse_document<'a>(env: Env<'a>, md: &str, options: ExOptions) -> NifResult<Term<'a>> {
     let comrak_options = options.comrak_options();
     let arena = Arena::new();
     let root = comrak::parse_document(&arena, md, &comrak_options);
-    let ex_document = comrak_ast_to_ex_document(root);
-    Ok(ex_document.encode(env))
+    comrak_ast_to_document_term(env, root)
 }
 
 #[rustler::nif(schedule = "DirtyCpu")]
@@ -65,10 +215,9 @@ fn markdown_to_xml_with_options<'a>(
 }
 
 #[rustler::nif(schedule = "DirtyCpu")]
-fn document_to_commonmark(env: Env<'_>, ex_document: ExDocument) -> NifResult<Term<'_>> {
+fn document_to_commonmark<'a>(env: Env<'a>, ex_document: Term<'a>) -> NifResult<Term<'a>> {
     let arena = Arena::new();
-    let ex_node = NewNode::Document(ex_document);
-    let comrak_ast = ex_document_to_comrak_ast(&arena, ex_node);
+    let comrak_ast = document_term_to_comrak_ast(&arena, ex_document)?;
     let mut buffer = String::new();
     let plugins = Plugins::default();
     comrak::format_commonmark_with_plugins(comrak_ast, &Options::default(), &mut buffer, &plugins)
@@ -80,12 +229,11 @@ fn document_to_commonmark(env: Env<'_>, ex_document: ExDocument) -> NifResult<Te
 #[rustler::nif(schedule = "DirtyCpu")]
 fn document_to_commonmark_with_options<'a>(
     env: Env<'a>,
-    ex_document: ExDocument,
+    ex_document: Term<'a>,
     options: ExOptions,
 ) -> NifResult<Term<'a>> {
     let arena = Arena::new();
-    let ex_node = NewNode::Document(ex_document);
-    let comrak_ast = ex_document_to_comrak_ast(&arena, ex_node);
+    let comrak_ast = document_term_to_comrak_ast(&arena, ex_document)?;
     let (comrak_options, lumis_adapter, _sanitize) = render_parts(options)?;
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
@@ -97,10 +245,9 @@ fn document_to_commonmark_with_options<'a>(
 }
 
 #[rustler::nif(schedule = "DirtyCpu")]
-fn document_to_html(env: Env<'_>, ex_document: ExDocument) -> NifResult<Term<'_>> {
+fn document_to_html<'a>(env: Env<'a>, ex_document: Term<'a>) -> NifResult<Term<'a>> {
     let arena = Arena::new();
-    let ex_node = NewNode::Document(ex_document);
-    let comrak_ast = ex_document_to_comrak_ast(&arena, ex_node);
+    let comrak_ast = document_term_to_comrak_ast(&arena, ex_document)?;
     let mut buffer = String::new();
     let options = Options::default();
     format_html_with_plugins(comrak_ast, &options, &mut buffer, &Plugins::default())
@@ -111,12 +258,11 @@ fn document_to_html(env: Env<'_>, ex_document: ExDocument) -> NifResult<Term<'_>
 #[rustler::nif(schedule = "DirtyCpu")]
 fn document_to_html_with_options<'a>(
     env: Env<'a>,
-    ex_document: ExDocument,
+    ex_document: Term<'a>,
     options: ExOptions,
 ) -> NifResult<Term<'a>> {
     let arena = Arena::new();
-    let ex_node = NewNode::Document(ex_document);
-    let comrak_ast = ex_document_to_comrak_ast(&arena, ex_node);
+    let comrak_ast = document_term_to_comrak_ast(&arena, ex_document)?;
     let (comrak_options, lumis_adapter, sanitize) = render_parts(options)?;
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
@@ -127,10 +273,9 @@ fn document_to_html_with_options<'a>(
 }
 
 #[rustler::nif(schedule = "DirtyCpu")]
-fn document_to_xml(env: Env<'_>, ex_document: ExDocument) -> NifResult<Term<'_>> {
+fn document_to_xml<'a>(env: Env<'a>, ex_document: Term<'a>) -> NifResult<Term<'a>> {
     let arena = Arena::new();
-    let ex_node = NewNode::Document(ex_document);
-    let comrak_ast = ex_document_to_comrak_ast(&arena, ex_node);
+    let comrak_ast = document_term_to_comrak_ast(&arena, ex_document)?;
     let mut buffer = String::new();
     let plugins = Plugins::default();
     comrak::format_xml_with_plugins(comrak_ast, &Options::default(), &mut buffer, &plugins)
@@ -142,12 +287,11 @@ fn document_to_xml(env: Env<'_>, ex_document: ExDocument) -> NifResult<Term<'_>>
 #[rustler::nif(schedule = "DirtyCpu")]
 fn document_to_xml_with_options<'a>(
     env: Env<'a>,
-    ex_document: ExDocument,
+    ex_document: Term<'a>,
     options: ExOptions,
 ) -> NifResult<Term<'a>> {
     let arena = Arena::new();
-    let ex_node = NewNode::Document(ex_document);
-    let comrak_ast = ex_document_to_comrak_ast(&arena, ex_node);
+    let comrak_ast = document_term_to_comrak_ast(&arena, ex_document)?;
     let (comrak_options, lumis_adapter, _sanitize) = render_parts(options)?;
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
@@ -376,4 +520,88 @@ fn do_safe_html(
 
     html.replace("&amp;lbrace;", "&lbrace;")
         .replace("&amp;rbrace;", "&rbrace;")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn iterative_ast_roundtrip_handles_deep_nesting() {
+        let markdown = format!("{}boom", "> ".repeat(5_000));
+        let options = Options::default();
+        let source_arena = Arena::new();
+        let target_arena = Arena::new();
+        let source_root = comrak::parse_document(&source_arena, &markdown, &options);
+        let target_root = clone_ast_iteratively(&target_arena, source_root).unwrap();
+
+        assert_eq!(
+            render_html(target_root, &options),
+            render_html(source_root, &options)
+        );
+    }
+
+    #[test]
+    fn iterative_ast_roundtrip_preserves_mixed_markdown() {
+        let markdown = concat!(
+            "# Release Notes\n\n",
+            "Intro with **bold**, _emphasis_, [a link](https://example.com), and `inline code`.\n\n",
+            "> A quote with nested content.\n",
+            ">\n",
+            "> - quoted item\n",
+            "> - another quoted item\n\n",
+            "- first\n",
+            "- second\n\n",
+            "```elixir\n",
+            "IO.puts(\"hello\")\n",
+            "```\n"
+        );
+        let options = Options::default();
+        let source_arena = Arena::new();
+        let target_arena = Arena::new();
+        let source_root = comrak::parse_document(&source_arena, markdown, &options);
+        let target_root = clone_ast_iteratively(&target_arena, source_root).unwrap();
+
+        assert_eq!(
+            render_html(target_root, &options),
+            render_html(source_root, &options)
+        );
+    }
+
+    fn clone_ast_iteratively<'a, 'b>(
+        arena: &'a Arena<'a>,
+        root: &'b AstNode<'b>,
+    ) -> NifResult<&'a AstNode<'a>> {
+        let mut cloned_root = None;
+        let mut stack: Vec<(&'b AstNode<'b>, Option<&'a AstNode<'a>>)> = vec![(root, None)];
+
+        while let Some((source_node, parent)) = stack.pop() {
+            let target_node =
+                ex_document_to_comrak_ast(arena, comrak_ast_to_ex_document_shallow(source_node));
+
+            if let Some(parent) = parent {
+                parent.append(target_node);
+            } else if cloned_root.is_none() {
+                cloned_root = Some(target_node);
+            } else {
+                return Err(rustler::Error::BadArg);
+            }
+
+            for child in source_node.reverse_children() {
+                stack.push((child, Some(target_node)));
+            }
+        }
+
+        cloned_root.ok_or(rustler::Error::BadArg)
+    }
+
+    fn render_html<'a>(root: &'a AstNode<'a>, options: &Options) -> String {
+        let mut output = String::new();
+
+        format_html_with_plugins(root, options, &mut output, &Plugins::default())
+            .expect("writing to String is infallible");
+
+        output
+    }
 }

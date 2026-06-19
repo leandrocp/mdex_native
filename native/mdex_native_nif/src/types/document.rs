@@ -1104,8 +1104,14 @@ pub fn ex_document_to_comrak_ast<'a>(
     node_arena
 }
 
-pub fn comrak_ast_to_ex_document<'a>(node: &'a AstNode<'a>) -> NewNode {
-    let children: Vec<NewNode> = node.children().map(comrak_ast_to_ex_document).collect();
+pub fn comrak_ast_to_ex_document_shallow<'a>(node: &'a AstNode<'a>) -> NewNode {
+    comrak_ast_to_ex_document_with_children(node, Vec::new())
+}
+
+fn comrak_ast_to_ex_document_with_children<'a>(
+    node: &'a AstNode<'a>,
+    children: Vec<NewNode>,
+) -> NewNode {
     let node_data = node.data();
     let sourcepos = node_data.sourcepos.into();
 
