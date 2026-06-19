@@ -163,6 +163,11 @@ pub fn text_to_anchor(text: &str) -> String {
     Anchorizer::new().anchorize(text)
 }
 
+#[rustler::nif]
+pub fn dangerous_url(url: &str) -> bool {
+    comrak::html::dangerous_url(url)
+}
+
 #[rustler::nif(schedule = "DirtyCpu")]
 pub fn safe_html(
     env: Env<'_>,

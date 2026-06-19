@@ -58,20 +58,22 @@ defmodule MDExNative.MixProject do
   defp deps do
     [
       {:rustler, "~> 0.32", optional: not @force_build?},
-      {:rustler_precompiled, "~> 0.7"}
+      {:rustler_precompiled, "~> 0.7"},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end
 
   defp aliases do
     [
-      docs: &build_docs/1,
       setup: ["deps.get", "compile"],
+      docs: &build_docs/1,
       "gen.checksum": "rustler_precompiled.download MDExNative.Native --all --print",
-      "format.all": ["format", "rust.fmt"],
-      "rust.lint": [
+      format: ["cmd cargo fmt --manifest-path=native/mdex_native_nif/Cargo.toml --all", "format"],
+      lint: [
+        "credo",
         "cmd cargo clippy --manifest-path=native/mdex_native_nif/Cargo.toml -- -Dwarnings"
       ],
-      "rust.fmt": ["cmd cargo fmt --manifest-path=native/mdex_native_nif/Cargo.toml --all"]
+      test: ["cmd cargo test --manifest-path=native/mdex_native_nif/Cargo.toml", "test"]
     ]
   end
 

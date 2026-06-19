@@ -123,4 +123,5 @@ defmodule MDExNative.Native do
     do: :erlang.nif_error(:nif_not_loaded)
 
   def text_to_anchor(_text), do: :erlang.nif_error(:nif_not_loaded)
+  def dangerous_url(_url), do: :erlang.nif_error(:nif_not_loaded)
 end

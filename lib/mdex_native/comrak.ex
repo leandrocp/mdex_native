@@ -29,9 +29,6 @@ defmodule MDExNative.Comrak do
   @typedoc "Rendered CommonMark XML."
   @type xml :: String.t()
 
-  @typedoc "Heading anchor generated from text."
-  @type anchor :: String.t()
-
   @typedoc "Parsed fenced code block info string."
   @type code_fence_info :: %{
           language: String.t(),
@@ -199,9 +196,31 @@ defmodule MDExNative.Comrak do
       iex> MDExNative.Comrak.anchorize("Hello World")
       "hello-world"
   """
-  @spec anchorize(String.t()) :: anchor()
+  @spec anchorize(String.t()) :: String.t()
   def anchorize(text) when is_binary(text) do
     MDExNative.Native.text_to_anchor(text)
+  end
+
+  @doc ~S"""
+  Returns whether a URL is considered dangerous or not.
+
+  Calls [`comrak::html::dangerous_url/1`](https://docs.rs/comrak/latest/comrak/html/fn.dangerous_url.html).
+
+  ## Examples
+
+      iex> MDExNative.Comrak.dangerous_url?("javascript:alert(1)")
+      true
+
+      iex> MDExNative.Comrak.dangerous_url?("https://elixir-lang.org")
+      false
+
+      iex> MDExNative.Comrak.dangerous_url?("data:image/png;base64,AAAA")
+      false
+
+  """
+  @spec dangerous_url?(String.t()) :: boolean()
+  def dangerous_url?(url) when is_binary(url) do
+    MDExNative.Native.dangerous_url(url)
   end
 
   @doc ~S"""
