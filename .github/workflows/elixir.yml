@@ -27,6 +27,7 @@ jobs:
     with:
       pairs: '[{"name":"OTP 29, Elixir main", "elixir":"main-otp-29", "otp":"maint-29"}]'
       env_vars: '{"MDEX_NATIVE_BUILD": "1"}'
+      credo: true
 
   e2e:
     if: ${{ github.event_name != 'pull_request' || !startsWith(github.head_ref, 'release-please--') }}
