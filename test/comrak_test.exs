@@ -9,8 +9,23 @@ defmodule MDExNative.ComrakTest do
 
   doctest MDExNative.Comrak
 
-  test "anchorizes text" do
+  test "anchorize" do
     assert MDExNative.Comrak.anchorize("Hello World") == "hello-world"
+  end
+
+  test "dangerous_url?" do
+    assert MDExNative.Comrak.dangerous_url?("javascript:malicious")
+    assert MDExNative.Comrak.dangerous_url?("Javascript:malicious")
+    assert MDExNative.Comrak.dangerous_url?("data:malicious")
+    assert MDExNative.Comrak.dangerous_url?("Data:malicious")
+    assert MDExNative.Comrak.dangerous_url?("vbscript:malicious")
+    assert MDExNative.Comrak.dangerous_url?("FILE:malicious")
+
+    refute MDExNative.Comrak.dangerous_url?("data:image/png/x")
+    refute MDExNative.Comrak.dangerous_url?("data:image/gif/x")
+    refute MDExNative.Comrak.dangerous_url?("data:image/jpeg/x")
+    refute MDExNative.Comrak.dangerous_url?("data:image/webp/x")
+    refute MDExNative.Comrak.dangerous_url?("https://elixir-lang.org")
   end
 
   test "renders markdown with Comrak options" do
