@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.2](https://github.com/leandrocp/mdex_native/compare/v0.2.1...v0.2.2) (2026-06-19)
+
+
+### Features
+
+* add `MDExNative.Comrak.dangerous_url?` ([#24](https://github.com/leandrocp/mdex_native/issues/24)) ([d05d02b](https://github.com/leandrocp/mdex_native/commit/d05d02bc954d5f869c2619c442f46da0bca70757))
+
+
+### Documentation
+
+* expose changelog ([487cb1c](https://github.com/leandrocp/mdex_native/commit/487cb1c6a32ba51b1fc9ee8cabe666bb46c73cfb))
+
 ## [0.2.1](https://github.com/leandrocp/mdex_native/compare/v0.2.0...v0.2.1) (2026-06-15)
 
 
