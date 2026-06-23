@@ -102,7 +102,7 @@ defmodule MDExNative.Integration.E2ETest do
     run!("mix", args, path, env, opts)
   end
 
-  defp run!(command, args, path, env, opts) do
+  defp run!(command, args, path, env, opts, attempt \\ 1) do
     label = Keyword.get(opts, :label, Path.relative_to_cwd(path))
     command_name = Enum.join([command | args], " ")
 
@@ -123,12 +123,18 @@ defmodule MDExNative.Integration.E2ETest do
       |> System.convert_time_unit(:native, :millisecond)
 
     if status != 0 do
-      flunk("#{command_name} failed in #{path} after #{elapsed_ms}ms\n\n#{output}")
+      if attempt < 3 do
+        IO.write("e2e[#{label}]: retrying #{command_name} after failed attempt #{attempt}\n")
+        Process.sleep(:timer.seconds(attempt))
+        run!(command, args, path, env, opts, attempt + 1)
+      else
+        flunk("#{command_name} failed in #{path} after #{elapsed_ms}ms\n\n#{output}")
+      end
+    else
+      IO.write("e2e[#{label}]: completed #{command_name} in #{elapsed_ms}ms\n")
+
+      output
     end
-
-    IO.write("e2e[#{label}]: completed #{command_name} in #{elapsed_ms}ms\n")
-
-    output
   end
 
   defp e2e_env(e2e_case, native_checkout_path, opts) do

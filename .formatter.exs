@@ -1,3 +1,7 @@
 [
-  inputs: ["{mix,.formatter}.exs", "{config,lib,test,examples}/**/*.{ex,exs}"]
+  inputs: [
+    "*.{ex,exs}",
+    "{config,lib,test,examples}/**/*.{ex,exs}"
+  ],
+  subdirectories: ["integration_test"]
 ]

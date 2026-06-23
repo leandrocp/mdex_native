@@ -60,9 +60,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
-            integration_test/tmp/cargo_target/default
-            integration_test/tmp/cargo_target/lumis
-            integration_test/tmp/cargo_target/syntect
+            native/mdex_native_nif -> integration_test/tmp/cargo_target/default
+            native/mdex_native_nif -> integration_test/tmp/cargo_target/lumis
+            native/mdex_native_nif -> integration_test/tmp/cargo_target/syntect
           shared-key: e2e
 
       - name: Run integration tests
@@ -70,6 +70,8 @@ jobs:
         env:
           MIX_ENV: test
           MDEX_NATIVE_BUILD: "1"
+          CARGO_HTTP_MULTIPLEXING: "false"
+          CARGO_NET_RETRY: "10"
         run: |
           mix deps.get
           mix test
