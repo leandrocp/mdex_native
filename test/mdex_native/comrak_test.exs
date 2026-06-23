@@ -1,6 +1,10 @@
 defmodule MDExNative.ComrakTest do
   use ExUnit.Case
 
+  alias MDExNative.Comrak.Document
+  alias MDExNative.Comrak.EscapedTag
+  alias MDExNative.Comrak.Paragraph
+
   @code_block_markdown """
   ```elixir
   IO.puts("Hello")
@@ -468,6 +472,37 @@ defmodule MDExNative.ComrakTest do
     document = %MDExNative.Comrak.Document{nodes: nodes}
 
     assert is_binary(MDExNative.Comrak.document_to_html(document))
+  end
+
+  test "document_to_html renders arbitrary escaped tag literals as text" do
+    document = %Document{
+      nodes: [
+        %Paragraph{
+          nodes: [%EscapedTag{literal: "<script>alert(1)</script>"}]
+        }
+      ]
+    }
+
+    assert MDExNative.Comrak.document_to_html(document, render: [unsafe: true], sanitize: nil) ==
+             "<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>\n"
+  end
+
+  test "document_to_html preserves Comrak escaped tag delimiter tokens" do
+    document = %Document{
+      nodes: [
+        %Paragraph{
+          nodes: [
+            %EscapedTag{
+              literal: "|",
+              nodes: [%MDExNative.Comrak.Text{literal: "spoiler"}]
+            }
+          ]
+        }
+      ]
+    }
+
+    assert MDExNative.Comrak.document_to_html(document, render: [unsafe: true], sanitize: nil) ==
+             "<p>|spoiler|</p>\n"
   end
 
   test "parses code fence info with language only" do

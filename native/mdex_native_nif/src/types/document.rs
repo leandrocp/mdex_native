@@ -928,7 +928,22 @@ pub struct ExEscapedTag {
 
 impl From<ExEscapedTag> for NodeValue {
     fn from(node: ExEscapedTag) -> Self {
-        NodeValue::EscapedTag(Box::leak(node.literal.into_boxed_str()))
+        if let Some(literal) = comrak_escaped_tag_literal(&node.literal) {
+            NodeValue::EscapedTag(literal)
+        } else {
+            NodeValue::Text(node.literal.into())
+        }
+    }
+}
+
+fn comrak_escaped_tag_literal(literal: &str) -> Option<&'static str> {
+    match literal {
+        "|" => Some("|"),
+        "~" => Some("~"),
+        "~~" => Some("~~"),
+        "==" => Some("=="),
+        "++" => Some("++"),
+        _ => None,
     }
 }
 
@@ -1078,8 +1093,13 @@ pub fn ex_document_to_comrak_ast<'a>(
         NewNode::SpoileredText(ExSpoileredText { nodes, sourcepos }) => (sourcepos, Some(nodes)),
         NewNode::Subtext(ExSubtext { nodes, sourcepos }) => (sourcepos, Some(nodes)),
         NewNode::EscapedTag(ExEscapedTag {
-            nodes, sourcepos, ..
-        }) => (sourcepos, Some(nodes)),
+            nodes,
+            literal,
+            sourcepos,
+        }) => {
+            let children = comrak_escaped_tag_literal(&literal).map(|_| nodes);
+            (sourcepos, children)
+        }
         NewNode::Alert(ExAlert {
             nodes, sourcepos, ..
         }) => (sourcepos, Some(nodes)),
@@ -1462,5 +1482,85 @@ fn char_to_string(c: u8) -> Result<String, &'static str> {
     match String::from_utf8(vec![c]) {
         Ok(s) => Ok(s),
         Err(_) => Err("failed to convert to string"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sourcepos() -> ExSourcepos {
+        ExSourcepos::default()
+    }
+
+    #[test]
+    fn escaped_tag_conversion_preserves_comrak_delimiter_tokens() {
+        let arena = TypedArena::new();
+        let node = ex_document_to_comrak_ast(
+            &arena,
+            NewNode::Document(ExDocument {
+                nodes: vec![NewNode::Paragraph(ExParagraph {
+                    nodes: vec![NewNode::EscapedTag(ExEscapedTag {
+                        nodes: vec![NewNode::Text(ExText {
+                            literal: "child".to_string(),
+                            sourcepos: sourcepos(),
+                        })],
+                        literal: "|".to_string(),
+                        sourcepos: sourcepos(),
+                    })],
+                    sourcepos: sourcepos(),
+                })],
+                sourcepos: sourcepos(),
+            }),
+        );
+        let paragraph = node.first_child().expect("document should have a child");
+        let child = paragraph
+            .first_child()
+            .expect("paragraph should have a child");
+
+        assert!(matches!(child.data().value, NodeValue::EscapedTag("|")));
+        assert!(matches!(
+            child
+                .first_child()
+                .expect("escaped tag should keep children")
+                .data()
+                .value,
+            NodeValue::Text(ref literal) if literal == "child"
+        ));
+    }
+
+    #[test]
+    fn escaped_tag_conversion_renders_arbitrary_literals_as_leaf_text() {
+        let arena = TypedArena::new();
+        let node = ex_document_to_comrak_ast(
+            &arena,
+            NewNode::Document(ExDocument {
+                nodes: vec![NewNode::Paragraph(ExParagraph {
+                    nodes: vec![NewNode::EscapedTag(ExEscapedTag {
+                        nodes: vec![NewNode::Text(ExText {
+                            literal: "child".to_string(),
+                            sourcepos: sourcepos(),
+                        })],
+                        literal: "<script>alert(1)</script>".to_string(),
+                        sourcepos: sourcepos(),
+                    })],
+                    sourcepos: sourcepos(),
+                })],
+                sourcepos: sourcepos(),
+            }),
+        );
+        let paragraph = node.first_child().expect("document should have a child");
+        let child = paragraph
+            .first_child()
+            .expect("paragraph should have a child");
+
+        assert!(matches!(
+            child.data().value,
+            NodeValue::Text(ref literal) if literal == "<script>alert(1)</script>"
+        ));
+        assert!(
+            child.first_child().is_none(),
+            "fallback text nodes cannot retain escaped tag children"
+        );
     }
 }
