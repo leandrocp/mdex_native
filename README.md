@@ -45,6 +45,18 @@ mix setup
 mix test
 ```
 
+## Precompiled Artifacts
+
+Precompiled NIFs are downloaded from GitHub network by default,
+but you can opt-in to download from CloudFlare:
+
+```elixir
+config :mdex_native, artifact_source: :cloudflare
+```
+
+Since version v0.2.3 and valid values are `:github` and `:cloudflare`.
+Defaults to `:github`.
+
 ## Packages
 
 ### [MDExNative.Comrak](https://mdex-native.hexdocs.pm/MDExNative.Comrak.html)
