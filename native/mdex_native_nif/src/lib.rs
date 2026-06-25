@@ -194,7 +194,10 @@ fn render_parts(
 )> {
     let comrak_options = options.comrak_options();
     let syntax_highlighter = match options.syntax_highlight {
-        Some(syntax_highlight) => Some(syntax_highlighter(syntax_highlight)?),
+        Some(syntax_highlight) => Some(syntax_highlighter(
+            syntax_highlight,
+            comrak_options.render.r#unsafe,
+        )?),
         None => None,
     };
 
@@ -203,13 +206,18 @@ fn render_parts(
 
 fn syntax_highlighter(
     syntax_highlight: ExSyntaxHighlightOptions,
+    render_unsafe: bool,
 ) -> NifResult<CodeFenceSyntaxHighlighter> {
+    #[cfg(not(feature = "lumis"))]
+    let _ = render_unsafe;
+
     match syntax_highlight.opts {
         ExSyntaxHighlightEngineOptions::Lumis(opts) => {
             #[cfg(feature = "lumis")]
             {
                 Ok(CodeFenceSyntaxHighlighter::Lumis(LumisAdapter::new(
                     opts.formatter,
+                    render_unsafe,
                 )))
             }
 

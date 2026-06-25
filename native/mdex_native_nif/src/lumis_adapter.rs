@@ -37,6 +37,7 @@ struct MultiThemesConfig {
 
 pub struct LumisAdapter {
     formatter_config: ExFormatterOption,
+    render_unsafe: bool,
     stored_attrs: Mutex<Option<Arc<HashMap<String, String>>>>,
     stored_lang: Mutex<Option<Language>>,
 }
@@ -45,6 +46,7 @@ impl Default for LumisAdapter {
     fn default() -> Self {
         Self {
             formatter_config: ExFormatterOption::default(),
+            render_unsafe: false,
             stored_attrs: Mutex::new(None),
             stored_lang: Mutex::new(None),
         }
@@ -52,9 +54,10 @@ impl Default for LumisAdapter {
 }
 
 impl LumisAdapter {
-    pub fn new(formatter_config: ExFormatterOption) -> Self {
+    pub fn new(formatter_config: ExFormatterOption, render_unsafe: bool) -> Self {
         Self {
             formatter_config,
+            render_unsafe,
             stored_attrs: Mutex::new(None),
             stored_lang: Mutex::new(None),
         }
@@ -373,9 +376,16 @@ impl SyntaxHighlighterAdapter for LumisAdapter {
         let pre_class = self
             .decorator_pre_class()
             .or_else(|| self.pre_class().map(|s| s.to_string()));
+        let escaped_pre_class = pre_class.as_deref().map(|class| {
+            if self.render_unsafe {
+                class.to_string()
+            } else {
+                v_htmlescape::escape_fmt(class).to_string()
+            }
+        });
 
         let mut adapter = FmtToIoAdapter(output);
-        html::open_pre_tag(&mut adapter, pre_class.as_deref(), theme.as_ref())
+        html::open_pre_tag(&mut adapter, escaped_pre_class.as_deref(), theme.as_ref())
             .map_err(|_| std::fmt::Error)
     }
 
@@ -506,10 +516,19 @@ impl SyntaxHighlighterAdapter for LumisAdapter {
                 if lines.contains(&line_number) {
                     if let Some(ref c) = class {
                         class_name.push(' ');
-                        class_name.push_str(c);
+                        if self.render_unsafe {
+                            class_name.push_str(c);
+                        } else {
+                            class_name.push_str(&v_htmlescape::escape_fmt(c).to_string());
+                        }
                     }
                     if let Some(ref s) = style {
-                        style_attr = format!(" style=\"{}\"", s);
+                        if self.render_unsafe {
+                            style_attr = format!(" style=\"{}\"", s);
+                        } else {
+                            style_attr =
+                                format!(" style=\"{}\"", v_htmlescape::escape_fmt(s).to_string());
+                        }
                     }
                 }
             }
@@ -537,7 +556,7 @@ mod tests {
     fn run_test(markdown: &str, formatter: ExFormatterOption, options: Options) -> String {
         let arena = Arena::new();
         let root = parse_document(&arena, markdown, &options);
-        let adapter = LumisAdapter::new(formatter);
+        let adapter = LumisAdapter::new(formatter, options.render.r#unsafe);
 
         let plugins = Plugins {
             render: comrak::options::RenderPlugins {
@@ -696,6 +715,117 @@ fn main() {
 </div><div class="l-line custom-highlight-class" style="background-color: #ffffcc; border-left: 3px solid #ff0000" data-line="4">    <span data-highlight="keyword" style="color: #cf222e;">let</span> <span data-highlight="variable" style="color: #1f2328;">z</span> <span data-highlight="operator" style="color: #0550ae;">=</span> <span data-highlight="number" style="color: #0550ae;">3</span><span data-highlight="punctuation.delimiter" style="color: #1f2328;">;</span>
 </div><div class="l-line custom-highlight-class" style="background-color: #ffffcc; border-left: 3px solid #ff0000" data-line="5">    <span data-highlight="keyword" style="color: #cf222e;">let</span> <span data-highlight="variable" style="color: #1f2328;">message</span> <span data-highlight="operator" style="color: #0550ae;">=</span> <span data-highlight="string" style="color: #0a3069;">&quot;Hello, world!&quot;</span><span data-highlight="punctuation.delimiter" style="color: #1f2328;">;</span>
 </div><div class="l-line" data-line="6"><span data-highlight="punctuation.bracket" style="color: #1f2328;">&rbrace;</span>
+</div></code></pre>"#;
+
+        assert_str_eq!(output.trim(), expected.trim());
+    }
+
+    #[test]
+    fn test_html_inline_decorator_attributes_are_escaped() {
+        let pre_class = "x\"><script>alert(1)</script>";
+
+        let markdown = format!("```text pre_class='{}'\nhello\n```", pre_class);
+
+        let formatter = ExFormatterOption::HtmlInline {
+            theme: None,
+            pre_class: None,
+            italic: false,
+            include_highlights: false,
+            highlight_lines: None,
+            header: None,
+        };
+
+        let mut options = Options::default();
+        options.render.github_pre_lang = true;
+        options.render.full_info_string = true;
+
+        let output = run_test(&markdown, formatter, options);
+
+        let expected = r#"<pre class="lumis x&quot;&gt;&lt;script&gt;alert(1)&lt;&#x2f;script&gt;"><code class="language-plaintext" translate="no" tabindex="0"><div class="l-line" data-line="1">hello
+</div></code></pre>"#;
+
+        assert_str_eq!(output.trim(), expected.trim());
+    }
+
+    #[test]
+    fn test_html_inline_decorator_attributes_respect_unsafe_render() {
+        let pre_class = "x\"><script>alert(1)</script>";
+
+        let markdown = format!("```text pre_class='{}'\nhello\n```", pre_class);
+
+        let formatter = ExFormatterOption::HtmlInline {
+            theme: None,
+            pre_class: None,
+            italic: false,
+            include_highlights: false,
+            highlight_lines: None,
+            header: None,
+        };
+
+        let mut options = Options::default();
+        options.render.github_pre_lang = true;
+        options.render.full_info_string = true;
+        options.render.r#unsafe = true;
+
+        let output = run_test(&markdown, formatter, options);
+
+        let expected = r#"<pre class="lumis x"><script>alert(1)</script>"><code class="language-plaintext" translate="no" tabindex="0"><div class="l-line" data-line="1">hello
+</div></code></pre>"#;
+
+        assert_str_eq!(output.trim(), expected.trim());
+    }
+
+    #[test]
+    fn test_html_inline_decorator_attributes_respect_unsafe_render_with_sanitize_clean() {
+        let pre_class = "x\"><script>alert(1)</script>";
+
+        let markdown = format!("```text pre_class='{}'\nhello\n```", pre_class);
+
+        let formatter = ExFormatterOption::HtmlInline {
+            theme: None,
+            pre_class: None,
+            italic: false,
+            include_highlights: false,
+            highlight_lines: None,
+            header: None,
+        };
+
+        let mut options = Options::default();
+        options.render.github_pre_lang = true;
+        options.render.full_info_string = true;
+        options.render.r#unsafe = true;
+
+        let unsafe_output = run_test(&markdown, formatter, options);
+        let output = ammonia::clean(&unsafe_output);
+
+        let expected = r#"<pre>"&gt;<code><div>hello
+</div></code></pre>"#;
+
+        assert_str_eq!(output.trim(), expected.trim());
+    }
+
+    #[test]
+    fn test_html_inline_safe_decorator_attribute_with_unsafe_render_and_sanitize_clean() {
+        let markdown = "```text pre_class='safe-class'\nhello\n```";
+
+        let formatter = ExFormatterOption::HtmlInline {
+            theme: None,
+            pre_class: None,
+            italic: false,
+            include_highlights: false,
+            highlight_lines: None,
+            header: None,
+        };
+
+        let mut options = Options::default();
+        options.render.github_pre_lang = true;
+        options.render.full_info_string = true;
+        options.render.r#unsafe = true;
+
+        let unsafe_output = run_test(markdown, formatter, options);
+        let output = ammonia::clean(&unsafe_output);
+
+        let expected = r#"<pre><code><div>hello
 </div></code></pre>"#;
 
         assert_str_eq!(output.trim(), expected.trim());
