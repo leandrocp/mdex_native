@@ -5,7 +5,6 @@ defmodule MDExNative.Native do
 
   mix_config = Mix.Project.config()
   version = mix_config[:version]
-  github_url = mix_config[:package][:links][:GitHub]
   mode = if Mix.env() in [:dev, :test], do: :debug, else: :release
 
   syntax_highlighter = Application.compile_env(:mdex_native, :syntax_highlighter, nil)
@@ -99,7 +98,7 @@ defmodule MDExNative.Native do
     otp_app: :mdex_native,
     crate: "mdex_native_nif",
     version: version,
-    base_url: "#{github_url}/releases/download/v#{version}",
+    base_url: {MDExNative.Native.ArtifactURL, :url},
     targets: targets,
     variants: variants,
     nif_versions: ["2.15"],

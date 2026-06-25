@@ -17,6 +17,12 @@ jobs:
       project-name: mdex_native_nif
       project-dir: native/mdex_native_nif
       feature-variants: '[{"features":"lumis","variant":"lumis"},{"features":"syntect","variant":"syntect"},{"features":"","variant":""}]'
+      r2-path: releases/download/${{ github.ref_name }}
+    secrets:
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
 
   hex-publish:
     needs: release-nifs
