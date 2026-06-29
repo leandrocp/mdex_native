@@ -543,8 +543,7 @@ impl SyntaxHighlighterAdapter for LumisAdapter {
                         if self.render_unsafe {
                             style_attr = format!(" style=\"{}\"", s);
                         } else {
-                            style_attr =
-                                format!(" style=\"{}\"", v_htmlescape::escape_fmt(s).to_string());
+                            style_attr = format!(" style=\"{}\"", v_htmlescape::escape_fmt(s));
                         }
                     }
                 }
