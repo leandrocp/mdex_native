@@ -748,6 +748,66 @@ fn main() {
     }
 
     #[test]
+    fn test_html_inline_highlight_lines_class_decorator_attribute_is_escaped() {
+        let highlight_lines_class = "x\"><script>alert(1)</script>";
+
+        let markdown = format!(
+            "```text highlight_lines=1 highlight_lines_class='{}'\nhello\n```",
+            highlight_lines_class
+        );
+
+        let formatter = ExFormatterOption::HtmlInline {
+            theme: None,
+            pre_class: None,
+            italic: false,
+            include_highlights: false,
+            highlight_lines: None,
+            header: None,
+        };
+
+        let mut options = Options::default();
+        options.render.github_pre_lang = true;
+        options.render.full_info_string = true;
+
+        let output = run_test(&markdown, formatter, options);
+
+        let expected = r#"<pre class="lumis"><code class="language-plaintext" translate="no" tabindex="0"><div class="l-line x&quot;&gt;&lt;script&gt;alert(1)&lt;&#x2f;script&gt;" data-line="1">hello
+</div></code></pre>"#;
+
+        assert_str_eq!(output.trim(), expected.trim());
+    }
+
+    #[test]
+    fn test_html_inline_highlight_lines_style_decorator_attribute_is_escaped() {
+        let highlight_lines_style = "x\"><script>alert(1)</script>";
+
+        let markdown = format!(
+            "```text highlight_lines=1 highlight_lines_style='{}'\nhello\n```",
+            highlight_lines_style
+        );
+
+        let formatter = ExFormatterOption::HtmlInline {
+            theme: None,
+            pre_class: None,
+            italic: false,
+            include_highlights: false,
+            highlight_lines: None,
+            header: None,
+        };
+
+        let mut options = Options::default();
+        options.render.github_pre_lang = true;
+        options.render.full_info_string = true;
+
+        let output = run_test(&markdown, formatter, options);
+
+        let expected = r#"<pre class="lumis"><code class="language-plaintext" translate="no" tabindex="0"><div class="l-line" style="x&quot;&gt;&lt;script&gt;alert(1)&lt;&#x2f;script&gt;" data-line="1">hello
+</div></code></pre>"#;
+
+        assert_str_eq!(output.trim(), expected.trim());
+    }
+
+    #[test]
     fn test_html_inline_decorator_attributes_respect_unsafe_render() {
         let pre_class = "x\"><script>alert(1)</script>";
 
