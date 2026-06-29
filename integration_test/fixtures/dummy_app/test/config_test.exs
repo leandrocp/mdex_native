@@ -4,7 +4,7 @@ defmodule MDExNativeE2E.ConfigTest do
   @rust "```rust\nfn main() {}\n```"
   test "compile-time syntax highlighter config is used" do
     case System.fetch_env!("MDEX_NATIVE_E2E_CASE") do
-      "default" ->
+      e2e_case when e2e_case in ["default", "cloudflare"] ->
         assert MDExNative.Comrak.markdown_to_html(@rust, syntax_highlight: nil) ==
                  "<pre><code class=\"language-rust\">fn main() &lbrace;&rbrace;\n</code></pre>\n"
 

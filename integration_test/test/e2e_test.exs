@@ -40,6 +40,21 @@ defmodule MDExNative.Integration.E2ETest do
     run_mix!(mdex_path, ["test"], env, label: "mdex")
   end
 
+  @tag :cloudflare
+  test "precompiled artifact loads from Cloudflare" do
+    dummy_app_path = prepare_dummy_app!("cloudflare", :hex)
+
+    env =
+      e2e_env("cloudflare", native_path(),
+        build_path: "dummy_app/cloudflare",
+        force_build: false
+      )
+
+    run_mix!(dummy_app_path, ["deps.get"], env, label: "dummy_app/cloudflare")
+    run_mix!(dummy_app_path, ["compile"], env, label: "dummy_app/cloudflare")
+    run_mix!(dummy_app_path, ["test"], env, label: "dummy_app/cloudflare")
+  end
+
   defp prepare_native_checkout!(name) do
     destination = Path.join(workspace_path(), name)
 
@@ -68,7 +83,7 @@ defmodule MDExNative.Integration.E2ETest do
     destination
   end
 
-  defp prepare_dummy_app!(e2e_case, native_checkout_path) do
+  defp prepare_dummy_app!(e2e_case, mdex_native_dep) do
     destination = Path.join([workspace_path(), "dummy_app", e2e_case])
 
     File.rm_rf!(destination)
@@ -81,12 +96,15 @@ defmodule MDExNative.Integration.E2ETest do
     |> File.read!()
     |> String.replace(
       ~s({:mdex_native, path: "../../.."}),
-      ~s({:mdex_native, path: #{inspect(native_checkout_path)}})
+      mdex_native_dependency(mdex_native_dep)
     )
     |> then(&File.write!(mix_exs, &1))
 
     destination
   end
+
+  defp mdex_native_dependency(:hex), do: ~s({:mdex_native, ">= 0.0.0"})
+  defp mdex_native_dependency(path), do: ~s({:mdex_native, path: #{inspect(path)}})
 
   defp copy_project_path!(path, destination) do
     source = Path.join(native_path(), path)
@@ -138,14 +156,19 @@ defmodule MDExNative.Integration.E2ETest do
   end
 
   defp e2e_env(e2e_case, native_checkout_path, opts) do
-    [
+    env = [
       {"MDEX_NATIVE_E2E_CASE", e2e_case},
       {"MDEX_NATIVE_PATH", native_checkout_path},
-      {"MDEX_NATIVE_BUILD", "1"},
       {"CARGO_TARGET_DIR", Path.join(cargo_target_path(), e2e_case)},
       {"MIX_BUILD_PATH", Path.join([workspace_path(), "_build", opts[:build_path]])},
       {"MIX_DEPS_PATH", Path.join([workspace_path(), "deps", opts[:build_path]])}
     ]
+
+    if Keyword.get(opts, :force_build, true) do
+      [{"MDEX_NATIVE_BUILD", "1"} | env]
+    else
+      env
+    end
   end
 
   defp mdex_repo do
