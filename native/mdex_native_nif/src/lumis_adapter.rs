@@ -5,7 +5,7 @@ use lumis::html;
 use lumis::languages::Language;
 use lumis::themes::{self, Appearance};
 use parking_lot::Mutex;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 use std::io;
 use std::sync::Arc;
@@ -184,19 +184,24 @@ impl LumisAdapter {
         None
     }
 
-    fn parse_highlight_lines(line_spec: &str) -> Vec<usize> {
-        let mut lines = Vec::new();
+    fn parse_highlight_lines(line_spec: &str, max_line: usize) -> HashSet<usize> {
+        let mut lines = HashSet::new();
         for part in line_spec.split(',') {
             let part = part.trim();
             if let Some((start, end)) = part.split_once('-') {
-                if let (Ok(s), Ok(e)) = (start.trim().parse::<usize>(), end.trim().parse::<usize>())
+                if let (Ok(start_line), Ok(end_line)) =
+                    (start.trim().parse::<usize>(), end.trim().parse::<usize>())
                 {
-                    for line in s..=e {
-                        lines.push(line);
+                    if start_line <= end_line && (1..=max_line).contains(&start_line) {
+                        for line in start_line.max(1)..=end_line.min(max_line) {
+                            lines.insert(line);
+                        }
                     }
                 }
             } else if let Ok(line) = part.parse::<usize>() {
-                lines.push(line);
+                if (1..=max_line).contains(&line) {
+                    lines.insert(line);
+                }
             }
         }
         lines
@@ -205,11 +210,12 @@ impl LumisAdapter {
     fn highlight_lines_config(
         &self,
         theme: &Option<themes::Theme>,
-    ) -> Option<(Vec<usize>, Option<String>, Option<String>)> {
+        max_line: usize,
+    ) -> Option<(HashSet<usize>, Option<String>, Option<String>)> {
         let stored_attrs = self.stored_attrs.lock();
         if let Some(attrs) = stored_attrs.as_ref() {
             if let Some(lines_spec) = attrs.get("highlight_lines") {
-                let lines = Self::parse_highlight_lines(lines_spec);
+                let lines = Self::parse_highlight_lines(lines_spec, max_line);
                 let is_linked =
                     matches!(self.formatter_config, ExFormatterOption::HtmlLinked { .. });
                 let class = attrs.get("highlight_lines_class").cloned().or_else(|| {
@@ -247,13 +253,14 @@ impl LumisAdapter {
         }
         drop(stored_attrs);
 
-        self.formatter_highlight_lines_config(theme)
+        self.formatter_highlight_lines_config(theme, max_line)
     }
 
     fn formatter_highlight_lines_config(
         &self,
         theme: &Option<themes::Theme>,
-    ) -> Option<(Vec<usize>, Option<String>, Option<String>)> {
+        max_line: usize,
+    ) -> Option<(HashSet<usize>, Option<String>, Option<String>)> {
         match &self.formatter_config {
             ExFormatterOption::HtmlInline {
                 highlight_lines: Some(hl),
@@ -263,7 +270,7 @@ impl LumisAdapter {
                 highlight_lines: Some(hl),
                 ..
             } => {
-                let lines = Self::convert_line_specs(&hl.lines);
+                let lines = Self::convert_line_specs(&hl.lines, max_line);
                 let style = hl.style.as_ref().map(|s| match s {
                     crate::types::elixir_types::ExHtmlInlineHighlightLinesStyle::Theme => theme
                         .as_ref()
@@ -290,7 +297,7 @@ impl LumisAdapter {
                 highlight_lines: Some(hl),
                 ..
             } => {
-                let lines = Self::convert_line_specs(&hl.lines);
+                let lines = Self::convert_line_specs(&hl.lines, max_line);
                 let class = Some(hl.class.clone());
                 Some((lines, None, class))
             }
@@ -298,14 +305,23 @@ impl LumisAdapter {
         }
     }
 
-    fn convert_line_specs(lines: &[crate::types::elixir_types::ExLineSpec]) -> Vec<usize> {
-        let mut result = Vec::new();
+    fn convert_line_specs(
+        lines: &[crate::types::elixir_types::ExLineSpec],
+        max_line: usize,
+    ) -> HashSet<usize> {
+        let mut result = HashSet::new();
         for spec in lines {
             match spec {
-                crate::types::elixir_types::ExLineSpec::Single(n) => result.push(*n),
+                crate::types::elixir_types::ExLineSpec::Single(n) => {
+                    if (1..=max_line).contains(n) {
+                        result.insert(*n);
+                    }
+                }
                 crate::types::elixir_types::ExLineSpec::Range { start, end } => {
-                    for n in *start..=*end {
-                        result.push(n);
+                    if start <= end && (1..=max_line).contains(start) {
+                        for n in (*start).max(1)..=(*end).min(max_line) {
+                            result.insert(n);
+                        }
                     }
                 }
             }
@@ -505,7 +521,8 @@ impl SyntaxHighlighterAdapter for LumisAdapter {
             html_output.push_str(remaining);
         }
 
-        let highlight_config = self.highlight_lines_config(&theme);
+        let line_count = html_output.lines().count();
+        let highlight_config = self.highlight_lines_config(&theme, line_count);
 
         for (i, line) in html_output.lines().enumerate() {
             let line_number = i + 1;
@@ -889,6 +906,142 @@ fn main() {
 </div></code></pre>"#;
 
         assert_str_eq!(output.trim(), expected.trim());
+    }
+
+    #[test]
+    fn test_html_inline_decorator_highlight_lines_clamped_to_rendered_lines() {
+        let markdown = r#"
+```rust highlight_lines="1-99999999999" highlight_lines_style="background-color: yellow;"
+fn main() {}
+```
+"#;
+
+        let formatter = ExFormatterOption::HtmlInline {
+            theme: None,
+            pre_class: None,
+            italic: false,
+            include_highlights: false,
+            highlight_lines: None,
+            header: None,
+        };
+
+        let mut options = Options::default();
+        options.render.github_pre_lang = true;
+        options.render.full_info_string = true;
+
+        let output = run_test(markdown, formatter, options);
+
+        assert!(output
+            .contains(r#"<div class="l-line" style="background-color: yellow;" data-line="1">"#));
+        assert!(!output.contains(r#"data-line="2""#));
+    }
+
+    #[test]
+    fn test_parse_highlight_lines_ignores_malformed_and_invalid_specs() {
+        let lines = LumisAdapter::parse_highlight_lines("abc,1-x,,0,-1,5-3,999-1000,1", 3);
+
+        assert_eq!(lines.len(), 1);
+        assert!(lines.contains(&1));
+    }
+
+    #[test]
+    fn test_parse_highlight_lines_clamps_mixed_ranges() {
+        let lines = LumisAdapter::parse_highlight_lines("1-2,2-99999999999,3", 3);
+
+        assert_eq!(lines.len(), 3);
+        assert!(lines.contains(&1));
+        assert!(lines.contains(&2));
+        assert!(lines.contains(&3));
+    }
+
+    #[test]
+    fn test_parse_highlight_lines_handles_whitespace_and_duplicates() {
+        let lines = LumisAdapter::parse_highlight_lines(" 1 , 2 - 3 , 3 , 2 ", 3);
+
+        assert_eq!(lines.len(), 3);
+        assert!(lines.contains(&1));
+        assert!(lines.contains(&2));
+        assert!(lines.contains(&3));
+    }
+
+    #[test]
+    fn test_parse_highlight_lines_returns_empty_when_no_rendered_lines() {
+        let lines = LumisAdapter::parse_highlight_lines("1,1-99999999999", 0);
+
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn test_parse_highlight_lines_ignores_ranges_starting_after_rendered_lines() {
+        let lines = LumisAdapter::parse_highlight_lines("4-99999999999,1-99999999999", 3);
+
+        assert_eq!(lines.len(), 3);
+        assert!(lines.contains(&1));
+        assert!(lines.contains(&2));
+        assert!(lines.contains(&3));
+    }
+
+    #[test]
+    fn test_formatter_highlight_lines_clamped_to_rendered_lines() {
+        let lines = vec![crate::types::elixir_types::ExLineSpec::Range {
+            start: 1,
+            end: 99_999_999_999,
+        }];
+
+        let converted = LumisAdapter::convert_line_specs(&lines, 1);
+
+        assert_eq!(converted.len(), 1);
+        assert!(converted.contains(&1));
+    }
+
+    #[test]
+    fn test_formatter_highlight_lines_handles_empty_rendered_output() {
+        let lines = vec![
+            crate::types::elixir_types::ExLineSpec::Single(1),
+            crate::types::elixir_types::ExLineSpec::Range {
+                start: 1,
+                end: 99_999_999_999,
+            },
+        ];
+
+        let converted = LumisAdapter::convert_line_specs(&lines, 0);
+
+        assert!(converted.is_empty());
+    }
+
+    #[test]
+    fn test_formatter_highlight_lines_deduplicates_overlapping_specs() {
+        let lines = vec![
+            crate::types::elixir_types::ExLineSpec::Range { start: 1, end: 3 },
+            crate::types::elixir_types::ExLineSpec::Range { start: 2, end: 4 },
+            crate::types::elixir_types::ExLineSpec::Single(3),
+        ];
+
+        let converted = LumisAdapter::convert_line_specs(&lines, 3);
+
+        assert_eq!(converted.len(), 3);
+        assert!(converted.contains(&1));
+        assert!(converted.contains(&2));
+        assert!(converted.contains(&3));
+    }
+
+    #[test]
+    fn test_formatter_highlight_lines_ignores_invalid_specs() {
+        let lines = vec![
+            crate::types::elixir_types::ExLineSpec::Single(0),
+            crate::types::elixir_types::ExLineSpec::Single(999),
+            crate::types::elixir_types::ExLineSpec::Range { start: 5, end: 3 },
+            crate::types::elixir_types::ExLineSpec::Range {
+                start: 999,
+                end: 1000,
+            },
+            crate::types::elixir_types::ExLineSpec::Single(1),
+        ];
+
+        let converted = LumisAdapter::convert_line_specs(&lines, 3);
+
+        assert_eq!(converted.len(), 1);
+        assert!(converted.contains(&1));
     }
 
     #[test]
