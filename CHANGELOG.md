@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.3](https://github.com/leandrocp/mdex_native/compare/v0.2.2...v0.2.3) (2026-06-29)
+
+
+### Features
+
+* cloudflare mirror ([#28](https://github.com/leandrocp/mdex_native/issues/28)) ([f249b57](https://github.com/leandrocp/mdex_native/commit/f249b57329b6ee317bdb6e670ae446e2898402a5))
+
+
+### Bug Fixes
+
+* avoid leaking escaped tag literals ([cbd927f](https://github.com/leandrocp/mdex_native/commit/cbd927fb5061b488de8d90a8ef6df65718ca1fe6))
+* **lumis:** sanitize decorator attributes ([7738ff4](https://github.com/leandrocp/mdex_native/commit/7738ff428a54058ea0a3293eb2e17b5f4c953e2d))
+* **lumis:** unbounded Lumis highlight_lines ranges ([798a363](https://github.com/leandrocp/mdex_native/commit/798a363b4339f6f7162ec8437c4c9f9b5ae6fbf3))
+* stack-safe comrak document conversion ([947696c](https://github.com/leandrocp/mdex_native/commit/947696c47bc22bea5dffc0f78c946fa6b70ce183))
+
 ## [0.2.2](https://github.com/leandrocp/mdex_native/compare/v0.2.1...v0.2.2) (2026-06-19)
 
 
