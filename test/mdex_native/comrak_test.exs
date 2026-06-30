@@ -50,6 +50,36 @@ defmodule MDExNative.ComrakTest do
     assert MDExNative.Comrak.markdown_to_xml("# Hello") =~ ~s(<heading level="1">)
   end
 
+  test "escapes curly braces in code by default" do
+    markdown = """
+    Inline `%{}`.
+
+    ```elixir
+    %{}
+    ```
+    """
+
+    assert MDExNative.Comrak.markdown_to_html(markdown) ==
+             "<p>Inline <code>%&lbrace;&rbrace;</code>.</p>\n" <>
+               "<pre><code class=\"language-elixir\">%&lbrace;&rbrace;\n</code></pre>\n"
+  end
+
+  test "can preserve curly braces in code" do
+    markdown = """
+    Inline `%{}`.
+
+    ```elixir
+    %{}
+    ```
+    """
+
+    assert MDExNative.Comrak.markdown_to_html(markdown,
+             escape_curly_braces_in_code: false
+           ) ==
+             "<p>Inline <code>%{}</code>.</p>\n" <>
+               "<pre><code class=\"language-elixir\">%{}\n</code></pre>\n"
+  end
+
   test "renders parsed documents" do
     document = MDExNative.Comrak.parse_document("# Hello")
 
@@ -503,6 +533,24 @@ defmodule MDExNative.ComrakTest do
 
     assert MDExNative.Comrak.document_to_html(document, render: [unsafe: true], sanitize: nil) ==
              "<p>|spoiler|</p>\n"
+  end
+
+  test "document_to_html can preserve curly braces in code" do
+    document = %Document{
+      nodes: [
+        %MDExNative.Comrak.CodeBlock{
+          info: "elixir",
+          literal: "%{}\n"
+        }
+      ]
+    }
+
+    assert MDExNative.Comrak.document_to_html(document) ==
+             "<pre><code class=\"language-elixir\">%&lbrace;&rbrace;\n</code></pre>\n"
+
+    assert MDExNative.Comrak.document_to_html(document,
+             escape_curly_braces_in_code: false
+           ) == "<pre><code class=\"language-elixir\">%{}\n</code></pre>\n"
   end
 
   test "parses code fence info with language only" do

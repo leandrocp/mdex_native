@@ -48,7 +48,7 @@ defmodule MDExNative.Comrak do
   @typedoc "Comrak [`Render`](https://docs.rs/comrak/latest/comrak/options/struct.Render.html) options."
   @type render_options :: keyword()
 
-  @typedoc "Comrak [`Options`](https://docs.rs/comrak/latest/comrak/options/struct.Options.html), plus `:syntax_highlight` and `:sanitize`."
+  @typedoc "Comrak [`Options`](https://docs.rs/comrak/latest/comrak/options/struct.Options.html), plus MDExNative rendering options."
   @type options :: keyword()
 
   @doc ~S"""
@@ -84,8 +84,7 @@ defmodule MDExNative.Comrak do
   ## Options
 
   Pass Comrak options as keyword lists matching [`comrak::Options`](https://docs.rs/comrak/latest/comrak/struct.Options.html)
-  or the extra `:syntax_highlight` and `:sanitize` options:
-  MDExNative adds two top-level options:
+  or the extra MDExNative top-level options:
 
   - `:extension` - mapper to Comrak's [`Extension` options](https://docs.rs/comrak/latest/comrak/options/struct.Extension.html).
   - `:parse` - mapper to Comrak's [`Parse` options](https://docs.rs/comrak/latest/comrak/options/struct.Parse.html).
@@ -118,6 +117,9 @@ defmodule MDExNative.Comrak do
 
     See the [Sanitization](sanitization.md) guide for more info.
 
+  - `:escape_curly_braces_in_code` - escapes `{` and `}` inside `<code>` tags after
+    rendering. Defaults to `true`.
+
   ## Examples
 
       iex> MDExNative.Comrak.markdown_to_html("**bold**")
@@ -133,6 +135,10 @@ defmodule MDExNative.Comrak do
       iex> markdown = "```rust\nfn main() {}\n```"
       iex> MDExNative.Comrak.markdown_to_html(markdown)
       "<pre><code class=\"language-rust\">fn main() &lbrace;&rbrace;\n</code></pre>\n"
+
+      iex> markdown = "```rust\nfn main() {}\n```"
+      iex> MDExNative.Comrak.markdown_to_html(markdown, escape_curly_braces_in_code: false)
+      "<pre><code class=\"language-rust\">fn main() {}\n</code></pre>\n"
 
   """
   @spec markdown_to_html(markdown(), options()) :: html()

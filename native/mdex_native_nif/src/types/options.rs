@@ -407,6 +407,7 @@ pub struct ExOptions {
     pub render: Option<ExRenderOptions>,
     pub syntax_highlight: Option<ExSyntaxHighlightOptions>,
     pub sanitize: Option<ExSanitizeOption>,
+    pub escape_curly_braces_in_code: Option<bool>,
 }
 
 impl<'a> Decoder<'a> for ExOptions {
@@ -417,6 +418,7 @@ impl<'a> Decoder<'a> for ExOptions {
             render: optional_field(term, "render")?,
             syntax_highlight: syntax_highlight_field(term)?,
             sanitize: optional_field(term, "sanitize")?,
+            escape_curly_braces_in_code: optional_field(term, "escape_curly_braces_in_code")?,
         })
     }
 }
