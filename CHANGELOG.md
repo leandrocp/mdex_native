@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.4](https://github.com/leandrocp/mdex_native/compare/v0.2.3...v0.2.4) (2026-07-03)
+
+
+### Bug Fixes
+
+* preserve curly braces ([#36](https://github.com/leandrocp/mdex_native/issues/36)) ([7cd5eae](https://github.com/leandrocp/mdex_native/commit/7cd5eae43fdd515e23fdc622d6c3dcba03a8d032))
+
+
+### Documentation
+
+* cloudflare source example ([917a54f](https://github.com/leandrocp/mdex_native/commit/917a54f3c2e6c1dd503f132ba920f27ab25ed6e5))
+
 ## [0.2.3](https://github.com/leandrocp/mdex_native/compare/v0.2.2...v0.2.3) (2026-06-29)
 
 
