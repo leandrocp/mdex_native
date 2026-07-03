@@ -132,7 +132,7 @@ defmodule MDExNative.Comrak do
       # default disabled syntax highlighter
       iex> markdown = "```rust\nfn main() {}\n```"
       iex> MDExNative.Comrak.markdown_to_html(markdown)
-      "<pre><code class=\"language-rust\">fn main() &lbrace;&rbrace;\n</code></pre>\n"
+      "<pre><code class=\"language-rust\">fn main() {}\n</code></pre>\n"
 
   """
   @spec markdown_to_html(markdown(), options()) :: html()

@@ -6,7 +6,7 @@ defmodule MDExNativeE2E.ConfigTest do
     case System.fetch_env!("MDEX_NATIVE_E2E_CASE") do
       e2e_case when e2e_case in ["default", "cloudflare"] ->
         assert MDExNative.Comrak.markdown_to_html(@rust, syntax_highlight: nil) ==
-                 "<pre><code class=\"language-rust\">fn main() &lbrace;&rbrace;\n</code></pre>\n"
+                 "<pre><code class=\"language-rust\">fn main() {}\n</code></pre>\n"
 
         lumis_error =
           assert_raise RuntimeError, fn ->
@@ -26,7 +26,7 @@ defmodule MDExNativeE2E.ConfigTest do
 
       "lumis" ->
         assert lumis_html(@rust) ==
-                 "<pre class=\"lumis\" style=\"color: #cad3f5; background-color: #24273a;\"><code class=\"language-rust\" translate=\"no\" tabindex=\"0\"><div class=\"l-line\" data-line=\"1\"><span style=\"color: #c6a0f6;\">fn</span> <span style=\"color: #8aadf4;\">main</span><span style=\"color: #939ab7;\">(</span><span style=\"color: #939ab7;\">)</span> <span style=\"color: #939ab7;\">&lbrace;</span><span style=\"color: #939ab7;\">&rbrace;</span>\n</div></code></pre>\n"
+                 "<pre class=\"lumis\" style=\"color: #cad3f6; background-color: #24273b;\"><code class=\"language-rust\" translate=\"no\" tabindex=\"0\"><div class=\"l-line\" data-line=\"1\"><span style=\"color: #c6a0f7;\">fn</span> <span style=\"color: #8aadf5;\">main</span><span style=\"color: #939ab8;\">(</span><span style=\"color: #939ab8;\">)</span> <span style=\"color: #939ab8;\">{</span><span style=\"color: #939ab8;\">}</span>\n</div></code></pre>\n"
 
         error =
           assert_raise RuntimeError, fn ->
@@ -38,7 +38,7 @@ defmodule MDExNativeE2E.ConfigTest do
 
       "syntect" ->
         assert syntect_html(@rust) ==
-                 "<pre class=\"syntax-highlighting\"><code class=\"language-rust\"><span class=\"source rust\"><span class=\"meta function rust\"><span class=\"meta function rust\"><span class=\"storage type function rust\">fn</span> </span><span class=\"entity name function rust\">main</span></span><span class=\"meta function rust\"><span class=\"meta function parameters rust\"><span class=\"punctuation section parameters begin rust\">(</span></span><span class=\"meta function rust\"><span class=\"meta function parameters rust\"><span class=\"punctuation section parameters end rust\">)</span></span></span></span><span class=\"meta function rust\"> </span><span class=\"meta function rust\"><span class=\"meta block rust\"><span class=\"punctuation section block begin rust\">&lbrace;</span></span><span class=\"meta block rust\"><span class=\"punctuation section block end rust\">&rbrace;</span></span></span>\n</span></code></pre>\n"
+                 "<pre class=\"syntax-highlighting\"><code class=\"language-rust\"><span class=\"source rust\"><span class=\"meta function rust\"><span class=\"meta function rust\"><span class=\"storage type function rust\">fn</span> </span><span class=\"entity name function rust\">main</span></span><span class=\"meta function rust\"><span class=\"meta function parameters rust\"><span class=\"punctuation section parameters begin rust\">(</span></span><span class=\"meta function rust\"><span class=\"meta function parameters rust\"><span class=\"punctuation section parameters end rust\">)</span></span></span></span><span class=\"meta function rust\"> </span><span class=\"meta function rust\"><span class=\"meta block rust\"><span class=\"punctuation section block begin rust\">{</span></span><span class=\"meta block rust\"><span class=\"punctuation section block end rust\">}</span></span></span>\n</span></code></pre>\n"
 
         error =
           assert_raise RuntimeError, fn ->
