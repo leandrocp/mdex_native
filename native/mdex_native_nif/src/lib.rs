@@ -186,6 +186,7 @@ fn markdown_to_html_with_options<'a>(
     options: ExOptions,
 ) -> NifResult<Term<'a>> {
     let (comrak_options, lumis_adapter, sanitize) = render_parts(options)?;
+    let escape_curly_braces_in_code = comrak_options.extension.phoenix_heex;
     let arena = Arena::new();
     let root = comrak::parse_document(&arena, md, &comrak_options);
     let mut buffer = String::new();
@@ -193,7 +194,7 @@ fn markdown_to_html_with_options<'a>(
 
     format_html_with_plugins(root, &comrak_options, &mut buffer, &plugins)
         .expect("writing to String is infallible");
-    Ok(do_safe_html(buffer, &sanitize, false, true).encode(env))
+    Ok(do_safe_html(buffer, &sanitize, false, escape_curly_braces_in_code).encode(env))
 }
 
 #[rustler::nif(schedule = "DirtyCpu")]
@@ -264,12 +265,13 @@ fn document_to_html_with_options<'a>(
     let arena = Arena::new();
     let comrak_ast = document_term_to_comrak_ast(&arena, ex_document)?;
     let (comrak_options, lumis_adapter, sanitize) = render_parts(options)?;
+    let escape_curly_braces_in_code = comrak_options.extension.phoenix_heex;
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
 
     format_html_with_plugins(comrak_ast, &comrak_options, &mut buffer, &plugins)
         .expect("writing to String is infallible");
-    Ok(do_safe_html(buffer, &sanitize, false, true).encode(env))
+    Ok(do_safe_html(buffer, &sanitize, false, escape_curly_braces_in_code).encode(env))
 }
 
 #[rustler::nif(schedule = "DirtyCpu")]

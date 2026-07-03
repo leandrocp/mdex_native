@@ -4,7 +4,11 @@ File.rm_rf!(cache_path)
 System.delete_env("MDEX_NATIVE_BUILD")
 
 System.put_env("MIX_INSTALL_DIR", Path.join(cache_path, "mix_install"))
-System.put_env("RUSTLER_PRECOMPILED_GLOBAL_CACHE_PATH", Path.join(cache_path, "rustler_precompiled"))
+
+System.put_env(
+  "RUSTLER_PRECOMPILED_GLOBAL_CACHE_PATH",
+  Path.join(cache_path, "rustler_precompiled")
+)
 
 Mix.install(
   [{:mdex_native, ">= 0.2.3"}],
