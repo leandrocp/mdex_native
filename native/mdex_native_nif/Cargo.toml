@@ -16,7 +16,7 @@ comrak = { version = "0.52", default-features = false, features = ["shortcodes",
 lumis = { version = "0.11", default-features = false, optional = true }
 lol_html = "3.0"
 parking_lot = "0.12"
-phf = { version = "0.13", features = ["macros"] }
+phf = { version = "0.14", features = ["macros"] }
 rustler = "0.38"
 serde = "1.0"
 shlex = "2.0.1"
