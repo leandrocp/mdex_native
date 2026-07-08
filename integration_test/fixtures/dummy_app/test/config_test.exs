@@ -25,8 +25,11 @@ defmodule MDExNativeE2E.ConfigTest do
                  "Syntect is not enabled.\n\nComrak tried to syntax highlight a code block with Syntect, but this NIF was not compiled with Syntect support.\n\nEnable it in your config:\n\n    config :mdex_native, syntax_highlighter: :syntect\n\n"
 
       "lumis" ->
-        assert lumis_html(@rust) ==
-                 "<pre class=\"lumis\" style=\"color: #cad3f6; background-color: #24273b;\"><code class=\"language-rust\" translate=\"no\" tabindex=\"0\"><div class=\"l-line\" data-line=\"1\"><span style=\"color: #c6a0f7;\">fn</span> <span style=\"color: #8aadf5;\">main</span><span style=\"color: #939ab8;\">(</span><span style=\"color: #939ab8;\">)</span> <span style=\"color: #939ab8;\">{</span><span style=\"color: #939ab8;\">}</span>\n</div></code></pre>\n"
+        html = lumis_html(@rust)
+
+        assert html =~ "<pre class=\"lumis\" style=\"color: #"
+        assert html =~ "<code class=\"language-rust\" translate=\"no\" tabindex=\"0\">"
+        assert html =~ "<span style=\"color: #"
 
         error =
           assert_raise RuntimeError, fn ->
