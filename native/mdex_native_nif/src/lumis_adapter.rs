@@ -401,8 +401,19 @@ impl SyntaxHighlighterAdapter for LumisAdapter {
         });
 
         let mut adapter = FmtToIoAdapter(output);
-        html::open_pre_tag(&mut adapter, escaped_pre_class.as_deref(), theme.as_ref())
+        if let Some(config) = self.multi_themes_config() {
+            html::open_multi_themes_pre_tag(
+                &mut adapter,
+                escaped_pre_class.as_deref(),
+                &config.themes,
+                config.default_theme.as_deref(),
+                &config.css_variable_prefix,
+            )
             .map_err(|_| std::fmt::Error)
+        } else {
+            html::open_pre_tag(&mut adapter, escaped_pre_class.as_deref(), theme.as_ref())
+                .map_err(|_| std::fmt::Error)
+        }
     }
 
     fn write_code_tag<'s>(
@@ -588,6 +599,54 @@ mod tests {
         html
     }
 
+    fn opening_pre_tag(html: &str) -> &str {
+        let end = html.find('>').expect("missing opening pre tag");
+        &html[..end]
+    }
+
+    fn attr_value<'a>(tag: &'a str, attr: &str) -> &'a str {
+        let marker = format!(r#"{attr}=""#);
+        let start = tag.find(&marker).expect("missing attribute") + marker.len();
+        let end = tag[start..].find('"').expect("unterminated attribute");
+        &tag[start..start + end]
+    }
+
+    fn assert_classes(tag: &str, expected: &[&str]) {
+        let classes: HashSet<&str> = attr_value(tag, "class").split(' ').collect();
+
+        assert_eq!(classes.len(), expected.len());
+        for class in expected {
+            assert!(classes.contains(class), "missing class {class:?} in {tag}");
+        }
+    }
+
+    fn ex_theme(theme: themes::Theme) -> crate::types::elixir_types::ExTheme {
+        crate::types::elixir_types::ExTheme {
+            name: theme.name,
+            appearance: match theme.appearance {
+                Appearance::Light => crate::types::elixir_types::ExAppearance::Light,
+                Appearance::Dark => crate::types::elixir_types::ExAppearance::Dark,
+            },
+            revision: theme.revision,
+            highlights: theme
+                .highlights
+                .into_iter()
+                .map(|(name, style)| {
+                    (
+                        name,
+                        crate::types::elixir_types::ExStyle {
+                            fg: style.fg,
+                            bg: style.bg,
+                            bold: style.bold,
+                            italic: style.italic,
+                            text_decoration: style.text_decoration.into(),
+                        },
+                    )
+                })
+                .collect(),
+        }
+    }
+
     #[test]
     fn test_default_formatter_option() {
         let markdown = r#"
@@ -662,6 +721,44 @@ fn main() {
 </div></code></pre>"#;
 
         assert_str_eq!(output.trim(), expected.trim());
+    }
+
+    #[test]
+    fn test_html_multi_themes_pre_tag_uses_multi_theme_classes_and_style() {
+        let markdown = r#"
+```elixir
+IO.puts(:hello)
+```
+"#;
+
+        let formatter = ExFormatterOption::HtmlMultiThemes {
+            themes: HashMap::from([
+                (
+                    "light".to_string(),
+                    ex_theme(themes::get("catppuccin_latte").unwrap()),
+                ),
+                (
+                    "dark".to_string(),
+                    ex_theme(themes::get("catppuccin_mocha").unwrap()),
+                ),
+            ]),
+            default_theme: Some("light-dark()".to_string()),
+            css_variable_prefix: None,
+            pre_class: None,
+            italic: false,
+            include_highlights: false,
+            highlight_lines: None,
+            header: None,
+        };
+
+        let output = run_test(markdown, formatter, Options::default());
+        let pre_tag = opening_pre_tag(&output);
+
+        assert_classes(pre_tag, &["lumis", "lumis-themes", "light", "dark"]);
+        assert_eq!(
+            attr_value(pre_tag, "style"),
+            "color: light-dark(#4c4f69, #cdd6f4); background-color: light-dark(#eff1f5, #1e1e2e);"
+        );
     }
 
     #[test]
