@@ -6,7 +6,7 @@
 ### Features
 
 * update comrak v0.53 ([#40](https://github.com/leandrocp/mdex_native/issues/40)) ([7e239ba](https://github.com/leandrocp/mdex_native/commit/7e239ba01ca72190119a5c473ef0f13add150fae))
-
+* Reduce comrak features to only ones used by @josevalim
 
 ### Bug Fixes
 
