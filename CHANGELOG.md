@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.5](https://github.com/leandrocp/mdex_native/compare/v0.2.4...v0.2.5) (2026-07-08)
+
+
+### Features
+
+* update comrak v0.53 ([#40](https://github.com/leandrocp/mdex_native/issues/40)) ([7e239ba](https://github.com/leandrocp/mdex_native/commit/7e239ba01ca72190119a5c473ef0f13add150fae))
+
+
+### Bug Fixes
+
+* bump minimum rustler_precompiled ([#37](https://github.com/leandrocp/mdex_native/issues/37)) ([36bd51c](https://github.com/leandrocp/mdex_native/commit/36bd51c809b9107ba2e2eb373b7f024064ba1f2d)), closes [#33](https://github.com/leandrocp/mdex_native/issues/33)
+* render attrs on pre tag for html multi themes formatter ([#39](https://github.com/leandrocp/mdex_native/issues/39)) ([05204c9](https://github.com/leandrocp/mdex_native/commit/05204c9b3e532ca555746e45a5bddd7bcb1d379d))
+
 ## [0.2.4](https://github.com/leandrocp/mdex_native/compare/v0.2.3...v0.2.4) (2026-07-03)
 
 
