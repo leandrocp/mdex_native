@@ -1,7 +1,7 @@
-if System.fetch_env!("MDEX_NATIVE_E2E_CASE") == "lumis" do
-  defmodule MDExNativeE2E.LumisRegressionTest do
-    use ExUnit.Case
+defmodule MDExNativeE2E.LumisRegressionTest do
+  use ExUnit.Case
 
+  if Application.compile_env(:mdex_native, :syntax_highlighter) == :lumis do
     test "native markdown_to_html_with_options includes Lumis multi-theme pre attributes (issue #32)" do
       markdown = "```elixir\nIO.puts(:hello)\n```"
 
