@@ -2,7 +2,7 @@ mod sanitize;
 
 #[cfg(feature = "lumis")]
 use super::elixir_types::ExFormatterOption;
-use comrak::options::{Extension, ListStyleType, Options, Parse, Render};
+use comrak::options::{AlertStyleType, Extension, ListStyleType, Options, Parse, Render};
 use rustler::types::atom::Atom;
 use rustler::{Decoder, NifResult, NifUnitEnum, Term};
 pub use sanitize::*;
@@ -60,6 +60,7 @@ pub struct ExExtensionOptions {
     pub multiline_block_quotes: Option<bool>,
     pub alerts: Option<bool>,
     pub math_dollars: Option<bool>,
+    pub math_latex: Option<bool>,
     pub math_code: Option<bool>,
     pub shortcodes: Option<bool>,
     pub wikilinks_title_after_pipe: Option<bool>,
@@ -76,6 +77,10 @@ pub struct ExExtensionOptions {
     pub cjk_friendly_emphasis: Option<bool>,
     pub phoenix_heex: Option<bool>,
     pub block_directive: Option<bool>,
+    pub header_attributes: Option<bool>,
+    pub fenced_code_attributes: Option<bool>,
+    pub inline_code_attributes: Option<bool>,
+    pub link_attributes: Option<bool>,
 }
 
 impl<'a> Decoder<'a> for ExExtensionOptions {
@@ -96,6 +101,7 @@ impl<'a> Decoder<'a> for ExExtensionOptions {
             multiline_block_quotes: optional_field(term, "multiline_block_quotes")?,
             alerts: optional_field(term, "alerts")?,
             math_dollars: optional_field(term, "math_dollars")?,
+            math_latex: optional_field(term, "math_latex")?,
             math_code: optional_field(term, "math_code")?,
             shortcodes: optional_field(term, "shortcodes")?,
             wikilinks_title_after_pipe: optional_field(term, "wikilinks_title_after_pipe")?,
@@ -112,6 +118,10 @@ impl<'a> Decoder<'a> for ExExtensionOptions {
             cjk_friendly_emphasis: optional_field(term, "cjk_friendly_emphasis")?,
             phoenix_heex: optional_field(term, "phoenix_heex")?,
             block_directive: optional_field(term, "block_directive")?,
+            header_attributes: optional_field(term, "header_attributes")?,
+            fenced_code_attributes: optional_field(term, "fenced_code_attributes")?,
+            inline_code_attributes: optional_field(term, "inline_code_attributes")?,
+            link_attributes: optional_field(term, "link_attributes")?,
         })
     }
 }
@@ -164,6 +174,9 @@ impl ExExtensionOptions {
         if let Some(value) = self.math_dollars {
             extension.math_dollars = value;
         }
+        if let Some(value) = self.math_latex {
+            extension.math_latex = value;
+        }
         if let Some(value) = self.math_code {
             extension.math_code = value;
         }
@@ -213,6 +226,18 @@ impl ExExtensionOptions {
         }
         if let Some(value) = self.block_directive {
             extension.block_directive = value;
+        }
+        if let Some(value) = self.header_attributes {
+            extension.header_attributes = value;
+        }
+        if let Some(value) = self.fenced_code_attributes {
+            extension.fenced_code_attributes = value;
+        }
+        if let Some(value) = self.inline_code_attributes {
+            extension.inline_code_attributes = value;
+        }
+        if let Some(value) = self.link_attributes {
+            extension.link_attributes = value;
         }
     }
 }
@@ -296,6 +321,22 @@ impl From<ExListStyleType> for ListStyleType {
     }
 }
 
+#[derive(Clone, Debug, Default, NifUnitEnum)]
+pub enum ExAlertStyleType {
+    #[default]
+    Specific,
+    Semantic,
+}
+
+impl From<ExAlertStyleType> for AlertStyleType {
+    fn from(alert_style_type: ExAlertStyleType) -> Self {
+        match alert_style_type {
+            ExAlertStyleType::Specific => AlertStyleType::Specific,
+            ExAlertStyleType::Semantic => AlertStyleType::Semantic,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct ExRenderOptions {
     pub hardbreaks: Option<bool>,
@@ -315,6 +356,7 @@ pub struct ExRenderOptions {
     pub ol_width: Option<usize>,
     pub experimental_minimize_commonmark: Option<bool>,
     pub compact_html: Option<bool>,
+    pub alert_style: Option<ExAlertStyleType>,
 }
 
 impl<'a> Decoder<'a> for ExRenderOptions {
@@ -340,6 +382,7 @@ impl<'a> Decoder<'a> for ExRenderOptions {
                 "experimental_minimize_commonmark",
             )?,
             compact_html: optional_field(term, "compact_html")?,
+            alert_style: optional_field(term, "alert_style")?,
         })
     }
 }
@@ -396,6 +439,9 @@ impl ExRenderOptions {
         }
         if let Some(value) = self.compact_html {
             render.compact_html = value;
+        }
+        if let Some(value) = self.alert_style {
+            render.alert_style = value.into();
         }
     }
 }

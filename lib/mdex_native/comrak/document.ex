@@ -10,6 +10,11 @@ defmodule MDExNative.Comrak.Sourcepos do
   defstruct start: {0, 0}, end: {0, 0}
 end
 
+defmodule MDExNative.Comrak.Attributes do
+  @moduledoc false
+  defstruct id: nil, classes: [], pairs: []
+end
+
 defmodule MDExNative.Comrak.Document do
   @moduledoc """
   Root of a parsed Markdown document.
@@ -94,6 +99,7 @@ defmodule MDExNative.Comrak.CodeBlock do
             info: "",
             literal: "",
             closed: true,
+            attrs: nil,
             sourcepos: %MDExNative.Comrak.Sourcepos{}
 end
 
@@ -113,6 +119,7 @@ defmodule MDExNative.Comrak.Heading do
             level: 1,
             setext: false,
             closed: false,
+            attrs: nil,
             sourcepos: %MDExNative.Comrak.Sourcepos{}
 end
 
@@ -173,7 +180,10 @@ end
 
 defmodule MDExNative.Comrak.Code do
   @moduledoc false
-  defstruct num_backticks: 0, literal: "", sourcepos: %MDExNative.Comrak.Sourcepos{}
+  defstruct num_backticks: 0,
+            literal: "",
+            attrs: nil,
+            sourcepos: %MDExNative.Comrak.Sourcepos{}
 end
 
 defmodule MDExNative.Comrak.HtmlInline do
@@ -218,12 +228,20 @@ end
 
 defmodule MDExNative.Comrak.Link do
   @moduledoc false
-  defstruct nodes: [], url: "", title: nil, sourcepos: %MDExNative.Comrak.Sourcepos{}
+  defstruct nodes: [],
+            url: "",
+            title: nil,
+            attrs: nil,
+            sourcepos: %MDExNative.Comrak.Sourcepos{}
 end
 
 defmodule MDExNative.Comrak.Image do
   @moduledoc false
-  defstruct nodes: [], url: "", title: nil, sourcepos: %MDExNative.Comrak.Sourcepos{}
+  defstruct nodes: [],
+            url: "",
+            title: nil,
+            attrs: nil,
+            sourcepos: %MDExNative.Comrak.Sourcepos{}
 end
 
 defmodule MDExNative.Comrak.ShortCode do

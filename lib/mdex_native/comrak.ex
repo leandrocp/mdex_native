@@ -87,9 +87,9 @@ defmodule MDExNative.Comrak do
   or the extra `:syntax_highlight` and `:sanitize` options:
   MDExNative adds two top-level options:
 
-  - `:extension` - mapper to Comrak's [`Extension` options](https://docs.rs/comrak/latest/comrak/options/struct.Extension.html).
-  - `:parse` - mapper to Comrak's [`Parse` options](https://docs.rs/comrak/latest/comrak/options/struct.Parse.html).
-  - `:render` - mapper to Comrak's [`Render` options](https://docs.rs/comrak/latest/comrak/options/struct.Render.html).
+  - `:extension` - maps to Comrak's [`Extension` options](https://docs.rs/comrak/latest/comrak/options/struct.Extension.html).
+  - `:parse` - maps to Comrak's [`Parse` options](https://docs.rs/comrak/latest/comrak/options/struct.Parse.html).
+  - `:render` - maps to Comrak's [`Render` options](https://docs.rs/comrak/latest/comrak/options/struct.Render.html),
   - `:syntax_highlight` - highlights fenced code blocks. Disabled by default.
 
     Defaults to `syntax_highlight: nil`.

@@ -1,8 +1,14 @@
 defmodule MDExNative.ComrakTest do
   use ExUnit.Case
 
+  alias MDExNative.Comrak.Attributes
+  alias MDExNative.Comrak.Code
+  alias MDExNative.Comrak.CodeBlock
   alias MDExNative.Comrak.Document
   alias MDExNative.Comrak.EscapedTag
+  alias MDExNative.Comrak.Heading
+  alias MDExNative.Comrak.Image
+  alias MDExNative.Comrak.Link
   alias MDExNative.Comrak.Paragraph
 
   @code_block_markdown """
@@ -36,6 +42,97 @@ defmodule MDExNative.ComrakTest do
     html = MDExNative.Comrak.markdown_to_html("- [x] done", extension: [tasklist: true])
 
     assert html =~ ~s(<input type="checkbox" checked="" disabled="" /> done)
+  end
+
+  test "renders heading anchors using Comrak 0.54 markup" do
+    assert MDExNative.Comrak.markdown_to_html("# Hello",
+             extension: [header_id_prefix: "user-content-"]
+           ) ==
+             "<h1 id=\"user-content-hello\">Hello" <>
+               "<a href=\"#hello\" aria-label=\"Link to heading 'Hello'\" " <>
+               "data-heading-content=\"Hello\" class=\"anchor\"></a></h1>\n"
+  end
+
+  test "renders LaTeX-delimited math when math_latex is enabled" do
+    markdown = ~S"Inline \(1 + 2\) and display \[x = y\]"
+
+    assert MDExNative.Comrak.markdown_to_html(markdown, extension: [math_latex: true]) ==
+             "<p>Inline <span data-math-style=\"inline\">1 + 2</span> and display " <>
+               "<span data-math-style=\"display\">x = y</span></p>\n"
+
+    assert MDExNative.Comrak.markdown_to_html(markdown) ==
+             "<p>Inline (1 + 2) and display [x = y]</p>\n"
+  end
+
+  test "parses supported node attributes into the document AST" do
+    markdown = ~S"""
+    # Heading {#title .primary data-level=1}
+
+    ```elixir {#sample .wide data-ratio=100%}
+    :ok
+    ```
+
+    `code`{.language-elixir}
+
+    [link](https://example.com){#docs .external rel=nofollow} ![image](image.png){width=100%}
+    """
+
+    document =
+      MDExNative.Comrak.parse_document(markdown,
+        extension: [
+          header_attributes: true,
+          fenced_code_attributes: true,
+          inline_code_attributes: true,
+          link_attributes: true
+        ]
+      )
+
+    assert %Document{
+             nodes: [
+               %Heading{
+                 attrs: %Attributes{
+                   id: "title",
+                   classes: ["primary"],
+                   pairs: [{"data-level", "1"}]
+                 }
+               },
+               %CodeBlock{
+                 info: "elixir",
+                 attrs: %Attributes{
+                   id: "sample",
+                   classes: ["wide"],
+                   pairs: [{"data-ratio", "100%"}]
+                 }
+               },
+               %Paragraph{nodes: [%Code{attrs: %Attributes{classes: ["language-elixir"]}}]},
+               %Paragraph{
+                 nodes: [
+                   %Link{
+                     attrs: %Attributes{
+                       id: "docs",
+                       classes: ["external"],
+                       pairs: [{"rel", "nofollow"}]
+                     }
+                   },
+                   _,
+                   %Image{attrs: %Attributes{pairs: [{"width", "100%"}]}}
+                 ]
+               }
+             ]
+           } = document
+  end
+
+  test "renders alerts with semantic HTML" do
+    markdown = "> [!note]\n> Something of note"
+
+    assert MDExNative.Comrak.markdown_to_html(markdown,
+             extension: [alerts: true],
+             render: [alert_style: :semantic]
+           ) ==
+             "<aside class=\"admonition note\">\n" <>
+               "<p class=\"admonition-title\">Note</p>\n" <>
+               "<p>Something of note</p>\n" <>
+               "</aside>\n"
   end
 
   test "renders markdown with sanitize keyword options" do
