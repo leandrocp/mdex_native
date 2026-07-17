@@ -1,5 +1,5 @@
 use comrak::nodes::{
-    AstNode, HeexNode, LineColumn, NodeHeexBlock, NodeTaskItem, NodeValue, Sourcepos,
+    AstNode, Attributes, HeexNode, LineColumn, NodeHeexBlock, NodeTaskItem, NodeValue, Sourcepos,
 };
 use typed_arena::Arena as TypedArena;
 
@@ -16,7 +16,7 @@ mod atoms {
     }
 }
 
-#[derive(Clone, Debug, Default, NifStruct, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, NifStruct, PartialEq)]
 #[module = "MDExNative.Comrak.Sourcepos"]
 pub struct ExSourcepos {
     pub start: (usize, usize),
@@ -43,6 +43,34 @@ impl From<ExSourcepos> for Sourcepos {
                 line: sourcepos.end.0,
                 column: sourcepos.end.1,
             },
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, NifStruct, PartialEq)]
+#[module = "MDExNative.Comrak.Attributes"]
+pub struct ExAttributes {
+    pub id: Option<String>,
+    pub classes: Vec<String>,
+    pub pairs: Vec<(String, String)>,
+}
+
+impl From<ExAttributes> for Attributes {
+    fn from(attributes: ExAttributes) -> Self {
+        Self {
+            id: attributes.id,
+            classes: attributes.classes,
+            pairs: attributes.pairs,
+        }
+    }
+}
+
+impl From<&Attributes> for ExAttributes {
+    fn from(attributes: &Attributes) -> Self {
+        Self {
+            id: attributes.id.clone(),
+            classes: attributes.classes.clone(),
+            pairs: attributes.pairs.clone(),
         }
     }
 }
@@ -98,6 +126,115 @@ pub enum NewNode {
     HeexBlock(ExHeexBlock),
     HeexInline(ExHeexInline),
     BlockDirective(ExBlockDirective),
+}
+
+impl NewNode {
+    fn sourcepos(&self) -> ExSourcepos {
+        match self {
+            Self::Document(ExDocument { sourcepos, .. })
+            | Self::FrontMatter(ExFrontMatter { sourcepos, .. })
+            | Self::BlockQuote(ExBlockQuote { sourcepos, .. })
+            | Self::List(ExList { sourcepos, .. })
+            | Self::ListItem(ExListItem { sourcepos, .. })
+            | Self::DescriptionList(ExDescriptionList { sourcepos, .. })
+            | Self::DescriptionItem(ExDescriptionItem { sourcepos, .. })
+            | Self::DescriptionTerm(ExDescriptionTerm { sourcepos, .. })
+            | Self::DescriptionDetails(ExDescriptionDetails { sourcepos, .. })
+            | Self::CodeBlock(ExCodeBlock { sourcepos, .. })
+            | Self::HtmlBlock(ExHtmlBlock { sourcepos, .. })
+            | Self::Paragraph(ExParagraph { sourcepos, .. })
+            | Self::Heading(ExHeading { sourcepos, .. })
+            | Self::ThematicBreak(ExThematicBreak { sourcepos })
+            | Self::FootnoteDefinition(ExFootnoteDefinition { sourcepos, .. })
+            | Self::FootnoteReference(ExFootnoteReference { sourcepos, .. })
+            | Self::Table(ExTable { sourcepos, .. })
+            | Self::TableRow(ExTableRow { sourcepos, .. })
+            | Self::TableCell(ExTableCell { sourcepos, .. })
+            | Self::Text(ExText { sourcepos, .. })
+            | Self::TaskItem(ExTaskItem { sourcepos, .. })
+            | Self::SoftBreak(ExSoftBreak { sourcepos })
+            | Self::LineBreak(ExLineBreak { sourcepos })
+            | Self::Code(ExCode { sourcepos, .. })
+            | Self::HtmlInline(ExHtmlInline { sourcepos, .. })
+            | Self::Raw(ExRaw { sourcepos, .. })
+            | Self::Emph(ExEmph { sourcepos, .. })
+            | Self::Strong(ExStrong { sourcepos, .. })
+            | Self::Strikethrough(ExStrikethrough { sourcepos, .. })
+            | Self::Highlight(ExHighlight { sourcepos, .. })
+            | Self::Insert(ExInsert { sourcepos, .. })
+            | Self::Superscript(ExSuperscript { sourcepos, .. })
+            | Self::Link(ExLink { sourcepos, .. })
+            | Self::Image(ExImage { sourcepos, .. })
+            | Self::ShortCode(ExShortCode { sourcepos, .. })
+            | Self::Math(ExMath { sourcepos, .. })
+            | Self::MultilineBlockQuote(ExMultilineBlockQuote { sourcepos, .. })
+            | Self::Escaped(ExEscaped { sourcepos })
+            | Self::WikiLink(ExWikiLink { sourcepos, .. })
+            | Self::Underline(ExUnderline { sourcepos, .. })
+            | Self::Subscript(ExSubscript { sourcepos, .. })
+            | Self::SpoileredText(ExSpoileredText { sourcepos, .. })
+            | Self::Subtext(ExSubtext { sourcepos, .. })
+            | Self::EscapedTag(ExEscapedTag { sourcepos, .. })
+            | Self::Alert(ExAlert { sourcepos, .. })
+            | Self::HeexBlock(ExHeexBlock { sourcepos, .. })
+            | Self::HeexInline(ExHeexInline { sourcepos, .. })
+            | Self::BlockDirective(ExBlockDirective { sourcepos, .. }) => *sourcepos,
+        }
+    }
+
+    fn take_children(&mut self) -> Option<Vec<NewNode>> {
+        match self {
+            Self::EscapedTag(ExEscapedTag { nodes, literal, .. }) => {
+                comrak_escaped_tag_literal(literal).map(|_| std::mem::take(nodes))
+            }
+            Self::Document(ExDocument { nodes, .. })
+            | Self::BlockQuote(ExBlockQuote { nodes, .. })
+            | Self::List(ExList { nodes, .. })
+            | Self::ListItem(ExListItem { nodes, .. })
+            | Self::DescriptionList(ExDescriptionList { nodes, .. })
+            | Self::DescriptionItem(ExDescriptionItem { nodes, .. })
+            | Self::DescriptionTerm(ExDescriptionTerm { nodes, .. })
+            | Self::DescriptionDetails(ExDescriptionDetails { nodes, .. })
+            | Self::CodeBlock(ExCodeBlock { nodes, .. })
+            | Self::HtmlBlock(ExHtmlBlock { nodes, .. })
+            | Self::Paragraph(ExParagraph { nodes, .. })
+            | Self::Heading(ExHeading { nodes, .. })
+            | Self::FootnoteDefinition(ExFootnoteDefinition { nodes, .. })
+            | Self::Table(ExTable { nodes, .. })
+            | Self::TableRow(ExTableRow { nodes, .. })
+            | Self::TableCell(ExTableCell { nodes, .. })
+            | Self::TaskItem(ExTaskItem { nodes, .. })
+            | Self::Emph(ExEmph { nodes, .. })
+            | Self::Strong(ExStrong { nodes, .. })
+            | Self::Strikethrough(ExStrikethrough { nodes, .. })
+            | Self::Highlight(ExHighlight { nodes, .. })
+            | Self::Insert(ExInsert { nodes, .. })
+            | Self::Superscript(ExSuperscript { nodes, .. })
+            | Self::Link(ExLink { nodes, .. })
+            | Self::Image(ExImage { nodes, .. })
+            | Self::MultilineBlockQuote(ExMultilineBlockQuote { nodes, .. })
+            | Self::WikiLink(ExWikiLink { nodes, .. })
+            | Self::Underline(ExUnderline { nodes, .. })
+            | Self::Subscript(ExSubscript { nodes, .. })
+            | Self::SpoileredText(ExSpoileredText { nodes, .. })
+            | Self::Subtext(ExSubtext { nodes, .. })
+            | Self::Alert(ExAlert { nodes, .. })
+            | Self::HeexBlock(ExHeexBlock { nodes, .. })
+            | Self::BlockDirective(ExBlockDirective { nodes, .. }) => Some(std::mem::take(nodes)),
+            _ => None,
+        }
+    }
+
+    fn take_attrs(&mut self) -> Option<ExAttributes> {
+        match self {
+            Self::CodeBlock(ExCodeBlock { attrs, .. })
+            | Self::Heading(ExHeading { attrs, .. })
+            | Self::Code(ExCode { attrs, .. })
+            | Self::Link(ExLink { attrs, .. })
+            | Self::Image(ExImage { attrs, .. }) => attrs.take(),
+            _ => None,
+        }
+    }
 }
 
 impl From<NewNode> for NodeValue {
@@ -347,6 +484,7 @@ pub struct ExCodeBlock {
     pub info: String,
     pub literal: String,
     pub closed: bool,
+    pub attrs: Option<ExAttributes>,
     pub sourcepos: ExSourcepos,
 }
 
@@ -402,6 +540,7 @@ pub struct ExHeading {
     pub level: u8,
     pub setext: bool,
     pub closed: bool,
+    pub attrs: Option<ExAttributes>,
     pub sourcepos: ExSourcepos,
 }
 
@@ -595,6 +734,7 @@ impl From<ExLineBreak> for NodeValue {
 pub struct ExCode {
     pub num_backticks: usize,
     pub literal: String,
+    pub attrs: Option<ExAttributes>,
     pub sourcepos: ExSourcepos,
 }
 
@@ -755,6 +895,7 @@ pub struct ExLink {
     pub nodes: Vec<NewNode>,
     pub url: String,
     pub title: String,
+    pub attrs: Option<ExAttributes>,
     pub sourcepos: ExSourcepos,
 }
 
@@ -773,6 +914,7 @@ pub struct ExImage {
     pub nodes: Vec<NewNode>,
     pub url: String,
     pub title: String,
+    pub attrs: Option<ExAttributes>,
     pub sourcepos: ExSourcepos,
 }
 
@@ -1009,110 +1151,16 @@ impl From<ExBlockDirective> for NodeValue {
 
 pub fn ex_document_to_comrak_ast<'a>(
     arena: &'a TypedArena<AstNode<'a>>,
-    new_node: NewNode,
+    mut new_node: NewNode,
 ) -> &'a AstNode<'a> {
-    let node_value = NodeValue::from(new_node.clone());
+    let sourcepos = new_node.sourcepos();
+    let children = new_node.take_children();
+    let attrs = new_node.take_attrs();
+    let node_value = NodeValue::from(new_node);
     let node_arena = arena.alloc(node_value.into());
 
-    let (sourcepos, children) = match new_node {
-        NewNode::Document(ExDocument { nodes, sourcepos }) => (sourcepos, Some(nodes)),
-        NewNode::FrontMatter(ExFrontMatter { sourcepos, .. }) => (sourcepos, None),
-        NewNode::BlockQuote(ExBlockQuote { nodes, sourcepos }) => (sourcepos, Some(nodes)),
-        NewNode::List(ExList {
-            nodes, sourcepos, ..
-        }) => (sourcepos, Some(nodes)),
-        NewNode::ListItem(ExListItem {
-            nodes, sourcepos, ..
-        }) => (sourcepos, Some(nodes)),
-        NewNode::DescriptionList(ExDescriptionList { nodes, sourcepos }) => {
-            (sourcepos, Some(nodes))
-        }
-        NewNode::DescriptionItem(ExDescriptionItem {
-            nodes, sourcepos, ..
-        }) => (sourcepos, Some(nodes)),
-        NewNode::DescriptionTerm(ExDescriptionTerm { nodes, sourcepos }) => {
-            (sourcepos, Some(nodes))
-        }
-        NewNode::DescriptionDetails(ExDescriptionDetails { nodes, sourcepos }) => {
-            (sourcepos, Some(nodes))
-        }
-        NewNode::CodeBlock(ExCodeBlock {
-            nodes, sourcepos, ..
-        }) => (sourcepos, Some(nodes)),
-        NewNode::HtmlBlock(ExHtmlBlock {
-            nodes, sourcepos, ..
-        }) => (sourcepos, Some(nodes)),
-        NewNode::Paragraph(ExParagraph { nodes, sourcepos }) => (sourcepos, Some(nodes)),
-        NewNode::Heading(ExHeading {
-            nodes, sourcepos, ..
-        }) => (sourcepos, Some(nodes)),
-        NewNode::ThematicBreak(ExThematicBreak { sourcepos }) => (sourcepos, None),
-        NewNode::FootnoteDefinition(ExFootnoteDefinition {
-            nodes, sourcepos, ..
-        }) => (sourcepos, Some(nodes)),
-        NewNode::FootnoteReference(ExFootnoteReference { sourcepos, .. }) => (sourcepos, None),
-        NewNode::Table(ExTable {
-            nodes, sourcepos, ..
-        }) => (sourcepos, Some(nodes)),
-        NewNode::TableRow(ExTableRow {
-            nodes, sourcepos, ..
-        }) => (sourcepos, Some(nodes)),
-        NewNode::TableCell(ExTableCell { nodes, sourcepos }) => (sourcepos, Some(nodes)),
-        NewNode::Text(ExText { sourcepos, .. }) => (sourcepos, None),
-        NewNode::TaskItem(ExTaskItem {
-            nodes, sourcepos, ..
-        }) => (sourcepos, Some(nodes)),
-        NewNode::SoftBreak(ExSoftBreak { sourcepos }) => (sourcepos, None),
-        NewNode::LineBreak(ExLineBreak { sourcepos }) => (sourcepos, None),
-        NewNode::Code(ExCode { sourcepos, .. }) => (sourcepos, None),
-        NewNode::HtmlInline(ExHtmlInline { sourcepos, .. }) => (sourcepos, None),
-        NewNode::Raw(ExRaw { sourcepos, .. }) => (sourcepos, None),
-        NewNode::Emph(ExEmph { nodes, sourcepos }) => (sourcepos, Some(nodes)),
-        NewNode::Strong(ExStrong { nodes, sourcepos }) => (sourcepos, Some(nodes)),
-        NewNode::Strikethrough(ExStrikethrough { nodes, sourcepos }) => (sourcepos, Some(nodes)),
-        NewNode::Highlight(ExHighlight { nodes, sourcepos }) => (sourcepos, Some(nodes)),
-        NewNode::Insert(ExInsert { nodes, sourcepos }) => (sourcepos, Some(nodes)),
-        NewNode::Superscript(ExSuperscript { nodes, sourcepos }) => (sourcepos, Some(nodes)),
-        NewNode::Link(ExLink {
-            nodes, sourcepos, ..
-        }) => (sourcepos, Some(nodes)),
-        NewNode::Image(ExImage {
-            nodes, sourcepos, ..
-        }) => (sourcepos, Some(nodes)),
-        NewNode::ShortCode(ExShortCode { sourcepos, .. }) => (sourcepos, None),
-        NewNode::Math(ExMath { sourcepos, .. }) => (sourcepos, None),
-        NewNode::MultilineBlockQuote(ExMultilineBlockQuote {
-            nodes, sourcepos, ..
-        }) => (sourcepos, Some(nodes)),
-        NewNode::Escaped(ExEscaped { sourcepos }) => (sourcepos, None),
-        NewNode::WikiLink(ExWikiLink {
-            nodes, sourcepos, ..
-        }) => (sourcepos, Some(nodes)),
-        NewNode::Underline(ExUnderline { nodes, sourcepos }) => (sourcepos, Some(nodes)),
-        NewNode::Subscript(ExSubscript { nodes, sourcepos }) => (sourcepos, Some(nodes)),
-        NewNode::SpoileredText(ExSpoileredText { nodes, sourcepos }) => (sourcepos, Some(nodes)),
-        NewNode::Subtext(ExSubtext { nodes, sourcepos }) => (sourcepos, Some(nodes)),
-        NewNode::EscapedTag(ExEscapedTag {
-            nodes,
-            literal,
-            sourcepos,
-        }) => {
-            let children = comrak_escaped_tag_literal(&literal).map(|_| nodes);
-            (sourcepos, children)
-        }
-        NewNode::Alert(ExAlert {
-            nodes, sourcepos, ..
-        }) => (sourcepos, Some(nodes)),
-        NewNode::HeexBlock(ExHeexBlock {
-            nodes, sourcepos, ..
-        }) => (sourcepos, Some(nodes)),
-        NewNode::HeexInline(ExHeexInline { sourcepos, .. }) => (sourcepos, None),
-        NewNode::BlockDirective(ExBlockDirective {
-            nodes, sourcepos, ..
-        }) => (sourcepos, Some(nodes)),
-    };
-
     node_arena.data_mut().sourcepos = sourcepos.into();
+    node_arena.data_mut().attrs = attrs.map(|attrs| Box::new(attrs.into()));
 
     if let Some(nodes) = children {
         for node in nodes {
@@ -1221,6 +1269,7 @@ fn comrak_ast_to_ex_document_with_children<'a>(
             info: attrs.info.to_string(),
             literal: attrs.literal.to_string(),
             closed: attrs.closed,
+            attrs: node_data.attrs.as_deref().map(Into::into),
             sourcepos,
         }),
 
@@ -1241,6 +1290,7 @@ fn comrak_ast_to_ex_document_with_children<'a>(
             level: attrs.level,
             setext: attrs.setext,
             closed: attrs.closed,
+            attrs: node_data.attrs.as_deref().map(Into::into),
             sourcepos,
         }),
 
@@ -1313,6 +1363,7 @@ fn comrak_ast_to_ex_document_with_children<'a>(
         NodeValue::Code(ref attrs) => NewNode::Code(ExCode {
             num_backticks: attrs.num_backticks,
             literal: attrs.literal.to_string(),
+            attrs: node_data.attrs.as_deref().map(Into::into),
             sourcepos,
         }),
 
@@ -1360,6 +1411,7 @@ fn comrak_ast_to_ex_document_with_children<'a>(
             nodes: children,
             url: attrs.url.to_string(),
             title: attrs.title.to_string(),
+            attrs: node_data.attrs.as_deref().map(Into::into),
             sourcepos,
         }),
 
@@ -1367,6 +1419,7 @@ fn comrak_ast_to_ex_document_with_children<'a>(
             nodes: children,
             url: attrs.url.to_string(),
             title: attrs.title.to_string(),
+            attrs: node_data.attrs.as_deref().map(Into::into),
             sourcepos,
         }),
 
