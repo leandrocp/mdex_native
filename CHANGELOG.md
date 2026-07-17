@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.6](https://github.com/leandrocp/mdex_native/compare/v0.2.5...v0.2.6) (2026-07-17)
+
+
+### Features
+
+* update comrak ([#42](https://github.com/leandrocp/mdex_native/issues/42)) ([fb5462a](https://github.com/leandrocp/mdex_native/commit/fb5462a4c6d68e3da40f51f6991fb47e4d63c213))
+
 ## [0.2.5](https://github.com/leandrocp/mdex_native/compare/v0.2.4...v0.2.5) (2026-07-08)
 
 
