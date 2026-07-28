@@ -378,12 +378,8 @@ impl SyntaxHighlighterAdapter for LumisAdapter {
         let custom_attrs = Self::custom_attrs(&attributes);
         let lang = attributes.get("lang").map(|l| Language::guess(Some(l), ""));
 
-        if let Some(attrs) = custom_attrs {
-            *self.stored_attrs.lock() = Some(Arc::new(attrs));
-        }
-        if let Some(language) = lang {
-            *self.stored_lang.lock() = Some(language);
-        }
+        *self.stored_attrs.lock() = custom_attrs.map(Arc::new);
+        *self.stored_lang.lock() = lang;
 
         let theme = self
             .decorator_theme()
@@ -604,6 +600,19 @@ mod tests {
         &html[..end]
     }
 
+    fn code_languages(html: &str) -> Vec<&str> {
+        let prefix = r#"<code class="language-"#;
+
+        html.match_indices(prefix)
+            .map(|(start, _)| {
+                html[start + prefix.len()..]
+                    .split_once('"')
+                    .expect("unterminated code language class")
+                    .0
+            })
+            .collect()
+    }
+
     fn attr_value<'a>(tag: &'a str, attr: &str) -> &'a str {
         let marker = format!(r#"{attr}=""#);
         let start = tag.find(&marker).expect("missing attribute") + marker.len();
@@ -692,6 +701,40 @@ text
 </div></code></pre>"#;
 
         assert_str_eq!(output.trim(), expected.trim());
+    }
+
+    #[test]
+    fn test_language_does_not_leak_to_bare_fence() {
+        for (language, source) in [
+            ("elixir", "IO.puts(:ok)"),
+            ("javascript", "console.log('ok')"),
+        ] {
+            let markdown =
+                format!("```{language}\n{source}\n```\n\n```\nC(n, k) = n! / (k!(n - k)!)\n```");
+            let output = run_test(&markdown, ExFormatterOption::default(), Options::default());
+
+            assert_eq!(code_languages(&output), [language, "plaintext"]);
+        }
+    }
+
+    #[test]
+    fn test_consecutive_bare_fences_are_plaintext() {
+        let markdown = "```\nfirst\n```\n\n```\nsecond\n```";
+        let output = run_test(markdown, ExFormatterOption::default(), Options::default());
+
+        assert_eq!(code_languages(&output), ["plaintext", "plaintext"]);
+    }
+
+    #[test]
+    fn test_explicit_plaintext_between_labeled_fences() {
+        let markdown =
+            "```elixir\nIO.puts(:ok)\n```\n\n```text\nplain\n```\n\n```javascript\nconsole.log('ok')\n```";
+        let output = run_test(markdown, ExFormatterOption::default(), Options::default());
+
+        assert_eq!(
+            code_languages(&output),
+            ["elixir", "plaintext", "javascript"]
+        );
     }
 
     #[test]
@@ -831,6 +874,34 @@ fn main() {
 </div></code></pre>"#;
 
         assert_str_eq!(output.trim(), expected.trim());
+    }
+
+    #[test]
+    fn test_decorator_attributes_do_not_leak_to_next_fence() {
+        let markdown = r#"
+```text pre_class=custom
+first
+```
+
+```
+second
+```
+"#;
+        let formatter = ExFormatterOption::HtmlInline {
+            theme: None,
+            pre_class: None,
+            italic: false,
+            include_highlights: false,
+            highlight_lines: None,
+            header: None,
+        };
+        let mut options = Options::default();
+        options.render.github_pre_lang = true;
+        options.render.full_info_string = true;
+
+        let output = run_test(markdown, formatter, options);
+
+        assert_eq!(output.matches("lumis custom").count(), 1);
     }
 
     #[test]
