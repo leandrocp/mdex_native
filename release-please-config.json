@@ -22,6 +22,7 @@
   "packages": {
     ".": {
       "release-type": "elixir",
+      "changelog-type": "github",
       "changelog-path": "CHANGELOG.md"
     }
   }
