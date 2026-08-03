@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.7 (2026-08-03)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+* docs: Document Comrak AST modules by @leandrocp in https://github.com/leandrocp/mdex_native/pull/44
+* fix: reset Lumis state between code fences by @lobo-tuerto in https://github.com/leandrocp/mdex_native/pull/47
+
+## New Contributors
+* @lobo-tuerto made their first contribution in https://github.com/leandrocp/mdex_native/pull/47
+
+**Full Changelog**: https://github.com/leandrocp/mdex_native/compare/v0.2.6...v0.2.7
+
 ## [0.2.6](https://github.com/leandrocp/mdex_native/compare/v0.2.5...v0.2.6) (2026-07-17)
 
 
