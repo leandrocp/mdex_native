@@ -355,6 +355,16 @@ impl LumisAdapter {
             .and_then(|info| Self::parse_custom_attributes(info.as_ref()))
     }
 
+    fn span_with_attrs(text: &str, attrs: String) -> String {
+        let escaped = html::escape(text);
+
+        if attrs.is_empty() {
+            escaped
+        } else {
+            format!("<span {attrs}>{escaped}</span>")
+        }
+    }
+
     fn language_from_attrs(
         attributes: &HashMap<&'static str, std::borrow::Cow<'_, str>>,
     ) -> Language {
@@ -485,8 +495,7 @@ impl SyntaxHighlighterAdapter for LumisAdapter {
                         html::span_linked(text, scope)
                     } else if is_multi_themes {
                         if let Some(ref config) = multi_themes_config {
-                            html::span_multi_themes(
-                                text,
+                            let attrs = html::span_multi_themes_attrs(
                                 scope,
                                 language,
                                 &config.themes,
@@ -494,26 +503,27 @@ impl SyntaxHighlighterAdapter for LumisAdapter {
                                 &config.css_variable_prefix,
                                 config.italic,
                                 config.include_highlights,
-                            )
+                            );
+                            Self::span_with_attrs(text, attrs)
                         } else {
-                            html::span_inline(
-                                text,
+                            let attrs = html::span_inline_attrs(
                                 language,
                                 scope,
                                 theme.as_ref(),
                                 italic,
                                 include_highlights,
-                            )
+                            );
+                            Self::span_with_attrs(text, attrs)
                         }
                     } else {
-                        html::span_inline(
-                            text,
+                        let attrs = html::span_inline_attrs(
                             language,
                             scope,
                             theme.as_ref(),
                             italic,
                             include_highlights,
-                        )
+                        );
+                        Self::span_with_attrs(text, attrs)
                     };
                     html_output.push_str(&span);
                 }
