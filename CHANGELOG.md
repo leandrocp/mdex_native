@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.8](https://github.com/leandrocp/mdex_native/compare/v0.2.7...v0.2.8) (2026-08-13)
+
+### Features
+
+- Update lumis v0.13 by @leandrocp in [#53](https://github.com/leandrocp/mdex_native/pull/53)
+
 ## 0.2.7 (2026-08-03)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
