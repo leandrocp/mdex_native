@@ -342,6 +342,15 @@ defmodule MDExNative.Comrak do
 
   defp syntax_highlight_option(option), do: option
 
+  defp check_native_output({:error, {:lumis_error, reason}}) do
+    raise """
+    Lumis failed to highlight a code block.
+
+    #{reason}
+
+    """
+  end
+
   defp check_native_output(:lumis_not_enabled) do
     raise """
     Lumis is unavailable.

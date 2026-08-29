@@ -68,6 +68,25 @@ defmodule MDExNativeE2E.LumisRegressionTest do
     refute third =~ "language-python"
   end
 
+  test "a Lumis failure reports what Lumis said" do
+    error =
+      assert_raise RuntimeError, fn ->
+        MDExNative.Comrak.markdown_to_html("```elixir\nIO.puts(:x)\n```",
+          syntax_highlight: [
+            engine: :lumis,
+            opts: [
+              formatter:
+                {:html_multi_themes,
+                 themes: [light: "catppuccin_latte"], default_theme: "light-dark()"}
+            ]
+          ]
+        )
+      end
+
+    assert error.message =~ "Lumis failed to highlight a code block"
+    assert error.message =~ "LightDark mode requires themes named 'light' and 'dark'"
+  end
+
   defp pre_classes(html) do
     [_before, pre] = String.split(html, "<pre class=\"", parts: 2)
     [classes | _after] = String.split(pre, "\"", parts: 2)

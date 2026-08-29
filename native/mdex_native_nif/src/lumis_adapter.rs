@@ -4,7 +4,7 @@ use std::sync::Mutex;
 
 use comrak::adapters::SyntaxHighlighterAdapter;
 use rustler::env::SavedTerm;
-use rustler::{Atom, Encoder, Error, OwnedEnv, Term};
+use rustler::{Atom, Encoder, OwnedEnv, Term};
 
 rustler::atoms! {
     provider_module = "Elixir.Lumis.Native",
@@ -12,6 +12,8 @@ rustler::atoms! {
     ok,
     nil,
 }
+
+const POISONED: &str = "a Lumis bridge lock is poisoned";
 
 pub struct LumisBridgeConfig {
     state: Mutex<BridgeState>,
@@ -51,8 +53,11 @@ impl LumisBridgeConfig {
         language: Option<&str>,
         attributes: &HashMap<String, String>,
         render_unsafe: bool,
-    ) -> Result<String, Error> {
-        let mut state = self.state.lock().map_err(|_| Error::BadArg)?;
+    ) -> Result<String, String> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| "the Lumis bridge lock is poisoned".to_string())?;
         let BridgeState {
             config_env,
             config,
@@ -60,7 +65,10 @@ impl LumisBridgeConfig {
         } = &mut *state;
 
         let rendered = config_env.run(|config_env| {
-            let (bridge, formatter): (Term<'_>, Term<'_>) = config.load(config_env).decode()?;
+            let (bridge, formatter): (Term<'_>, Term<'_>) = config
+                .load(config_env)
+                .decode()
+                .map_err(|_| "the Lumis bridge configuration is not a resource".to_string())?;
 
             call_env.run(|env| {
                 let bridge = bridge.in_env(env);
@@ -76,15 +84,19 @@ impl LumisBridgeConfig {
                         (&mut call_term as *mut usize).cast(),
                     )
                 }
-                .map_err(|_| Error::Atom("lumis_bridge_call_failed"))?;
+                .map_err(|_| {
+                    "the loaded Lumis NIF does not export lumis_mdex_bridge_v1".to_string()
+                })?;
 
                 let response = unsafe { Term::new(env, call_term) };
-                let (status, value): (Atom, String) = response.decode()?;
+                let (status, value): (Atom, String) = response
+                    .decode()
+                    .map_err(|_| "the Lumis bridge returned an unexpected response".to_string())?;
 
                 if status == ok() {
                     Ok(value)
                 } else {
-                    Err(Error::Term(Box::new(value)))
+                    Err(value)
                 }
             })
         });
@@ -154,6 +166,10 @@ pub struct LumisAdapter {
     bridge: LumisBridgeConfig,
     render_unsafe: bool,
     fence: Mutex<FenceState>,
+    /// Comrak's adapter trait can only answer `fmt::Error`, which says nothing
+    /// about why Lumis refused a fence. Park the reason here for the NIF to read
+    /// once the render has unwound.
+    failure: Mutex<Option<String>>,
 }
 
 impl LumisAdapter {
@@ -162,7 +178,20 @@ impl LumisAdapter {
             bridge,
             render_unsafe,
             fence: Mutex::new(FenceState::default()),
+            failure: Mutex::new(None),
         }
+    }
+
+    pub fn take_failure(&self) -> Option<String> {
+        self.failure.lock().ok()?.take()
+    }
+
+    fn fail(&self, reason: String) -> fmt::Error {
+        if let Ok(mut failure) = self.failure.lock() {
+            failure.get_or_insert(reason);
+        }
+
+        fmt::Error
     }
 }
 
@@ -172,7 +201,7 @@ impl SyntaxHighlighterAdapter for LumisAdapter {
         _output: &mut dyn Write,
         attributes: HashMap<&'static str, std::borrow::Cow<'_, str>>,
     ) -> fmt::Result {
-        let mut fence = self.fence.lock().map_err(|_| fmt::Error)?;
+        let mut fence = self.fence.lock().map_err(|_| self.fail(POISONED.into()))?;
         fence.reset();
         fence.update(&attributes);
 
@@ -186,7 +215,7 @@ impl SyntaxHighlighterAdapter for LumisAdapter {
     ) -> fmt::Result {
         self.fence
             .lock()
-            .map_err(|_| fmt::Error)?
+            .map_err(|_| self.fail(POISONED.into()))?
             .update(&attributes);
 
         Ok(())
@@ -198,12 +227,12 @@ impl SyntaxHighlighterAdapter for LumisAdapter {
         language: Option<&str>,
         source: &str,
     ) -> fmt::Result {
-        let fence = self.fence.lock().map_err(|_| fmt::Error)?;
+        let fence = self.fence.lock().map_err(|_| self.fail(POISONED.into()))?;
         let language = fence.language.as_deref().or(language);
         let highlighted = self
             .bridge
             .render(source, language, &fence.attributes, self.render_unsafe)
-            .map_err(|_| fmt::Error)?;
+            .map_err(|reason| self.fail(reason))?;
 
         output.write_str(&highlighted)
     }
