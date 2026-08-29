@@ -3,7 +3,7 @@ defmodule MDExNative.Integration.E2ETest do
 
   @mdex_repo "https://github.com/leandrocp/mdex.git"
   @mdex_branch "feat/lumis-native-bridge"
-  @lumis_ref "7936ad86ffcadbd079644f938c80bd3ad940b924"
+  @lumis_ref "3083f5728e0f304d19a1520c22461a4a89f8ceb8"
 
   setup_all do
     File.rm_rf!(workspace_path())
