@@ -348,7 +348,13 @@ defmodule MDExNative.Comrak do
 
     Comrak tried to syntax highlight a code block with Lumis, but no Lumis bridge was supplied.
 
-    Use MDEx with the :lumis dependency to enable Lumis highlighting.
+    Add :lumis to your deps:
+
+        {:lumis, "~> 0.1"}
+
+    If it is already there, the installed version predates the MDExNative bridge:
+
+        mix deps.update lumis
 
     """
   end

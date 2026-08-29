@@ -34,6 +34,40 @@ defmodule MDExNativeE2E.LumisRegressionTest do
     end
   end
 
+  test "a decorated fence keeps its decorators to itself" do
+    markdown = """
+    ```elixir highlight_lines=1 pre_class=first
+    IO.puts(:hello)
+    ```
+
+    ```elixir
+    IO.puts(:bye)
+    ```
+
+    ```
+    #!/usr/bin/env python
+    ```
+    """
+
+    html =
+      MDExNative.Comrak.markdown_to_html(markdown,
+        render: [unsafe: true, full_info_string: true],
+        syntax_highlight: [engine: :lumis, opts: [formatter: {:html_inline, theme: "onedark"}]]
+      )
+
+    [first, second, third] = tl(String.split(html, "<pre "))
+
+    assert first =~ ~s(class="lumis first")
+    assert first =~ "background-color: #3b4252;"
+
+    refute second =~ "first"
+    refute second =~ "background-color: #3b4252;"
+    assert second =~ "language-elixir"
+
+    assert third =~ "language-plaintext"
+    refute third =~ "language-python"
+  end
+
   defp pre_classes(html) do
     [_before, pre] = String.split(html, "<pre class=\"", parts: 2)
     [classes | _after] = String.split(pre, "\"", parts: 2)
