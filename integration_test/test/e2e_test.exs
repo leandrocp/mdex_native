@@ -3,6 +3,7 @@ defmodule MDExNative.Integration.E2ETest do
 
   @mdex_repo "https://github.com/leandrocp/mdex.git"
   @mdex_branch "feat/lumis-native-bridge"
+  @lumis_ref "7936ad86ffcadbd079644f938c80bd3ad940b924"
 
   setup_all do
     File.rm_rf!(workspace_path())
@@ -37,6 +38,8 @@ defmodule MDExNative.Integration.E2ETest do
       [],
       label: "mdex"
     )
+
+    pin_mdex_lumis!(mdex_path)
 
     env = e2e_env("lumis", native_checkout_path, build_path: "mdex")
 
@@ -110,6 +113,22 @@ defmodule MDExNative.Integration.E2ETest do
 
   defp mdex_native_dependency(:hex), do: ~s({:mdex_native, ">= 0.0.0"})
   defp mdex_native_dependency(path), do: ~s({:mdex_native, path: #{inspect(path)}})
+
+  defp pin_mdex_lumis!(mdex_path) do
+    mix_exs = Path.join(mdex_path, "mix.exs")
+    source = File.read!(mix_exs)
+
+    dependency =
+      ~s({:lumis, github: "leandrocp/lumis", ref: "#{@lumis_ref}", sparse: "packages/elixir/lumis", optional: true, override: true})
+
+    updated = String.replace(source, ~s({:lumis, "~> 0.1", optional: true}), dependency)
+
+    if updated == source do
+      raise "could not pin the MDEx Lumis dependency"
+    end
+
+    File.write!(mix_exs, updated)
+  end
 
   defp copy_project_path!(path, destination) do
     source = Path.join(native_path(), path)
