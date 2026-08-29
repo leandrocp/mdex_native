@@ -94,15 +94,12 @@ defmodule MDExNative.Comrak do
 
     Defaults to `syntax_highlight: nil`.
 
-    To highlight code, compile MDExNative with a highlighter and choose the engine:
+    Choose a highlighting engine:
 
       **Lumis**
 
-      ```
-      config :mdex_native, syntax_highlighter: :lumis
-
-      [engine: :lumis, opts: [formatter: {:html_inline, theme: "catppuccin_macchiato"}]]
-      ```
+      Add Lumis as a separate `:lumis` dependency. MDExNative uses that NIF
+      without embedding a second copy. See the syntax-highlighting guide.
 
       **Syntect**
 
@@ -300,6 +297,43 @@ defmodule MDExNative.Comrak do
       {:opts, opts} when is_list(opts) -> {:opts, Map.new(opts, &syntax_highlight_option/1)}
       option -> syntax_highlight_option(option)
     end)
+    |> maybe_add_lumis_bridge()
+  end
+
+  defp maybe_add_lumis_bridge(%{engine: :syntect} = options), do: options
+  defp maybe_add_lumis_bridge(%{opts: %{mdex_bridge: _}} = options), do: options
+  defp maybe_add_lumis_bridge(%{mdex_bridge: _} = options), do: options
+
+  defp maybe_add_lumis_bridge(options) do
+    lumis = :"Elixir.Lumis"
+
+    if Code.ensure_loaded?(lumis) and function_exported?(lumis, :__mdex_bridge__, 0) do
+      case options do
+        %{engine: :lumis} ->
+          opts = normalize_lumis_options(lumis, Map.get(options, :opts, %{}))
+          Map.put(options, :opts, opts)
+
+        options ->
+          normalize_lumis_options(lumis, options)
+      end
+    else
+      options
+    end
+  end
+
+  defp normalize_lumis_options(lumis, options) do
+    options =
+      Enum.map(options, fn
+        {:formatter, {formatter, formatter_options}} when is_map(formatter_options) ->
+          {:formatter, {formatter, Map.to_list(formatter_options)}}
+
+        option ->
+          option
+      end)
+
+    options = apply(lumis, :validate_options!, [options])
+    options = apply(lumis, :rust_options!, [options])
+    Map.put(options, :mdex_bridge, apply(lumis, :__mdex_bridge__, []))
   end
 
   defp syntax_highlight_option({:formatter, {formatter, opts}}) when is_list(opts) do
@@ -310,13 +344,11 @@ defmodule MDExNative.Comrak do
 
   defp check_native_output(:lumis_not_enabled) do
     raise """
-    Lumis is not enabled.
+    Lumis is unavailable.
 
-    Comrak tried to syntax highlight a code block with Lumis, but this NIF was not compiled with Lumis support.
+    Comrak tried to syntax highlight a code block with Lumis, but no Lumis bridge was supplied.
 
-    Enable it in your config:
-
-        config :mdex_native, syntax_highlighter: :lumis
+    Use MDEx with the :lumis dependency to enable Lumis highlighting.
 
     """
   end

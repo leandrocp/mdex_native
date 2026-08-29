@@ -655,7 +655,7 @@ defmodule MDExNative.ComrakTest do
            }
   end
 
-  test "raises when lumis is requested but no syntax highlighter is compiled" do
+  test "raises when lumis is requested without a bridge" do
     error =
       assert_raise RuntimeError, fn ->
         MDExNative.Comrak.markdown_to_html(@code_block_markdown,
@@ -669,8 +669,8 @@ defmodule MDExNative.ComrakTest do
         )
       end
 
-    assert error.message =~ "Lumis is not enabled."
-    assert error.message =~ "config :mdex_native, syntax_highlighter: :lumis"
+    assert error.message =~ "Lumis is unavailable."
+    assert error.message =~ "no Lumis bridge was supplied"
   end
 
   test "raises when syntect is requested but no syntax highlighter is compiled" do

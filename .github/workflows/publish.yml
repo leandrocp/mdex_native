@@ -16,7 +16,8 @@ jobs:
     with:
       project-name: mdex_native_nif
       project-dir: native/mdex_native_nif
-      feature-variants: '[{"features":"lumis","variant":"lumis"},{"features":"syntect","variant":"syntect"},{"features":"","variant":""}]'
+      feature-variants: '[{"features":"syntect","variant":"syntect"},{"features":"","variant":""}]'
+      nif-versions: '["2.16"]'
       r2-path: releases/download/${{ github.ref_name }}
     secrets:
       R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}

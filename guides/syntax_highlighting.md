@@ -14,13 +14,14 @@ is added on the `<pre>` class.
 
 ## Lumis
 
-Configure MDExNative before compiling dependencies:
+Lumis support is supplied by the separate `:lumis` dependency. MDExNative no
+longer embeds a second copy of Lumis in its NIF. Add both dependencies, then
+pass `syntax_highlight` when rendering:
 
 ```elixir
-config :mdex_native, syntax_highlighter: :lumis
+{:mdex_native, "~> 0.3"},
+{:lumis, "~> 0.7"}
 ```
-
-Then pass `syntax_highlight` when rendering:
 
 ````elixir
 markdown = """
@@ -78,9 +79,8 @@ Bundle size depends on the selected highlighter:
 
 | Config | Compressed artifact size |
 | --- | ---: |
-| `syntax_highlighter: :lumis` | 15 MB |
 | `syntax_highlighter: :syntect` | 3 MB |
-| `syntax_highlighter: nil` | - |
+| `syntax_highlighter: nil` or `:lumis` | - |
 
 ## Legacy CPUs
 

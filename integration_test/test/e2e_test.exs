@@ -2,6 +2,7 @@ defmodule MDExNative.Integration.E2ETest do
   use ExUnit.Case
 
   @mdex_repo "https://github.com/leandrocp/mdex.git"
+  @mdex_branch "feat/lumis-native-bridge"
 
   setup_all do
     File.rm_rf!(workspace_path())
@@ -11,7 +12,7 @@ defmodule MDExNative.Integration.E2ETest do
     :ok
   end
 
-  test "syntax highlighter compile-time options" do
+  test "syntax highlighter integrations" do
     for e2e_case <- ~w(default lumis syntect) do
       native_checkout_path = prepare_native_checkout!("native/#{e2e_case}")
       dummy_app_path = prepare_dummy_app!(e2e_case, native_checkout_path)
@@ -29,7 +30,11 @@ defmodule MDExNative.Integration.E2ETest do
 
     File.rm_rf!(mdex_path)
 
-    run!("git", ["clone", "--depth", "1", mdex_repo(), mdex_path], native_path(), [],
+    run!(
+      "git",
+      ["clone", "--depth", "1", "--branch", @mdex_branch, mdex_repo(), mdex_path],
+      native_path(),
+      [],
       label: "mdex"
     )
 
@@ -159,6 +164,7 @@ defmodule MDExNative.Integration.E2ETest do
     env = [
       {"MDEX_NATIVE_E2E_CASE", e2e_case},
       {"MDEX_NATIVE_PATH", native_checkout_path},
+      {"LUMIS_BUILD", "1"},
       {"CARGO_TARGET_DIR", Path.join(cargo_target_path(), e2e_case)},
       {"MIX_BUILD_PATH", Path.join([workspace_path(), "_build", opts[:build_path]])},
       {"MIX_DEPS_PATH", Path.join([workspace_path(), "deps", opts[:build_path]])}

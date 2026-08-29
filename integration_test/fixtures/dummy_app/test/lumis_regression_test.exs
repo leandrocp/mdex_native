@@ -10,7 +10,11 @@ defmodule MDExNativeE2E.LumisRegressionTest do
          themes: [light: "catppuccin_latte", dark: "catppuccin_mocha"],
          default_theme: "light-dark()"}
 
-      lumis_opts = [formatter: formatter] |> Lumis.validate_options!() |> Lumis.rust_options!()
+      lumis_opts =
+        [formatter: formatter]
+        |> Lumis.validate_options!()
+        |> Lumis.rust_options!()
+        |> Map.put(:mdex_bridge, Lumis.__mdex_bridge__())
 
       html =
         MDExNative.Native.markdown_to_html_with_options(markdown, %{

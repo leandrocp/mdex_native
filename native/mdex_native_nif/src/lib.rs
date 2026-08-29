@@ -1,7 +1,6 @@
 #[macro_use]
 extern crate rustler;
 
-#[cfg(feature = "lumis")]
 mod lumis_adapter;
 mod types;
 
@@ -14,7 +13,6 @@ use comrak::plugins::syntect::{SyntectAdapter, SyntectAdapterBuilder};
 use comrak::{Anchorizer, Arena, Options};
 use lol_html::html_content::ContentType;
 use lol_html::{rewrite_str, text, RewriteStrSettings};
-#[cfg(feature = "lumis")]
 use lumis_adapter::LumisAdapter;
 use rustler::types::list::ListIterator;
 use rustler::{Encoder, Env, NifResult, Term};
@@ -354,24 +352,15 @@ fn syntax_highlighter(
     syntax_highlight: ExSyntaxHighlightOptions,
     render_unsafe: bool,
 ) -> NifResult<CodeFenceSyntaxHighlighter> {
-    #[cfg(not(feature = "lumis"))]
-    let _ = render_unsafe;
-
     match syntax_highlight.opts {
         ExSyntaxHighlightEngineOptions::Lumis(opts) => {
-            #[cfg(feature = "lumis")]
-            {
-                Ok(CodeFenceSyntaxHighlighter::Lumis(LumisAdapter::new(
-                    opts.formatter,
-                    render_unsafe,
-                )))
-            }
-
-            #[cfg(not(feature = "lumis"))]
-            {
-                let _ = opts;
-                Err(rustler::Error::Atom("lumis_not_enabled"))
-            }
+            let bridge = opts
+                .bridge
+                .ok_or(rustler::Error::Atom("lumis_not_enabled"))?;
+            Ok(CodeFenceSyntaxHighlighter::Lumis(LumisAdapter::new(
+                bridge,
+                render_unsafe,
+            )))
         }
         ExSyntaxHighlightEngineOptions::Syntect(opts) => {
             #[cfg(feature = "syntect")]
@@ -398,13 +387,11 @@ fn syntax_highlighter(
 }
 
 enum CodeFenceSyntaxHighlighter {
-    #[cfg(feature = "lumis")]
     Lumis(LumisAdapter),
     #[cfg(feature = "syntect")]
     Syntect(SyntectAdapter),
 }
 
-#[cfg(any(feature = "lumis", feature = "syntect"))]
 impl SyntaxHighlighterAdapter for CodeFenceSyntaxHighlighter {
     fn write_highlighted(
         &self,
@@ -413,7 +400,6 @@ impl SyntaxHighlighterAdapter for CodeFenceSyntaxHighlighter {
         code: &str,
     ) -> std::fmt::Result {
         match self {
-            #[cfg(feature = "lumis")]
             Self::Lumis(adapter) => adapter.write_highlighted(output, lang, code),
             #[cfg(feature = "syntect")]
             Self::Syntect(adapter) => adapter.write_highlighted(output, lang, code),
@@ -426,7 +412,6 @@ impl SyntaxHighlighterAdapter for CodeFenceSyntaxHighlighter {
         attributes: std::collections::HashMap<&'static str, std::borrow::Cow<'_, str>>,
     ) -> std::fmt::Result {
         match self {
-            #[cfg(feature = "lumis")]
             Self::Lumis(adapter) => adapter.write_pre_tag(output, attributes),
             #[cfg(feature = "syntect")]
             Self::Syntect(adapter) => adapter.write_pre_tag(output, attributes),
@@ -439,39 +424,10 @@ impl SyntaxHighlighterAdapter for CodeFenceSyntaxHighlighter {
         attributes: std::collections::HashMap<&'static str, std::borrow::Cow<'_, str>>,
     ) -> std::fmt::Result {
         match self {
-            #[cfg(feature = "lumis")]
             Self::Lumis(adapter) => adapter.write_code_tag(output, attributes),
             #[cfg(feature = "syntect")]
             Self::Syntect(adapter) => adapter.write_code_tag(output, attributes),
         }
-    }
-}
-
-#[cfg(not(any(feature = "lumis", feature = "syntect")))]
-impl SyntaxHighlighterAdapter for CodeFenceSyntaxHighlighter {
-    fn write_highlighted(
-        &self,
-        _output: &mut dyn std::fmt::Write,
-        _lang: Option<&str>,
-        _code: &str,
-    ) -> std::fmt::Result {
-        match *self {}
-    }
-
-    fn write_pre_tag(
-        &self,
-        _output: &mut dyn std::fmt::Write,
-        _attributes: std::collections::HashMap<&'static str, std::borrow::Cow<'_, str>>,
-    ) -> std::fmt::Result {
-        match *self {}
-    }
-
-    fn write_code_tag(
-        &self,
-        _output: &mut dyn std::fmt::Write,
-        _attributes: std::collections::HashMap<&'static str, std::borrow::Cow<'_, str>>,
-    ) -> std::fmt::Result {
-        match *self {}
     }
 }
 

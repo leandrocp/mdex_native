@@ -1,7 +1,6 @@
 mod sanitize;
 
-#[cfg(feature = "lumis")]
-use super::elixir_types::ExFormatterOption;
+use crate::lumis_adapter::LumisBridgeConfig;
 use comrak::options::{AlertStyleType, Extension, ListStyleType, Options, Parse, Render};
 use rustler::types::atom::Atom;
 use rustler::{Decoder, NifResult, NifUnitEnum, Term};
@@ -508,8 +507,7 @@ pub enum ExSyntaxHighlightEngine {
 
 #[derive(Debug, Default)]
 pub struct ExLumisOptions {
-    #[cfg(feature = "lumis")]
-    pub formatter: ExFormatterOption,
+    pub bridge: Option<LumisBridgeConfig>,
 }
 
 #[derive(Debug, Default)]
@@ -540,19 +538,14 @@ pub enum ExSyntaxHighlightEngineOptions {
     Syntect(ExSyntectOptions),
 }
 
-#[cfg(feature = "lumis")]
 impl<'a> Decoder<'a> for ExLumisOptions {
     fn decode(term: Term<'a>) -> NifResult<Self> {
-        Ok(Self {
-            formatter: optional_field(term, "formatter")?.unwrap_or_default(),
-        })
-    }
-}
+        let bridge: Option<Term<'a>> = optional_field(term, "mdex_bridge")?;
+        let formatter: Option<Term<'a>> = optional_field(term, "formatter")?;
 
-#[cfg(not(feature = "lumis"))]
-impl<'a> Decoder<'a> for ExLumisOptions {
-    fn decode(_term: Term<'a>) -> NifResult<Self> {
-        Ok(Self {})
+        Ok(Self {
+            bridge: bridge.map(|bridge| LumisBridgeConfig::new(bridge, formatter)),
+        })
     }
 }
 

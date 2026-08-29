@@ -17,21 +17,19 @@ defmodule MDExNative.Native do
 
   syntax_highlighter_features =
     case syntax_highlighter do
-      :lumis -> ["lumis"]
       :syntect -> ["syntect"]
-      nil -> []
+      _ -> []
     end
 
-  cargo_features = ["nif_version_2_15" | syntax_highlighter_features]
+  cargo_features = ["nif_version_2_16" | syntax_highlighter_features]
 
-  feature_variants = [:lumis, :syntect]
-  legacy_variants = [:legacy_cpu, :legacy_cpu_lumis, :legacy_cpu_syntect]
+  feature_variants = [:syntect]
+  legacy_variants = [:legacy_cpu, :legacy_cpu_syntect]
 
   feature_variant =
     case syntax_highlighter do
-      :lumis -> :lumis
       :syntect -> :syntect
-      nil -> nil
+      _ -> nil
     end
 
   legacy_env = System.get_env("MDEX_NATIVE_USE_LEGACY_ARTIFACTS")
@@ -101,7 +99,7 @@ defmodule MDExNative.Native do
     base_url: {MDExNative.Native.ArtifactURL, :url},
     targets: targets,
     variants: variants,
-    nif_versions: ["2.15"],
+    nif_versions: ["2.16"],
     mode: mode,
     default_features: false,
     features: cargo_features,
