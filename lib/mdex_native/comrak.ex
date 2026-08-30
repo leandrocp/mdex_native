@@ -348,6 +348,21 @@ defmodule MDExNative.Comrak do
 
   defp check_native_output(:lumis_not_enabled), do: raise(lumis_not_enabled_message())
 
+  defp check_native_output(:syntect_not_enabled) do
+    raise """
+    Syntect is not enabled.
+
+    Comrak tried to syntax highlight a code block with Syntect, but this NIF was not compiled with Syntect support.
+
+    Enable it in your config:
+
+        config :mdex_native, syntax_highlighter: :syntect
+
+    """
+  end
+
+  defp check_native_output(value), do: value
+
   defp lumis_not_enabled_message do
     """
     Lumis is not enabled.
@@ -364,19 +379,4 @@ defmodule MDExNative.Comrak do
 
     """
   end
-
-  defp check_native_output(:syntect_not_enabled) do
-    raise """
-    Syntect is not enabled.
-
-    Comrak tried to syntax highlight a code block with Syntect, but this NIF was not compiled with Syntect support.
-
-    Enable it in your config:
-
-        config :mdex_native, syntax_highlighter: :syntect
-
-    """
-  end
-
-  defp check_native_output(value), do: value
 end
