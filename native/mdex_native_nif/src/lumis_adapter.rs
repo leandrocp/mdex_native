@@ -355,6 +355,54 @@ impl LumisAdapter {
             .and_then(|info| Self::parse_custom_attributes(info.as_ref()))
     }
 
+    /// The language the decorator was told to use, or the best guess from the
+    /// info string and the source itself.
+    fn resolve_language(&self, lang: Option<&str>, source: &str) -> Language {
+        if let Some(stored_lang) = *self.stored_lang.lock() {
+            stored_lang
+        } else {
+            Language::guess(Some(lang.unwrap_or("plaintext")), source)
+        }
+    }
+
+    /// The `class` and `style` attributes for one output line: `l-line` on its
+    /// own, plus whatever `highlight_lines` asked for on the lines it covers.
+    fn line_attrs(
+        &self,
+        highlight_config: Option<&(HashSet<usize>, Option<String>, Option<String>)>,
+        line_number: usize,
+    ) -> (String, String) {
+        let mut class_name = String::from("l-line");
+        let mut style_attr = String::new();
+
+        let Some((lines, style, class)) = highlight_config else {
+            return (class_name, style_attr);
+        };
+        if !lines.contains(&line_number) {
+            return (class_name, style_attr);
+        }
+
+        if let Some(class) = class {
+            class_name.push(' ');
+            class_name.push_str(&self.escape_unless_unsafe(class));
+        }
+        if let Some(style) = style {
+            style_attr = format!(" style=\"{}\"", self.escape_unless_unsafe(style));
+        }
+
+        (class_name, style_attr)
+    }
+
+    /// Author-supplied attribute values are escaped unless the document opted
+    /// into raw HTML, which is the same trade `render.unsafe` makes elsewhere.
+    fn escape_unless_unsafe(&self, value: &str) -> String {
+        if self.render_unsafe {
+            value.to_string()
+        } else {
+            v_htmlescape::escape_fmt(value).to_string()
+        }
+    }
+
     fn span_with_attrs(text: &str, attrs: String) -> String {
         let escaped = html::escape(text);
 
@@ -450,15 +498,7 @@ impl SyntaxHighlighterAdapter for LumisAdapter {
         lang: Option<&str>,
         source: &str,
     ) -> std::fmt::Result {
-        let stored_lang = *self.stored_lang.lock();
-
-        let language = if let Some(stored_lang) = stored_lang {
-            stored_lang
-        } else if let Some(lang_str) = lang {
-            Language::guess(Some(lang_str), source)
-        } else {
-            Language::guess(Some("plaintext"), source)
-        };
+        let language = self.resolve_language(lang, source);
         let is_plaintext = language == Language::PlainText;
 
         let theme = self
@@ -543,28 +583,7 @@ impl SyntaxHighlighterAdapter for LumisAdapter {
 
         for (i, line) in html_output.lines().enumerate() {
             let line_number = i + 1;
-            let mut class_name = String::from("l-line");
-            let mut style_attr = String::new();
-
-            if let Some((ref lines, ref style, ref class)) = highlight_config {
-                if lines.contains(&line_number) {
-                    if let Some(ref c) = class {
-                        class_name.push(' ');
-                        if self.render_unsafe {
-                            class_name.push_str(c);
-                        } else {
-                            class_name.push_str(&v_htmlescape::escape_fmt(c).to_string());
-                        }
-                    }
-                    if let Some(ref s) = style {
-                        if self.render_unsafe {
-                            style_attr = format!(" style=\"{}\"", s);
-                        } else {
-                            style_attr = format!(" style=\"{}\"", v_htmlescape::escape_fmt(s));
-                        }
-                    }
-                }
-            }
+            let (class_name, style_attr) = self.line_attrs(highlight_config.as_ref(), line_number);
 
             write!(
                 output,
