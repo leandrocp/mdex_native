@@ -128,7 +128,13 @@ impl<'a> Decoder<'a> for ExExtensionOptions {
 
 #[allow(deprecated)]
 impl ExExtensionOptions {
-    pub fn apply(self, extension: &mut Extension<'static>) {
+    pub fn apply(mut self, extension: &mut Extension<'static>) {
+        self.apply_common_options(extension);
+        self.apply_additional_options(extension);
+        self.apply_rewriters_and_attributes(extension);
+    }
+
+    fn apply_common_options(&mut self, extension: &mut Extension<'static>) {
         if let Some(value) = self.strikethrough {
             extension.strikethrough = value;
         }
@@ -147,8 +153,8 @@ impl ExExtensionOptions {
         if let Some(value) = self.superscript {
             extension.superscript = value;
         }
-        if self.header_id_prefix.is_some() {
-            extension.header_id_prefix = self.header_id_prefix;
+        if let Some(value) = self.header_id_prefix.take() {
+            extension.header_id_prefix = Some(value);
         }
         if let Some(value) = self.header_id_prefix_in_href {
             extension.header_id_prefix_in_href = value;
@@ -159,11 +165,14 @@ impl ExExtensionOptions {
         if let Some(value) = self.inline_footnotes {
             extension.inline_footnotes = value;
         }
+    }
+
+    fn apply_additional_options(&mut self, extension: &mut Extension<'static>) {
         if let Some(value) = self.description_lists {
             extension.description_lists = value;
         }
-        if self.front_matter_delimiter.is_some() {
-            extension.front_matter_delimiter = self.front_matter_delimiter;
+        if let Some(value) = self.front_matter_delimiter.take() {
+            extension.front_matter_delimiter = Some(value);
         }
         if let Some(value) = self.multiline_block_quotes {
             extension.multiline_block_quotes = value;
@@ -210,11 +219,14 @@ impl ExExtensionOptions {
         if let Some(value) = self.insert {
             extension.insert = value;
         }
-        if let Some(rewrite) = self.image_url_rewriter {
+    }
+
+    fn apply_rewriters_and_attributes(&mut self, extension: &mut Extension<'static>) {
+        if let Some(rewrite) = self.image_url_rewriter.take() {
             extension.image_url_rewriter =
                 Some(Arc::new(move |url: &str| rewrite.replace("{@url}", url)));
         }
-        if let Some(rewrite) = self.link_url_rewriter {
+        if let Some(rewrite) = self.link_url_rewriter.take() {
             extension.link_url_rewriter =
                 Some(Arc::new(move |url: &str| rewrite.replace("{@url}", url)));
         }
