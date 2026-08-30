@@ -48,9 +48,9 @@ defmodule MDExNative.ComrakTest do
     assert MDExNative.Comrak.markdown_to_html("# Hello",
              extension: [header_id_prefix: "user-content-"]
            ) ==
-             "<h1 id=\"user-content-hello\">Hello" <>
-               "<a href=\"#hello\" aria-label=\"Link to heading 'Hello'\" " <>
-               "data-heading-content=\"Hello\" class=\"anchor\"></a></h1>\n"
+             ~s(<h1 id="user-content-hello">Hello) <>
+               ~s(<a href="#hello" aria-label="Link to heading 'Hello'" ) <>
+               ~s(data-heading-content="Hello" class="anchor"></a></h1>\n)
   end
 
   test "renders LaTeX-delimited math when math_latex is enabled" do
