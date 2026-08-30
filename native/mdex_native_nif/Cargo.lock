@@ -1083,7 +1083,7 @@ dependencies = [
 [[package]]
 name = "lumis-core"
 version = "2.4.0"
-source = "git+https://github.com/leandrocp/lumis?branch=refactor%2Fshare-wasm-runtime#642293fa065d7a88f6af85000d0009e33d0cd102"
+source = "git+https://github.com/leandrocp/lumis?branch=refactor%2Fshare-wasm-runtime#4fae11eb5ca30df2ff1a29448f4de6ca0864477e"
 dependencies = [
  "derive_builder",
  "glob",
@@ -1103,7 +1103,7 @@ dependencies = [
 [[package]]
 name = "lumis-wasm-runtime"
 version = "0.2.0"
-source = "git+https://github.com/leandrocp/lumis?branch=refactor%2Fshare-wasm-runtime#642293fa065d7a88f6af85000d0009e33d0cd102"
+source = "git+https://github.com/leandrocp/lumis?branch=refactor%2Fshare-wasm-runtime#4fae11eb5ca30df2ff1a29448f4de6ca0864477e"
 dependencies = [
  "etcetera",
  "lumis-core",

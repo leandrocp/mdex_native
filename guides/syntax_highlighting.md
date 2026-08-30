@@ -63,7 +63,7 @@ deployment renders:
 MDExNative.load_language("elixir")
 ```
 
-`Lumis.load/1` warms the same store, so either call serves both.
+`Lumis.Languages.load/1` warms the same store, so either call serves both.
 
 A language whose parser cannot be obtained leaves that one fence unhighlighted
 rather than failing the document.
