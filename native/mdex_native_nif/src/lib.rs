@@ -234,19 +234,18 @@ fn first_reference_link_block_start<'a>(
         }
     }
 
-    let mut block_starts = root
+    let mut block_spans = root
         .children()
-        .map(|node| node.data().sourcepos.start.line)
+        .map(|node| {
+            let sourcepos = node.data().sourcepos;
+            (sourcepos.start.line, sourcepos.end.line)
+        })
         .collect::<Vec<_>>();
-    block_starts.dedup();
+    block_spans.dedup();
 
-    for (index, start_line) in block_starts.iter().copied().enumerate() {
+    for (start_line, end_line) in block_spans {
         let from = *line_starts.get(start_line.saturating_sub(1))?;
-        let to = block_starts
-            .get(index + 1)
-            .and_then(|line| line_starts.get(line.saturating_sub(1)))
-            .copied()
-            .unwrap_or(md.len());
+        let to = line_starts.get(end_line).copied().unwrap_or(md.len());
 
         if markdown_has_unresolved_reference_link(&md[from..to], options) {
             return Some(start_line);

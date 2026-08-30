@@ -60,6 +60,16 @@ defmodule MDExNative.ComrakTest do
                %{}
              )
 
+    assert {_document, false, 1} =
+             MDExNative.Native.parse_document_with_metadata(
+               """
+               Read [the docs].
+
+               [the docs]: https://example.com
+               """,
+               %{}
+             )
+
     assert {_document, false, nil} =
              MDExNative.Native.parse_document_with_metadata(
                "- [x] done",
