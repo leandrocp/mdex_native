@@ -297,9 +297,28 @@ defmodule MDExNative.Comrak do
   defp syntax_highlight_options(options) do
     options
     |> Map.new(fn
-      {:opts, opts} when is_list(opts) -> {:opts, Map.new(opts, &syntax_highlight_option/1)}
+      {:opts, opts} when is_list(opts) -> {:opts, normalize_lumis_opts(opts)}
       option -> syntax_highlight_option(option)
     end)
+  end
+
+  # Lumis owns the shape its NIF decodes, and only it knows every formatter's
+  # defaults. Sending it through Lumis's own conversion is what lets a caller
+  # write `{:html_inline, theme: "onedark"}` and omit the rest.
+  defp normalize_lumis_opts(opts) do
+    lumis = :"Elixir.Lumis"
+
+    if Keyword.keyword?(opts) and Code.ensure_loaded?(lumis) and
+         function_exported?(lumis, :rust_options!, 1) do
+      opts
+      |> then(&apply(lumis, :validate_options!, [&1]))
+      |> then(&apply(lumis, :rust_options!, [&1]))
+    else
+      Map.new(opts, &syntax_highlight_option/1)
+    end
+  rescue
+    # Not Lumis options at all, such as `[theme: "..."]` for Syntect.
+    _ -> Map.new(opts, &syntax_highlight_option/1)
   end
 
   defp syntax_highlight_option({:formatter, {formatter, opts}}) when is_list(opts) do
