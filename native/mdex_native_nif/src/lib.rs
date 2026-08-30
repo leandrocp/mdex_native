@@ -7,7 +7,7 @@ mod types;
 
 use comrak::adapters::SyntaxHighlighterAdapter;
 use comrak::format_html_with_plugins;
-use comrak::nodes::AstNode;
+use comrak::nodes::{AstNode, NodeValue};
 use comrak::options::Plugins;
 #[cfg(feature = "syntect")]
 use comrak::plugins::syntect::{SyntectAdapter, SyntectAdapterBuilder};
@@ -18,6 +18,8 @@ use lol_html::{rewrite_str, text, RewriteStrSettings};
 use lumis_adapter::LumisAdapter;
 use rustler::types::list::ListIterator;
 use rustler::{Encoder, Env, NifResult, Term};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use types::{document::*, options::*};
 
 rustler::init!("Elixir.MDExNative.Native");
@@ -177,6 +179,103 @@ fn parse_document<'a>(env: Env<'a>, md: &str, options: ExOptions) -> NifResult<T
     let arena = Arena::new();
     let root = comrak::parse_document(&arena, md, &comrak_options);
     comrak_ast_to_document_term(env, root)
+}
+
+#[rustler::nif(schedule = "DirtyCpu")]
+fn parse_document_with_metadata<'a>(
+    env: Env<'a>,
+    md: &str,
+    options: ExOptions,
+) -> NifResult<Term<'a>> {
+    let base_options = options.comrak_options();
+    let mut comrak_options = base_options.clone();
+    let unresolved_reference_links = Arc::new(AtomicUsize::new(0));
+    let callback_count = Arc::clone(&unresolved_reference_links);
+
+    comrak_options.parse.broken_link_callback = Some(Arc::new(
+        move |_reference: comrak::options::BrokenLinkReference<'_>| {
+            callback_count.fetch_add(1, Ordering::Relaxed);
+            None
+        },
+    ));
+
+    let arena = Arena::new();
+    let root = comrak::parse_document(&arena, md, &comrak_options);
+    let task_items = root
+        .descendants()
+        .filter(|node| matches!(&node.data().value, NodeValue::TaskItem(_)))
+        .count();
+    let reference_link_block_start = first_reference_link_block_start(md, root, &base_options);
+    let document = comrak_ast_to_document_term(env, root)?;
+    // Comrak runs the broken-link callback for `[x]` before its task-list
+    // postprocessor promotes that syntax to a TaskItem. Those parser-owned
+    // nodes are not unresolved links and must not leak into the metadata.
+    let unresolved_reference_link = unresolved_reference_links.load(Ordering::Relaxed) > task_items;
+
+    Ok((
+        document,
+        unresolved_reference_link,
+        reference_link_block_start,
+    )
+        .encode(env))
+}
+
+fn first_reference_link_block_start<'a>(
+    md: &str,
+    root: &'a AstNode<'a>,
+    options: &Options<'static>,
+) -> Option<usize> {
+    let mut line_starts = Vec::with_capacity(md.lines().count().saturating_add(1));
+    line_starts.push(0);
+
+    for (offset, byte) in md.bytes().enumerate() {
+        if byte == b'\n' {
+            line_starts.push(offset + 1);
+        }
+    }
+
+    let mut block_starts = root
+        .children()
+        .map(|node| node.data().sourcepos.start.line)
+        .collect::<Vec<_>>();
+    block_starts.dedup();
+
+    for (index, start_line) in block_starts.iter().copied().enumerate() {
+        let from = *line_starts.get(start_line.saturating_sub(1))?;
+        let to = block_starts
+            .get(index + 1)
+            .and_then(|line| line_starts.get(line.saturating_sub(1)))
+            .copied()
+            .unwrap_or(md.len());
+
+        if markdown_has_unresolved_reference_link(&md[from..to], options) {
+            return Some(start_line);
+        }
+    }
+
+    None
+}
+
+fn markdown_has_unresolved_reference_link(md: &str, options: &Options<'static>) -> bool {
+    let unresolved_reference_links = Arc::new(AtomicUsize::new(0));
+    let callback_count = Arc::clone(&unresolved_reference_links);
+    let mut options = options.clone();
+
+    options.parse.broken_link_callback = Some(Arc::new(
+        move |_reference: comrak::options::BrokenLinkReference<'_>| {
+            callback_count.fetch_add(1, Ordering::Relaxed);
+            None
+        },
+    ));
+
+    let arena = Arena::new();
+    let root = comrak::parse_document(&arena, md, &options);
+    let task_items = root
+        .descendants()
+        .filter(|node| matches!(&node.data().value, NodeValue::TaskItem(_)))
+        .count();
+
+    unresolved_reference_links.load(Ordering::Relaxed) > task_items
 }
 
 #[rustler::nif(schedule = "DirtyCpu")]

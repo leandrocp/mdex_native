@@ -44,6 +44,53 @@ defmodule MDExNative.ComrakTest do
     assert html =~ ~s(<input type="checkbox" checked="" disabled="" /> done)
   end
 
+  test "reports unresolved reference links from the parser" do
+    assert {_document, true, 1} =
+             MDExNative.Native.parse_document_with_metadata("Read [the docs].", %{})
+
+    assert {_document, false, 1} =
+             MDExNative.Native.parse_document_with_metadata(
+               """
+               Read [the docs].
+
+               Another paragraph.
+
+               [the docs]: https://example.com
+               """,
+               %{}
+             )
+
+    assert {_document, false, nil} =
+             MDExNative.Native.parse_document_with_metadata(
+               "- [x] done",
+               %{extension: %{tasklist: true}}
+             )
+
+    assert {_document, false, nil} =
+             MDExNative.Native.parse_document_with_metadata(
+               "- [ ] pending",
+               %{extension: %{tasklist: true}}
+             )
+
+    assert {_document, true, 3} =
+             MDExNative.Native.parse_document_with_metadata(
+               "- [x] done\n\nRegular [x].",
+               %{extension: %{tasklist: true}}
+             )
+
+    assert {_document, true, 3} =
+             MDExNative.Native.parse_document_with_metadata(
+               "- [ ] pending\n\nRegular [x].",
+               %{extension: %{tasklist: true}}
+             )
+
+    assert {_document, false, nil} =
+             MDExNative.Native.parse_document_with_metadata(
+               "[the docs](https://example.com)",
+               %{}
+             )
+  end
+
   test "renders heading anchors using Comrak 0.54 markup" do
     assert MDExNative.Comrak.markdown_to_html("# Hello",
              extension: [header_id_prefix: "user-content-"]
