@@ -14,6 +14,12 @@ is added on the `<pre>` class.
 
 ## Lumis
 
+Add Lumis to your deps, which supplies the parsers:
+
+```elixir
+{:lumis, "~> 0.7"}
+```
+
 Configure MDExNative before compiling dependencies:
 
 ```elixir
@@ -42,6 +48,25 @@ html = MDExNative.Comrak.markdown_to_html(markdown,
 ````
 
 Lumis formatters and options are documented in [`Lumis`](https://lumis.hexdocs.pm/Lumis.html#t:formatter/0).
+
+### Parsers load on demand
+
+A parser is a WebAssembly module fetched and compiled the first time a language
+is rendered, not a grammar compiled into this library. MDExNative and the
+`:lumis` application share one store, so whichever one fetches a parser first,
+both use it.
+
+That first render pays a download and a Wasmtime compile. Warm the languages a
+deployment renders:
+
+```elixir
+MDExNative.load_language("elixir")
+```
+
+`Lumis.load/1` warms the same store, so either call serves both.
+
+A language whose parser cannot be obtained leaves that one fence unhighlighted
+rather than failing the document.
 
 ## Syntect
 
@@ -78,7 +103,7 @@ Bundle size depends on the selected highlighter:
 
 | Config | Compressed artifact size |
 | --- | ---: |
-| `syntax_highlighter: :lumis` | 15 MB |
+| `syntax_highlighter: :lumis` | 5 MB |
 | `syntax_highlighter: :syntect` | 3 MB |
 | `syntax_highlighter: nil` | - |
 

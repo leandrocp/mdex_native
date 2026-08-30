@@ -12,12 +12,15 @@ crate-type = ["cdylib"]
 
 [dependencies]
 ammonia = "4.1"
+anyhow = "1"
+once_cell = "1.21"
 comrak = { version = "0.54", default-features = false, features = [
   "attributes",
   "shortcodes",
   "phoenix_heex",
 ] }
-lumis = { version = "0.13", default-features = false, optional = true }
+lumis-core = { version = "2.5", default-features = false, features = ["all-languages", "rustler"], optional = true }
+lumis-wasm-runtime = { version = "0.2.1", optional = true }
 lol_html = "3.0"
 parking_lot = "0.12"
 phf = { version = "0.14", features = ["macros"] }
@@ -33,6 +36,7 @@ pretty_assertions = "1.4"
 
 [features]
 default = ["nif_version_2_15"]
-lumis = ["dep:lumis", "lumis/all-languages"]
+lumis = ["dep:lumis-core", "dep:lumis-wasm-runtime"]
 nif_version_2_15 = ["rustler/nif_version_2_15"]
 syntect = ["comrak/syntect", "dep:two-face"]
+

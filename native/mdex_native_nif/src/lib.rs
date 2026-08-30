@@ -3,6 +3,10 @@ extern crate rustler;
 
 #[cfg(feature = "lumis")]
 mod lumis_adapter;
+#[cfg(feature = "lumis")]
+mod lumis_render;
+#[cfg(feature = "lumis")]
+mod lumis_runtime;
 mod types;
 
 use comrak::adapters::SyntaxHighlighterAdapter;
@@ -24,7 +28,8 @@ rustler::init!("Elixir.MDExNative.Native");
 
 mod atoms {
     rustler::atoms! {
-        nodes
+        nodes,
+        lumis_error
     }
 }
 
@@ -192,8 +197,10 @@ fn markdown_to_html_with_options<'a>(
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
 
-    format_html_with_plugins(root, &comrak_options, &mut buffer, &plugins)
-        .expect("writing to String is infallible");
+    finish_render(
+        format_html_with_plugins(root, &comrak_options, &mut buffer, &plugins),
+        &lumis_adapter,
+    )?;
     Ok(do_safe_html(buffer, &sanitize, false, escape_curly_braces_in_code).encode(env))
 }
 
@@ -209,8 +216,10 @@ fn markdown_to_xml_with_options<'a>(
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
 
-    comrak::format_xml_with_plugins(root, &comrak_options, &mut buffer, &plugins)
-        .expect("writing to String is infallible");
+    finish_render(
+        comrak::format_xml_with_plugins(root, &comrak_options, &mut buffer, &plugins),
+        &lumis_adapter,
+    )?;
     let xml = buffer;
     Ok(xml.encode(env))
 }
@@ -239,8 +248,10 @@ fn document_to_commonmark_with_options<'a>(
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
 
-    comrak::format_commonmark_with_plugins(comrak_ast, &comrak_options, &mut buffer, &plugins)
-        .expect("writing to String is infallible");
+    finish_render(
+        comrak::format_commonmark_with_plugins(comrak_ast, &comrak_options, &mut buffer, &plugins),
+        &lumis_adapter,
+    )?;
     let document = buffer;
     Ok(document.encode(env))
 }
@@ -269,8 +280,10 @@ fn document_to_html_with_options<'a>(
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
 
-    format_html_with_plugins(comrak_ast, &comrak_options, &mut buffer, &plugins)
-        .expect("writing to String is infallible");
+    finish_render(
+        format_html_with_plugins(comrak_ast, &comrak_options, &mut buffer, &plugins),
+        &lumis_adapter,
+    )?;
     Ok(do_safe_html(buffer, &sanitize, false, escape_curly_braces_in_code).encode(env))
 }
 
@@ -298,8 +311,10 @@ fn document_to_xml_with_options<'a>(
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
 
-    comrak::format_xml_with_plugins(comrak_ast, &comrak_options, &mut buffer, &plugins)
-        .expect("writing to String is infallible");
+    finish_render(
+        comrak::format_xml_with_plugins(comrak_ast, &comrak_options, &mut buffer, &plugins),
+        &lumis_adapter,
+    )?;
     let xml = buffer;
     Ok(xml.encode(env))
 }
@@ -393,6 +408,37 @@ fn syntax_highlighter(
                 let _ = opts;
                 Err(rustler::Error::Atom("syntect_not_enabled"))
             }
+        }
+    }
+}
+
+/// Writing into a `String` cannot fail, so a render only ends in `Err` when the
+/// syntax-highlighter adapter refused a code fence. Comrak's adapter trait can
+/// only report that as a bare `fmt::Error`, so the reason is collected from the
+/// adapter here rather than thrown away.
+fn finish_render(
+    render: std::fmt::Result,
+    syntax_highlighter: &Option<CodeFenceSyntaxHighlighter>,
+) -> NifResult<()> {
+    render.map_err(|_| {
+        let reason = syntax_highlighter
+            .as_ref()
+            .and_then(CodeFenceSyntaxHighlighter::take_failure)
+            .unwrap_or_else(|| "a syntax highlighter refused a code block".to_string());
+
+        rustler::Error::Term(Box::new((atoms::lumis_error(), reason)))
+    })
+}
+
+impl CodeFenceSyntaxHighlighter {
+    fn take_failure(&self) -> Option<String> {
+        match self {
+            #[cfg(feature = "lumis")]
+            Self::Lumis(adapter) => adapter.take_failure(),
+            #[cfg(feature = "syntect")]
+            Self::Syntect(_) => None,
+            #[cfg(not(any(feature = "lumis", feature = "syntect")))]
+            _ => None,
         }
     }
 }

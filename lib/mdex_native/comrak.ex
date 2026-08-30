@@ -308,6 +308,15 @@ defmodule MDExNative.Comrak do
 
   defp syntax_highlight_option(option), do: option
 
+  defp check_native_output({:error, {:lumis_error, reason}}) do
+    raise """
+    Lumis failed to highlight a code block.
+
+    #{reason}
+
+    """
+  end
+
   defp check_native_output(:lumis_not_enabled) do
     raise """
     Lumis is not enabled.
@@ -317,6 +326,10 @@ defmodule MDExNative.Comrak do
     Enable it in your config:
 
         config :mdex_native, syntax_highlighter: :lumis
+
+    And add Lumis to your deps, which supplies the parsers:
+
+        {:lumis, "~> 0.7"}
 
     """
   end

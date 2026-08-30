@@ -18,7 +18,7 @@ defmodule MDExNativeE2E.MixProject do
   defp deps do
     [
       {:mdex_native, path: "../../.."},
-      {:lumis, "~> 0.6"}
+      {:lumis, "~> 0.7"}
     ]
   end
 end
