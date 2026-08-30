@@ -673,6 +673,18 @@ defmodule MDExNative.ComrakTest do
     assert error.message =~ "no Lumis bridge was supplied"
   end
 
+  test "raises with the reason when the bridge is not a Lumis resource" do
+    error =
+      assert_raise RuntimeError, fn ->
+        MDExNative.Comrak.markdown_to_html(@code_block_markdown,
+          syntax_highlight: [engine: :lumis, opts: [mdex_bridge: make_ref()]]
+        )
+      end
+
+    assert error.message =~ "Lumis failed to highlight a code block."
+    assert error.message =~ "does not export lumis_mdex_bridge_v1"
+  end
+
   test "raises when syntect is requested but no syntax highlighter is compiled" do
     error =
       assert_raise RuntimeError, fn ->
