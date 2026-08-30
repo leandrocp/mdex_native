@@ -10,7 +10,7 @@ defmodule MDExNative do
   moves both off the first request. Returns whether the parser is ready.
 
   Shares its store with the `:lumis` application, so a parser either side warms
-  serves both.
+  serves both. Answers `false` when this NIF was built without Lumis.
 
   ## Examples
 
@@ -21,5 +21,9 @@ defmodule MDExNative do
   @spec load_language(String.t()) :: boolean()
   def load_language(name) when is_binary(name) do
     MDExNative.Native.load_lumis_language(name)
+  rescue
+    # The NIF exports this only when built with the Lumis feature.
+    UndefinedFunctionError -> false
+    ErlangError -> false
   end
 end

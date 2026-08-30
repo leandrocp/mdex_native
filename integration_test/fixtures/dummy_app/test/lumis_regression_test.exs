@@ -56,7 +56,18 @@ defmodule MDExNativeE2E.LumisRegressionTest do
 
     test "warming a parser reports it ready and shares the lumis store" do
       assert is_binary(Lumis.data_dir())
-      assert MDExNative.load_language("elixir")
+      assert MDExNative.load_language("elixir") == true
+    end
+
+    test "an invalid Lumis option reports what Lumis said" do
+      error =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          MDExNative.Comrak.markdown_to_html("```elixir\n:ok\n```",
+            syntax_highlight: [engine: :lumis, opts: [formatter: {:html_inline, nope: true}]]
+          )
+        end
+
+      assert Exception.message(error) =~ "nope"
     end
   end
 

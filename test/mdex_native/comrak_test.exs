@@ -673,6 +673,16 @@ defmodule MDExNative.ComrakTest do
     assert error.message =~ "config :mdex_native, syntax_highlighter: :lumis"
   end
 
+  test "keeps Syntect options off the Lumis conversion path" do
+    assert MDExNative.Comrak.markdown_to_html(@code_block_markdown,
+             syntax_highlight: [engine: :syntect, opts: [theme: "InspiredGitHub"]]
+           ) =~ "syntax-highlighting"
+  rescue
+    # This NIF may be built without Syntect; the point is that `[theme: ...]`
+    # never reaches Lumis's validation.
+    error in RuntimeError -> assert error.message =~ "Syntect is not enabled."
+  end
+
   test "raises when syntect is requested but no syntax highlighter is compiled" do
     error =
       assert_raise RuntimeError, fn ->
