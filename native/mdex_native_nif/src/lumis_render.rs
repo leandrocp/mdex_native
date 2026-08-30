@@ -41,7 +41,7 @@ pub fn render_code_fence(
     } else {
         let executor = crate::lumis_runtime::executor().map_err(|reason| format!("{reason:#}"))?;
         match executor.highlight(source, language.id_name(), rainbow_brackets) {
-            Ok(events) => events,
+            Ok(events) => flatten_events(source, events),
             Err(RuntimeError::LanguageNotLoaded(language)) => {
                 return Err(format!("language {language} is not loaded"));
             }
@@ -276,6 +276,47 @@ fn line_background_from_name(theme: Option<&String>) -> String {
     line_background(&theme)
 }
 
+/// Collapses nested scopes so each span carries exactly one, and leaves
+/// whitespace-only spans unscoped.
+///
+/// Lumis's formatters nest: an inner scope renders inside its outer one. MDEx
+/// has always published the flat form, and `mdex_test.exs` pins it, so a fence
+/// deliberately renders differently from `Lumis.highlight/2` for languages with
+/// injected or nested scopes. Per-character colour is the same either way; only
+/// the element structure differs, and CSS written against the flat form would
+/// break without this.
+fn flatten_events(source: &str, events: Vec<HighlightEvent>) -> Vec<HighlightEvent> {
+    let mut flattened = Vec::with_capacity(events.len());
+    let mut scopes = Vec::new();
+
+    for event in events {
+        match event {
+            HighlightEvent::Start {
+                scope_index,
+                language,
+            } => scopes.push((scope_index, language)),
+            HighlightEvent::End => {
+                scopes.pop();
+            }
+            HighlightEvent::Source { start, end } => {
+                let text = source.get(start..end).unwrap_or_default();
+                if text.trim().is_empty() || scopes.is_empty() {
+                    flattened.push(HighlightEvent::Source { start, end });
+                } else if let Some((scope_index, language)) = scopes.last() {
+                    flattened.push(HighlightEvent::Start {
+                        scope_index: *scope_index,
+                        language: language.clone(),
+                    });
+                    flattened.push(HighlightEvent::Source { start, end });
+                    flattened.push(HighlightEvent::End);
+                }
+            }
+        }
+    }
+
+    flattened
+}
+
 fn linked_highlight_lines(
     attributes: &HashMap<String, String>,
     render_unsafe: bool,
@@ -340,6 +381,44 @@ mod tests {
         assert_eq!(lines.len(), 2);
         assert!(matches!(lines[0], ExLineSpec::Single(1)));
         assert!(matches!(lines[1], ExLineSpec::Range { start: 3, end: 5 }));
+    }
+
+    #[test]
+    fn flattens_nested_scopes_to_the_innermost_non_whitespace_scope() {
+        let events = vec![
+            HighlightEvent::Start {
+                scope_index: 1,
+                language: "elixir".to_string(),
+            },
+            HighlightEvent::Source { start: 0, end: 1 },
+            HighlightEvent::Start {
+                scope_index: 2,
+                language: "elixir".to_string(),
+            },
+            HighlightEvent::Source { start: 1, end: 2 },
+            HighlightEvent::End,
+            HighlightEvent::Source { start: 2, end: 3 },
+            HighlightEvent::End,
+        ];
+
+        assert_eq!(
+            flatten_events("a b", events),
+            vec![
+                HighlightEvent::Start {
+                    scope_index: 1,
+                    language: "elixir".to_string(),
+                },
+                HighlightEvent::Source { start: 0, end: 1 },
+                HighlightEvent::End,
+                HighlightEvent::Source { start: 1, end: 2 },
+                HighlightEvent::Start {
+                    scope_index: 1,
+                    language: "elixir".to_string(),
+                },
+                HighlightEvent::Source { start: 2, end: 3 },
+                HighlightEvent::End,
+            ]
+        );
     }
 
     #[test]
