@@ -7,7 +7,15 @@
       name: "default",
       strict: true,
       files: %{
-        included: ["lib/", "src/", "test/", "config/", "examples/", "integration_test/", "mix.exs"],
+        included: [
+          "lib/",
+          "src/",
+          "test/",
+          "config/",
+          "examples/",
+          "integration_test/",
+          "mix.exs"
+        ],
         excluded: [~r"/_build/", ~r"/deps/", ~r"/node_modules/", ~r"/integration_test/tmp/"]
       },
       checks: %{
