@@ -18,7 +18,10 @@ defmodule MDExNativeE2E.MixProject do
   defp deps do
     [
       {:mdex_native, path: "../../.."},
-      {:lumis, "~> 0.7"}
+      {:lumis,
+       github: "leandrocp/lumis",
+       branch: "refactor/share-wasm-runtime",
+       sparse: "packages/elixir/lumis"}
     ]
   end
 end

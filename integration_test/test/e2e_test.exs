@@ -159,6 +159,9 @@ defmodule MDExNative.Integration.E2ETest do
     env = [
       {"MDEX_NATIVE_E2E_CASE", e2e_case},
       {"MDEX_NATIVE_PATH", native_checkout_path},
+      # Lumis comes from a branch until its crates publish, so there is no
+      # precompiled NIF to download for it.
+      {"LUMIS_BUILD", "1"},
       {"CARGO_TARGET_DIR", Path.join(cargo_target_path(), e2e_case)},
       {"MIX_BUILD_PATH", Path.join([workspace_path(), "_build", opts[:build_path]])},
       {"MIX_DEPS_PATH", Path.join([workspace_path(), "deps", opts[:build_path]])}

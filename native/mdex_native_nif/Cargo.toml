@@ -19,8 +19,11 @@ comrak = { version = "0.54", default-features = false, features = [
   "shortcodes",
   "phoenix_heex",
 ] }
-lumis-core = { version = "2.5", default-features = false, features = ["all-languages", "rustler"], optional = true }
-lumis-wasm-runtime = { version = "0.2.1", optional = true }
+# Until lumis-core 2.5 and lumis-wasm-runtime 0.2.1 are published, both are
+# taken from the branch that adds the `rustler` feature and `Executor`.
+# Swap back to version requirements before merging.
+lumis-core = { git = "https://github.com/leandrocp/lumis", branch = "refactor/share-wasm-runtime", default-features = false, features = ["all-languages", "rustler"], optional = true }
+lumis-wasm-runtime = { git = "https://github.com/leandrocp/lumis", branch = "refactor/share-wasm-runtime", optional = true }
 lol_html = "3.0"
 parking_lot = "0.12"
 phf = { version = "0.14", features = ["macros"] }
