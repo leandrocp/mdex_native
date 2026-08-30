@@ -376,9 +376,8 @@ fn syntax_highlighter(
         ExSyntaxHighlightEngineOptions::Lumis(opts) => {
             #[cfg(feature = "lumis")]
             {
-                Ok(CodeFenceSyntaxHighlighter::Lumis(LumisAdapter::new(
-                    opts.formatter,
-                    render_unsafe,
+                Ok(CodeFenceSyntaxHighlighter::Lumis(Box::new(
+                    LumisAdapter::new(opts.formatter, render_unsafe),
                 )))
             }
 
@@ -445,7 +444,7 @@ impl CodeFenceSyntaxHighlighter {
 
 enum CodeFenceSyntaxHighlighter {
     #[cfg(feature = "lumis")]
-    Lumis(LumisAdapter),
+    Lumis(Box<LumisAdapter>),
     #[cfg(feature = "syntect")]
     Syntect(SyntectAdapter),
 }
