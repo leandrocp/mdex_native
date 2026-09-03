@@ -295,12 +295,41 @@ defmodule MDExNative.Comrak do
   end
 
   defp syntax_highlight_options(options) do
+    engine = Keyword.get(options, :engine, :lumis)
+
     options
     |> Map.new(fn
-      {:opts, opts} when is_list(opts) -> {:opts, Map.new(opts, &syntax_highlight_option/1)}
+      {:opts, opts} when is_list(opts) -> {:opts, normalize_opts(engine, opts)}
       option -> syntax_highlight_option(option)
     end)
   end
+
+  # Lumis owns the shape its NIF decodes, and only it knows every formatter's
+  # defaults. Sending it through Lumis's own conversion is what lets a caller
+  # write `{:html_inline, theme: "onedark"}` and omit the rest.
+  #
+  # Nothing is rescued: an invalid Lumis option should surface Lumis's own
+  # message here, not decode to something the NIF quietly ignores.
+  defp normalize_opts(:lumis, opts) do
+    lumis = :"Elixir.Lumis"
+
+    cond do
+      not Keyword.keyword?(opts) ->
+        Map.new(opts, &syntax_highlight_option/1)
+
+      Code.ensure_loaded?(lumis) and function_exported?(lumis, :rust_options!, 1) ->
+        opts
+        |> then(&apply(lumis, :validate_options!, [&1]))
+        |> then(&apply(lumis, :rust_options!, [&1]))
+
+      true ->
+        # Without Lumis there is nothing to convert these against, and the NIF
+        # would only report that its decode failed.
+        raise lumis_not_enabled_message()
+    end
+  end
+
+  defp normalize_opts(_engine, opts), do: Map.new(opts, &syntax_highlight_option/1)
 
   defp syntax_highlight_option({:formatter, {formatter, opts}}) when is_list(opts) do
     {:formatter, {formatter, Map.new(opts)}}
@@ -308,18 +337,16 @@ defmodule MDExNative.Comrak do
 
   defp syntax_highlight_option(option), do: option
 
-  defp check_native_output(:lumis_not_enabled) do
+  defp check_native_output({:error, {:lumis_error, reason}}) do
     raise """
-    Lumis is not enabled.
+    Lumis failed to highlight a code block.
 
-    Comrak tried to syntax highlight a code block with Lumis, but this NIF was not compiled with Lumis support.
-
-    Enable it in your config:
-
-        config :mdex_native, syntax_highlighter: :lumis
+    #{reason}
 
     """
   end
+
+  defp check_native_output(:lumis_not_enabled), do: raise(lumis_not_enabled_message())
 
   defp check_native_output(:syntect_not_enabled) do
     raise """
@@ -335,4 +362,21 @@ defmodule MDExNative.Comrak do
   end
 
   defp check_native_output(value), do: value
+
+  defp lumis_not_enabled_message do
+    """
+    Lumis is not enabled.
+
+    Comrak tried to syntax highlight a code block with Lumis, but this NIF was not compiled with Lumis support.
+
+    Enable it in your config:
+
+        config :mdex_native, syntax_highlighter: :lumis
+
+    And add Lumis to your deps, which supplies the parsers:
+
+        {:lumis, "~> 0.7"}
+
+    """
+  end
 end
