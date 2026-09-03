@@ -5,6 +5,9 @@ authors = ["Leandro Pereira"]
 edition = "2021"
 rust-version = "1.91"
 
+[lints.clippy]
+cognitive_complexity = "deny"
+
 [lib]
 name = "mdex_native_nif"
 path = "src/lib.rs"

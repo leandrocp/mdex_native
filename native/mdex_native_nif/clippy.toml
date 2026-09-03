@@ -1,0 +1,7 @@
+# Complexity ceiling for this crate, denied in Cargo.toml's [lints.clippy].
+#
+# Cognitive rather than cyclomatic complexity: `?` makes every fallible call a
+# cyclomatic branch, which scores a flat 36-field decoder the same as a deeply
+# nested function. 10 is the Rust counterpart of the ceiling of 9 that Credo
+# enforces on the Elixir here and oxlint enforces on the JavaScript elsewhere.
+cognitive-complexity-threshold = 10

@@ -8,6 +8,23 @@ use rustler::{Decoder, NifResult, NifUnitEnum, Term};
 pub use sanitize::*;
 use std::sync::Arc;
 
+/// Overwrites `target` when Elixir sent a value for the field, and leaves it
+/// at its Comrak default when it did not. Every `apply` below is a list of
+/// these, so the rule lives in one place instead of once per field.
+fn overwrite<T>(target: &mut T, value: Option<T>) {
+    if let Some(value) = value {
+        *target = value;
+    }
+}
+
+/// Same rule for a field that is itself optional: `nil` from Elixir means
+/// "leave it alone", not "clear it".
+fn overwrite_optional<T>(target: &mut Option<T>, value: Option<T>) {
+    if value.is_some() {
+        *target = value;
+    }
+}
+
 fn is_atom(term: Term, name: &str) -> NifResult<bool> {
     Ok(Atom::decode(term).is_ok_and(|atom| {
         Atom::from_str(term.get_env(), name).is_ok_and(|expected| atom == expected)
@@ -128,117 +145,88 @@ impl<'a> Decoder<'a> for ExExtensionOptions {
 
 #[allow(deprecated)]
 impl ExExtensionOptions {
-    pub fn apply(self, extension: &mut Extension<'static>) {
-        if let Some(value) = self.strikethrough {
-            extension.strikethrough = value;
-        }
-        if let Some(value) = self.tagfilter {
-            extension.tagfilter = value;
-        }
-        if let Some(value) = self.table {
-            extension.table = value;
-        }
-        if let Some(value) = self.autolink {
-            extension.autolink = value;
-        }
-        if let Some(value) = self.tasklist {
-            extension.tasklist = value;
-        }
-        if let Some(value) = self.superscript {
-            extension.superscript = value;
-        }
-        if self.header_id_prefix.is_some() {
-            extension.header_id_prefix = self.header_id_prefix;
-        }
-        if let Some(value) = self.header_id_prefix_in_href {
-            extension.header_id_prefix_in_href = value;
-        }
-        if let Some(value) = self.footnotes {
-            extension.footnotes = value;
-        }
-        if let Some(value) = self.inline_footnotes {
-            extension.inline_footnotes = value;
-        }
-        if let Some(value) = self.description_lists {
-            extension.description_lists = value;
-        }
-        if self.front_matter_delimiter.is_some() {
-            extension.front_matter_delimiter = self.front_matter_delimiter;
-        }
-        if let Some(value) = self.multiline_block_quotes {
-            extension.multiline_block_quotes = value;
-        }
-        if let Some(value) = self.alerts {
-            extension.alerts = value;
-        }
-        if let Some(value) = self.math_dollars {
-            extension.math_dollars = value;
-        }
-        if let Some(value) = self.math_latex {
-            extension.math_latex = value;
-        }
-        if let Some(value) = self.math_code {
-            extension.math_code = value;
-        }
-        if let Some(value) = self.shortcodes {
-            extension.shortcodes = value;
-        }
-        if let Some(value) = self.wikilinks_title_after_pipe {
-            extension.wikilinks_title_after_pipe = value;
-        }
-        if let Some(value) = self.wikilinks_title_before_pipe {
-            extension.wikilinks_title_before_pipe = value;
-        }
-        if let Some(value) = self.underline {
-            extension.underline = value;
-        }
-        if let Some(value) = self.subscript {
-            extension.subscript = value;
-        }
-        if let Some(value) = self.spoiler {
-            extension.spoiler = value;
-        }
-        if let Some(value) = self.greentext {
-            extension.greentext = value;
-        }
-        if let Some(value) = self.subtext {
-            extension.subtext = value;
-        }
-        if let Some(value) = self.highlight {
-            extension.highlight = value;
-        }
-        if let Some(value) = self.insert {
-            extension.insert = value;
-        }
-        if let Some(rewrite) = self.image_url_rewriter {
+    pub fn apply(mut self, extension: &mut Extension<'static>) {
+        self.apply_common_options(extension);
+        self.apply_additional_options(extension);
+        self.apply_rewriters_and_attributes(extension);
+    }
+
+    fn apply_common_options(&mut self, extension: &mut Extension<'static>) {
+        overwrite(&mut extension.strikethrough, self.strikethrough);
+        overwrite(&mut extension.tagfilter, self.tagfilter);
+        overwrite(&mut extension.table, self.table);
+        overwrite(&mut extension.autolink, self.autolink);
+        overwrite(&mut extension.tasklist, self.tasklist);
+        overwrite(&mut extension.superscript, self.superscript);
+        overwrite_optional(
+            &mut extension.header_id_prefix,
+            self.header_id_prefix.take(),
+        );
+        overwrite(
+            &mut extension.header_id_prefix_in_href,
+            self.header_id_prefix_in_href,
+        );
+        overwrite(&mut extension.footnotes, self.footnotes);
+        overwrite(&mut extension.inline_footnotes, self.inline_footnotes);
+    }
+
+    fn apply_additional_options(&mut self, extension: &mut Extension<'static>) {
+        overwrite(&mut extension.description_lists, self.description_lists);
+        overwrite_optional(
+            &mut extension.front_matter_delimiter,
+            self.front_matter_delimiter.take(),
+        );
+        overwrite(
+            &mut extension.multiline_block_quotes,
+            self.multiline_block_quotes,
+        );
+        overwrite(&mut extension.alerts, self.alerts);
+        overwrite(&mut extension.math_dollars, self.math_dollars);
+        overwrite(&mut extension.math_latex, self.math_latex);
+        overwrite(&mut extension.math_code, self.math_code);
+        overwrite(&mut extension.shortcodes, self.shortcodes);
+        overwrite(
+            &mut extension.wikilinks_title_after_pipe,
+            self.wikilinks_title_after_pipe,
+        );
+        overwrite(
+            &mut extension.wikilinks_title_before_pipe,
+            self.wikilinks_title_before_pipe,
+        );
+        overwrite(&mut extension.underline, self.underline);
+        overwrite(&mut extension.subscript, self.subscript);
+        overwrite(&mut extension.spoiler, self.spoiler);
+        overwrite(&mut extension.greentext, self.greentext);
+        overwrite(&mut extension.subtext, self.subtext);
+        overwrite(&mut extension.highlight, self.highlight);
+        overwrite(&mut extension.insert, self.insert);
+    }
+
+    fn apply_rewriters_and_attributes(&mut self, extension: &mut Extension<'static>) {
+        if let Some(rewrite) = self.image_url_rewriter.take() {
             extension.image_url_rewriter =
                 Some(Arc::new(move |url: &str| rewrite.replace("{@url}", url)));
         }
-        if let Some(rewrite) = self.link_url_rewriter {
+        if let Some(rewrite) = self.link_url_rewriter.take() {
             extension.link_url_rewriter =
                 Some(Arc::new(move |url: &str| rewrite.replace("{@url}", url)));
         }
-        if let Some(value) = self.cjk_friendly_emphasis {
-            extension.cjk_friendly_emphasis = value;
-        }
-        if let Some(value) = self.phoenix_heex {
-            extension.phoenix_heex = value;
-        }
-        if let Some(value) = self.block_directive {
-            extension.block_directive = value;
-        }
-        if let Some(value) = self.header_attributes {
-            extension.header_attributes = value;
-        }
-        if let Some(value) = self.fenced_code_attributes {
-            extension.fenced_code_attributes = value;
-        }
-        if let Some(value) = self.inline_code_attributes {
-            extension.inline_code_attributes = value;
-        }
-        if let Some(value) = self.link_attributes {
-            extension.link_attributes = value;
-        }
+        overwrite(
+            &mut extension.cjk_friendly_emphasis,
+            self.cjk_friendly_emphasis,
+        );
+        overwrite(&mut extension.phoenix_heex, self.phoenix_heex);
+        overwrite(&mut extension.block_directive, self.block_directive);
+        overwrite(&mut extension.header_attributes, self.header_attributes);
+        overwrite(
+            &mut extension.fenced_code_attributes,
+            self.fenced_code_attributes,
+        );
+        overwrite(
+            &mut extension.inline_code_attributes,
+            self.inline_code_attributes,
+        );
+        overwrite(&mut extension.link_attributes, self.link_attributes);
     }
 }
 
@@ -273,33 +261,21 @@ impl<'a> Decoder<'a> for ExParseOptions {
 
 impl ExParseOptions {
     pub fn apply(self, parse: &mut Parse<'static>) {
-        if let Some(value) = self.smart {
-            parse.smart = value;
-        }
-        if self.default_info_string.is_some() {
-            parse.default_info_string = self.default_info_string;
-        }
-        if let Some(value) = self.relaxed_tasklist_matching {
-            parse.relaxed_tasklist_matching = value;
-        }
-        if let Some(value) = self.relaxed_autolinks {
-            parse.relaxed_autolinks = value;
-        }
-        if let Some(value) = self.ignore_setext {
-            parse.ignore_setext = value;
-        }
-        if let Some(value) = self.tasklist_in_table {
-            parse.tasklist_in_table = value;
-        }
-        if let Some(value) = self.leave_footnote_definitions {
-            parse.leave_footnote_definitions = value;
-        }
-        if let Some(value) = self.escaped_char_spans {
-            parse.escaped_char_spans = value;
-        }
-        if let Some(value) = self.sourcepos_chars {
-            parse.sourcepos_chars = value;
-        }
+        overwrite(&mut parse.smart, self.smart);
+        overwrite_optional(&mut parse.default_info_string, self.default_info_string);
+        overwrite(
+            &mut parse.relaxed_tasklist_matching,
+            self.relaxed_tasklist_matching,
+        );
+        overwrite(&mut parse.relaxed_autolinks, self.relaxed_autolinks);
+        overwrite(&mut parse.ignore_setext, self.ignore_setext);
+        overwrite(&mut parse.tasklist_in_table, self.tasklist_in_table);
+        overwrite(
+            &mut parse.leave_footnote_definitions,
+            self.leave_footnote_definitions,
+        );
+        overwrite(&mut parse.escaped_char_spans, self.escaped_char_spans);
+        overwrite(&mut parse.sourcepos_chars, self.sourcepos_chars);
     }
 }
 
@@ -389,60 +365,33 @@ impl<'a> Decoder<'a> for ExRenderOptions {
 
 impl ExRenderOptions {
     pub fn apply(self, render: &mut Render) {
-        if let Some(value) = self.hardbreaks {
-            render.hardbreaks = value;
-        }
-        if let Some(value) = self.github_pre_lang {
-            render.github_pre_lang = value;
-        }
-        if let Some(value) = self.full_info_string {
-            render.full_info_string = value;
-        }
-        if let Some(value) = self.width {
-            render.width = value;
-        }
-        if let Some(value) = self.r#unsafe {
-            render.r#unsafe = value;
-        }
-        if let Some(value) = self.escape {
-            render.escape = value;
-        }
-        if let Some(value) = self.list_style {
-            render.list_style = ListStyleType::from(value);
-        }
-        if let Some(value) = self.sourcepos {
-            render.sourcepos = value;
-        }
-        if let Some(value) = self.escaped_char_spans {
-            render.escaped_char_spans = value;
-        }
-        if let Some(value) = self.ignore_empty_links {
-            render.ignore_empty_links = value;
-        }
-        if let Some(value) = self.gfm_quirks {
-            render.gfm_quirks = value;
-        }
-        if let Some(value) = self.prefer_fenced {
-            render.prefer_fenced = value;
-        }
-        if let Some(value) = self.figure_with_caption {
-            render.figure_with_caption = value;
-        }
-        if let Some(value) = self.tasklist_classes {
-            render.tasklist_classes = value;
-        }
-        if let Some(value) = self.ol_width {
-            render.ol_width = value;
-        }
-        if let Some(value) = self.experimental_minimize_commonmark {
-            render.experimental_minimize_commonmark = value;
-        }
-        if let Some(value) = self.compact_html {
-            render.compact_html = value;
-        }
-        if let Some(value) = self.alert_style {
-            render.alert_style = value.into();
-        }
+        overwrite(&mut render.hardbreaks, self.hardbreaks);
+        overwrite(&mut render.github_pre_lang, self.github_pre_lang);
+        overwrite(&mut render.full_info_string, self.full_info_string);
+        overwrite(&mut render.width, self.width);
+        overwrite(&mut render.r#unsafe, self.r#unsafe);
+        overwrite(&mut render.escape, self.escape);
+        overwrite(
+            &mut render.list_style,
+            self.list_style.map(ListStyleType::from),
+        );
+        overwrite(&mut render.sourcepos, self.sourcepos);
+        overwrite(&mut render.escaped_char_spans, self.escaped_char_spans);
+        overwrite(&mut render.ignore_empty_links, self.ignore_empty_links);
+        overwrite(&mut render.gfm_quirks, self.gfm_quirks);
+        overwrite(&mut render.prefer_fenced, self.prefer_fenced);
+        overwrite(&mut render.figure_with_caption, self.figure_with_caption);
+        overwrite(&mut render.tasklist_classes, self.tasklist_classes);
+        overwrite(&mut render.ol_width, self.ol_width);
+        overwrite(
+            &mut render.experimental_minimize_commonmark,
+            self.experimental_minimize_commonmark,
+        );
+        overwrite(&mut render.compact_html, self.compact_html);
+        overwrite(
+            &mut render.alert_style,
+            self.alert_style.map(AlertStyleType::from),
+        );
     }
 }
 
