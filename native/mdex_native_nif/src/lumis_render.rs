@@ -73,138 +73,80 @@ fn with_mdex_attributes(
 ) -> ExFormatterOption {
     use ExFormatterOption as F;
 
-    let pre_class = || mdex_attribute(attributes, "pre_class", render_unsafe);
-
     match formatter {
         F::HtmlInline {
-            mut theme,
-            pre_class: mut formatter_pre_class,
+            theme,
+            pre_class,
             italic,
-            mut include_highlights,
+            include_highlights,
             rainbow_brackets,
-            mut highlight_lines,
+            highlight_lines,
             header: _,
-        } => {
-            if theme.is_none() {
-                theme = Some(ThemeOrString::String("onedark".to_string()));
-            }
-            if let Some(theme_name) = attributes.get("theme") {
-                theme = Some(ThemeOrString::String(theme_name.clone()));
-            }
-            if let Some(class) = pre_class() {
-                formatter_pre_class = Some(class);
-            }
-            if attributes.contains_key("include_highlights") {
-                include_highlights = true;
-            }
-            if let Some(lines) =
-                inline_highlight_lines(attributes, Some(line_background(&theme)), render_unsafe)
-            {
-                highlight_lines = Some(lines);
-            }
-
-            F::HtmlInline {
-                theme,
-                pre_class: formatter_pre_class,
-                italic,
-                include_highlights,
-                rainbow_brackets,
-                highlight_lines,
-                // Comrak owns the closing tags, so an outer header cannot be
-                // closed by its syntax-highlighter adapter contract.
-                header: None,
-            }
-        }
+        } => html_inline_with_attributes(
+            theme,
+            pre_class,
+            italic,
+            include_highlights,
+            rainbow_brackets,
+            highlight_lines,
+            attributes,
+            render_unsafe,
+        ),
         F::HtmlLinked {
-            pre_class: mut formatter_pre_class,
+            pre_class,
             rainbow_brackets,
-            mut highlight_lines,
+            highlight_lines,
             header: _,
-        } => {
-            if let Some(class) = pre_class() {
-                formatter_pre_class = Some(class);
-            }
-            if let Some(lines) = linked_highlight_lines(attributes, render_unsafe) {
-                highlight_lines = Some(lines);
-            }
-
-            F::HtmlLinked {
-                pre_class: formatter_pre_class,
-                rainbow_brackets,
-                highlight_lines,
-                header: None,
-            }
-        }
+        } => F::HtmlLinked {
+            pre_class: mdex_attribute(attributes, "pre_class", render_unsafe).or(pre_class),
+            rainbow_brackets,
+            highlight_lines: linked_highlight_lines(attributes, render_unsafe).or(highlight_lines),
+            header: None,
+        },
         F::HtmlMultiThemes {
             themes,
             default_theme,
             css_variable_prefix,
-            pre_class: mut formatter_pre_class,
+            pre_class,
             italic,
-            mut include_highlights,
+            include_highlights,
             rainbow_brackets,
-            mut highlight_lines,
+            highlight_lines,
             header: _,
-        } => {
-            if let Some(class) = pre_class() {
-                formatter_pre_class = Some(class);
-            }
-            if attributes.contains_key("include_highlights") {
-                include_highlights = true;
-            }
-            if let Some(lines) = inline_highlight_lines(
-                attributes,
-                Some(line_background_from_name(attributes.get("theme"))),
-                render_unsafe,
-            ) {
-                highlight_lines = Some(lines);
-            } else if let Some(lines) = highlight_lines.as_mut() {
-                if matches!(lines.style, Some(ExHtmlInlineHighlightLinesStyle::Theme)) {
-                    lines.style = Some(ExHtmlInlineHighlightLinesStyle::Style {
-                        style: line_background_from_name(attributes.get("theme")),
-                    });
-                }
-            }
-
-            F::HtmlMultiThemes {
-                themes,
-                default_theme,
-                css_variable_prefix,
-                pre_class: formatter_pre_class,
-                italic,
-                include_highlights,
-                rainbow_brackets,
+        } => F::HtmlMultiThemes {
+            themes,
+            default_theme,
+            css_variable_prefix,
+            pre_class: mdex_attribute(attributes, "pre_class", render_unsafe).or(pre_class),
+            italic,
+            include_highlights: include_highlights || attributes.contains_key("include_highlights"),
+            rainbow_brackets,
+            highlight_lines: multi_theme_highlight_lines(
                 highlight_lines,
-                header: None,
-            }
-        }
+                attributes,
+                render_unsafe,
+            ),
+            header: None,
+        },
+        // A terminal formatter cannot render into a code fence; MDEx has always
+        // treated it as the inline HTML one.
         F::Terminal {
-            mut theme,
+            theme,
             rainbow_brackets,
             ..
-        } => {
-            if theme.is_none() {
-                theme = Some(ThemeOrString::String("onedark".to_string()));
-            }
-            if let Some(theme_name) = attributes.get("theme") {
-                theme = Some(ThemeOrString::String(theme_name.clone()));
-            }
-            let highlight_lines =
-                inline_highlight_lines(attributes, Some(line_background(&theme)), render_unsafe);
-
-            F::HtmlInline {
-                theme,
-                pre_class: pre_class(),
-                italic: false,
-                include_highlights: attributes.contains_key("include_highlights"),
-                rainbow_brackets,
-                highlight_lines,
-                header: None,
-            }
-        }
+        } => html_inline_with_attributes(
+            theme,
+            None,
+            false,
+            false,
+            rainbow_brackets,
+            None,
+            attributes,
+            render_unsafe,
+        ),
         F::BbcodeScoped { rainbow_brackets } => F::HtmlInline {
             theme: None,
-            pre_class: pre_class(),
+            pre_class: mdex_attribute(attributes, "pre_class", render_unsafe),
             italic: false,
             include_highlights: attributes.contains_key("include_highlights"),
             rainbow_brackets,
@@ -212,6 +154,69 @@ fn with_mdex_attributes(
             header: None,
         },
     }
+}
+
+/// `header` is always dropped: Comrak owns the closing tags, so an outer header
+/// could never be closed by its syntax-highlighter adapter contract.
+#[allow(clippy::too_many_arguments)]
+fn html_inline_with_attributes(
+    theme: Option<ThemeOrString>,
+    pre_class: Option<String>,
+    italic: bool,
+    include_highlights: bool,
+    rainbow_brackets: bool,
+    highlight_lines: Option<ExHtmlInlineHighlightLines>,
+    attributes: &HashMap<String, String>,
+    render_unsafe: bool,
+) -> ExFormatterOption {
+    let theme = attributes
+        .get("theme")
+        .map(|name| ThemeOrString::String(name.clone()))
+        .or(theme)
+        .or_else(|| Some(ThemeOrString::String("onedark".to_string())));
+
+    ExFormatterOption::HtmlInline {
+        pre_class: mdex_attribute(attributes, "pre_class", render_unsafe).or(pre_class),
+        italic,
+        include_highlights: include_highlights || attributes.contains_key("include_highlights"),
+        rainbow_brackets,
+        highlight_lines: inline_highlight_lines(
+            attributes,
+            Some(line_background(&theme)),
+            render_unsafe,
+        )
+        .or(highlight_lines),
+        theme,
+        header: None,
+    }
+}
+
+/// A multi-theme block resolves `style: :theme` against the decorator's theme,
+/// which the formatter itself cannot see.
+fn multi_theme_highlight_lines(
+    highlight_lines: Option<ExHtmlInlineHighlightLines>,
+    attributes: &HashMap<String, String>,
+    render_unsafe: bool,
+) -> Option<ExHtmlInlineHighlightLines> {
+    if let Some(lines) = inline_highlight_lines(
+        attributes,
+        Some(line_background_from_name(attributes.get("theme"))),
+        render_unsafe,
+    ) {
+        return Some(lines);
+    }
+
+    let mut highlight_lines = highlight_lines?;
+    if matches!(
+        highlight_lines.style,
+        Some(ExHtmlInlineHighlightLinesStyle::Theme)
+    ) {
+        highlight_lines.style = Some(ExHtmlInlineHighlightLinesStyle::Style {
+            style: line_background_from_name(attributes.get("theme")),
+        });
+    }
+
+    Some(highlight_lines)
 }
 
 fn inline_highlight_lines(
