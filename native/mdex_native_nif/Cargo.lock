@@ -773,9 +773,9 @@ dependencies = [
 
 [[package]]
 name = "lumis"
-version = "0.13.0"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d6b4c3bc71722287436dc29c46a6a76da4f3f9b1f20e1ad94e96122d7d213b4"
+checksum = "0587173e6a7e4e748a7c136418d96774a0e8b6ac816dc2e5388a3a96c05be43c"
 dependencies = [
  "anyhow",
  "cc",
@@ -812,7 +812,6 @@ dependencies = [
  "tree-sitter-cpp",
  "tree-sitter-css",
  "tree-sitter-d",
- "tree-sitter-diff",
  "tree-sitter-elixir",
  "tree-sitter-elm",
  "tree-sitter-embedded-template",
@@ -876,9 +875,9 @@ checksum = "c2d43a6d891318b3540680d68c91635b8064c6b3879200ef40a8e8adb099ff0c"
 
 [[package]]
 name = "lumis-core"
-version = "2.4.0"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50204bef53c7b17a14b41de745bf75aeec5feb3ffb25d48f82ca184420544123"
+checksum = "b86aa67672256aa5dc91681d78f98b52dd3af7daae28c631673e98db8440596d"
 dependencies = [
  "derive_builder",
  "glob",
@@ -896,11 +895,12 @@ dependencies = [
 
 [[package]]
 name = "lumis-wasm-runtime"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "544a8809eefaab1402fbe0e3cfaacb93146bab95d968f3540a25a1f4054ba608"
+checksum = "b19dfdab518688ba8605277e74d210af62c67d59b515e678507cf74d21dfd82e"
 dependencies = [
  "etcetera",
+ "lumis-core",
  "semver",
  "serde",
  "serde_json",
@@ -1897,16 +1897,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tree-sitter-diff"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dfe1e5ca280a65dfe5ba4205c1bcc84edf486464fed315db53dee6da9a335889"
-dependencies = [
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
 name = "tree-sitter-elixir"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2008,9 +1998,9 @@ dependencies = [
 
 [[package]]
 name = "tree-sitter-graphql"
-version = "0.1.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efedc4cac157161cc23a0adc4553a2cedc908e1cd754b6cd033a919bb81ce5d6"
+checksum = "e54723227ad8bf2b5700331ea522785d545a7f9787ff7271044a8f9e24ea660b"
 dependencies = [
  "cc",
  "tree-sitter-language",
@@ -2144,9 +2134,9 @@ dependencies = [
 
 [[package]]
 name = "tree-sitter-matlab"
-version = "1.3.0"
+version = "1.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e8d8831a78547f54860dd8467166b1ab0c466d03d43c4bb447af55c024281f7"
+checksum = "97962a0daf32492453fbea1984d34c4d8460b66b95c6c04feecc4cbf1b00a984"
 dependencies = [
  "cc",
  "tree-sitter-language",
@@ -2264,9 +2254,9 @@ dependencies = [
 
 [[package]]
 name = "tree-sitter-racket"
-version = "0.24.7"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8395b6a054e6264c67e1ef915f239c4f86575b7d7c69638bdbf3c336c58f128"
+checksum = "066bd54f4513d35a21b44f733da74bb065bb6734e565db96b516a79dd7c29e5f"
 dependencies = [
  "cc",
  "tree-sitter-language",
@@ -2501,9 +2491,9 @@ dependencies = [
 
 [[package]]
 name = "wasmparser"
-version = "0.255.0"
+version = "0.258.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8e329ef4b5d46e73b91d3ac6924417cad55a8cbbf869c199283383427c3320b"
+checksum = "d9a61719f93a87b16d325921e251800c4833f8fab50fa21c7de73aed50086313"
 dependencies = [
  "bitflags",
  "hashbrown",
