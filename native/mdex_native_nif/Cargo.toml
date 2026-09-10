@@ -15,7 +15,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 ammonia = "4.1"
-comrak = { version = "0.54", default-features = false, features = [
+comrak = { version = "0.55", default-features = false, features = [
   "attributes",
   "shortcodes",
   "phoenix_heex",
