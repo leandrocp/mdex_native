@@ -5,11 +5,13 @@ defmodule MDExNative.ComrakTest do
   alias MDExNative.Comrak.Code
   alias MDExNative.Comrak.CodeBlock
   alias MDExNative.Comrak.Document
+  alias MDExNative.Comrak.Escaped
   alias MDExNative.Comrak.EscapedTag
   alias MDExNative.Comrak.Heading
   alias MDExNative.Comrak.Image
   alias MDExNative.Comrak.Link
   alias MDExNative.Comrak.Paragraph
+  alias MDExNative.Comrak.Text
 
   @code_block_markdown """
   ```elixir
@@ -673,6 +675,56 @@ defmodule MDExNative.ComrakTest do
 
     assert MDExNative.Comrak.document_to_html(document, render: [unsafe: true], sanitize: nil) ==
              "<p>|spoiler|</p>\n"
+  end
+
+  describe "escaped character spans" do
+    @escaped_options [parse: [escaped_char_spans: true], render: [escaped_char_spans: true]]
+
+    test "parse_document nests the escaped character in the declared :nodes field" do
+      assert %Document{
+               nodes: [
+                 %Paragraph{
+                   nodes: [
+                     %Escaped{nodes: [%Text{literal: "*"}]},
+                     %Text{literal: "escaped"},
+                     %Escaped{nodes: [%Text{literal: "*"}]}
+                   ]
+                 }
+               ]
+             } = MDExNative.Comrak.parse_document(~S(\*escaped\*), @escaped_options)
+    end
+
+    test "Escaped children survive struct reconstruction" do
+      document = MDExNative.Comrak.parse_document(~S(\*escaped\*), @escaped_options)
+      escaped = document.nodes |> hd() |> Map.fetch!(:nodes) |> hd()
+
+      rebuilt = struct(Escaped, Map.from_struct(escaped))
+
+      assert rebuilt == escaped
+      assert %Escaped{nodes: [%Text{literal: "*"}]} = rebuilt
+    end
+
+    test "document_to_commonmark and document_to_xml round trip the escaped character" do
+      document = MDExNative.Comrak.parse_document(~S(\*escaped\*), @escaped_options)
+      xml = MDExNative.Comrak.document_to_xml(document, @escaped_options)
+
+      assert MDExNative.Comrak.document_to_commonmark(document, @escaped_options) ==
+               "\\*escaped\\*\n"
+
+      assert xml =~ ~r{<escaped>\s*<text xml:space="preserve">\*</text>\s*</escaped>}
+      refute xml =~ "<escaped />"
+    end
+
+    test "renders a manually built Escaped node" do
+      document = %Document{
+        nodes: [%Paragraph{nodes: [%Escaped{nodes: [%Text{literal: "*"}]}]}]
+      }
+
+      assert MDExNative.Comrak.document_to_commonmark(document, @escaped_options) == "\\*\n"
+
+      assert MDExNative.Comrak.document_to_html(document, @escaped_options) ==
+               "<p><span data-escaped-char>*</span></p>\n"
+    end
   end
 
   test "parses code fence info with language only" do
