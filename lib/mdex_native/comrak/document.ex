@@ -593,11 +593,14 @@ defmodule MDExNative.Comrak.Escaped do
   @moduledoc """
   An escaped character.
 
+  The escaped character itself is held in `:nodes` as a
+  `MDExNative.Comrak.Text` node.
+
   Spec: https://github.github.com/gfm/#backslash-escapes
   """
 
-  @type t :: %__MODULE__{}
-  defstruct sourcepos: %MDExNative.Comrak.Sourcepos{}
+  @type t :: %__MODULE__{nodes: [MDExNative.Comrak.ast_node()]}
+  defstruct nodes: [], sourcepos: %MDExNative.Comrak.Sourcepos{}
 end
 
 defmodule MDExNative.Comrak.WikiLink do
