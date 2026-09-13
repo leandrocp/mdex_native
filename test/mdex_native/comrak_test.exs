@@ -147,6 +147,34 @@ defmodule MDExNative.ComrakTest do
     assert MDExNative.Comrak.markdown_to_xml("# Hello") =~ ~s(<heading level="1">)
   end
 
+  test "renders documents larger than the small input threshold" do
+    markdown = String.duplicate("Paragraph with **bold** text.\n\n", 1_000)
+    assert byte_size(markdown) > 16 * 1024
+
+    assert MDExNative.Comrak.markdown_to_html(markdown) ==
+             String.duplicate("<p>Paragraph with <strong>bold</strong> text.</p>\n", 1_000)
+  end
+
+  test "both scheduler paths render identical HTML" do
+    markdown = """
+    # Heading
+
+    Paragraph with **bold**, `code`, and a [link](https://example.com).
+
+    - [x] item
+    - item
+
+    ```elixir
+    %{a: 1}
+    ```
+    """
+
+    options = %{extension: %{tasklist: true, phoenix_heex: true}, render: %{unsafe: true}}
+
+    assert MDExNative.Native.markdown_to_html_with_options_small(markdown, options) ==
+             MDExNative.Native.markdown_to_html_with_options(markdown, options)
+  end
+
   test "preserves curly braces in code by default" do
     markdown = """
     Inline `%{}`.
