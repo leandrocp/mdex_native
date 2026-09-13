@@ -593,8 +593,9 @@ defmodule MDExNative.Comrak.Escaped do
   @moduledoc """
   An escaped character.
 
-  The escaped character itself is held in `:nodes` as a
-  `MDExNative.Comrak.Text` node.
+  Only kept in the tree when parsing with `escaped_char_spans` enabled,
+  otherwise Comrak splices the character back into its neighbours. Comrak
+  emits the escaped character as a single `MDExNative.Comrak.Text` child.
 
   Spec: https://github.github.com/gfm/#backslash-escapes
   """
