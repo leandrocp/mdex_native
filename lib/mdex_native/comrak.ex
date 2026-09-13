@@ -138,8 +138,28 @@ defmodule MDExNative.Comrak do
   @spec markdown_to_html(markdown(), options()) :: html()
   def markdown_to_html(markdown, options \\ []) when is_binary(markdown) do
     markdown
-    |> MDExNative.Native.markdown_to_html_with_options(options!(options))
+    |> render_html(options!(options))
     |> check_native_output()
+  end
+
+  # Comrak renders on the order of 10ns per input byte, so anything under this
+  # size finishes far inside a scheduler time slice and is cheaper to run
+  # directly than to hand off to a dirty scheduler.
+  @small_input_bytes 16 * 1024
+
+  defp render_html(markdown, options) do
+    if small_input?(markdown, options) do
+      MDExNative.Native.markdown_to_html_with_options_small(markdown, options)
+    else
+      MDExNative.Native.markdown_to_html_with_options(markdown, options)
+    end
+  end
+
+  # Syntax highlighting has no comparable bound on how long a small input can
+  # take, so those calls always go to a dirty scheduler.
+  defp small_input?(markdown, options) do
+    byte_size(markdown) <= @small_input_bytes and
+      Map.get(options, :syntax_highlight) in [nil, false]
   end
 
   @doc ~S"""

@@ -109,6 +109,10 @@ defmodule MDExNative.Native do
 
   def parse_document(_md, _opts), do: :erlang.nif_error(:nif_not_loaded)
   def markdown_to_html_with_options(_md, _opts), do: :erlang.nif_error(:nif_not_loaded)
+
+  def markdown_to_html_with_options_small(_md, _opts),
+    do: :erlang.nif_error(:nif_not_loaded)
+
   def markdown_to_xml_with_options(_md, _opts), do: :erlang.nif_error(:nif_not_loaded)
 
   def document_to_commonmark(_doc), do: :erlang.nif_error(:nif_not_loaded)

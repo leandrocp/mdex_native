@@ -3,10 +3,88 @@ mod sanitize;
 #[cfg(feature = "lumis")]
 use super::elixir_types::ExFormatterOption;
 use comrak::options::{AlertStyleType, Extension, ListStyleType, Options, Parse, Render};
-use rustler::types::atom::Atom;
+use rustler::types::atom::{self, Atom};
 use rustler::{Decoder, NifResult, NifUnitEnum, Term};
 pub use sanitize::*;
 use std::sync::Arc;
+
+/// Every option key is read on every call, so they are interned once when the
+/// NIF loads instead of being looked up from a string each time.
+mod atoms {
+    rustler::atoms! {
+        alert_style,
+        alerts,
+        autolink,
+        block_directive,
+        cjk_friendly_emphasis,
+        compact_html,
+        default_info_string,
+        description_lists,
+        engine,
+        escape,
+        escaped_char_spans,
+        experimental_minimize_commonmark,
+        extension,
+        fenced_code_attributes,
+        figure_with_caption,
+        footnotes,
+        formatter,
+        front_matter_delimiter,
+        full_info_string,
+        gfm_quirks,
+        github_pre_lang,
+        greentext,
+        hardbreaks,
+        header_attributes,
+        header_id_prefix,
+        header_id_prefix_in_href,
+        highlight,
+        ignore_empty_links,
+        ignore_setext,
+        image_url_rewriter,
+        inline_code_attributes,
+        inline_footnotes,
+        insert,
+        leave_footnote_definitions,
+        link_attributes,
+        link_url_rewriter,
+        list_style,
+        math_code,
+        math_dollars,
+        math_latex,
+        multiline_block_quotes,
+        ol_width,
+        opts,
+        parse,
+        phoenix_heex,
+        prefer_fenced,
+        relaxed_autolinks,
+        relaxed_tasklist_matching,
+        render,
+        sanitize,
+        shortcodes,
+        smart,
+        sourcepos,
+        sourcepos_chars,
+        spoiler,
+        strikethrough,
+        subscript,
+        subtext,
+        superscript,
+        syntax_highlight,
+        table,
+        tagfilter,
+        tasklist,
+        tasklist_classes,
+        tasklist_in_table,
+        theme,
+        underline,
+        unsafe_ = "unsafe",
+        width,
+        wikilinks_title_after_pipe,
+        wikilinks_title_before_pipe
+    }
+}
 
 /// Overwrites `target` when Elixir sent a value for the field, and leaves it
 /// at its Comrak default when it did not. Every `apply` below is a list of
@@ -25,19 +103,17 @@ fn overwrite_optional<T>(target: &mut Option<T>, value: Option<T>) {
     }
 }
 
-fn is_atom(term: Term, name: &str) -> NifResult<bool> {
-    Ok(Atom::decode(term).is_ok_and(|atom| {
-        Atom::from_str(term.get_env(), name).is_ok_and(|expected| atom == expected)
-    }))
+fn is_atom(term: Term, expected: Atom) -> bool {
+    Atom::decode(term).is_ok_and(|atom| atom == expected)
 }
 
-fn optional_field<'a, T>(term: Term<'a>, key: &str) -> NifResult<Option<T>>
+fn optional_field<'a, T>(term: Term<'a>, key: Atom) -> NifResult<Option<T>>
 where
     T: Decoder<'a>,
 {
-    match term.map_get(Atom::from_str(term.get_env(), key)?) {
+    match term.map_get(key) {
         Ok(value) => {
-            if is_atom(value, "nil")? {
+            if is_atom(value, atom::nil()) {
                 Ok(None)
             } else {
                 value.decode()
@@ -48,9 +124,9 @@ where
 }
 
 fn syntax_highlight_field(term: Term) -> NifResult<Option<ExSyntaxHighlightOptions>> {
-    match term.map_get(Atom::from_str(term.get_env(), "syntax_highlight")?) {
+    match term.map_get(atoms::syntax_highlight()) {
         Ok(value) => {
-            if is_atom(value, "nil")? || is_atom(value, "false")? {
+            if is_atom(value, atom::nil()) || is_atom(value, atom::false_()) {
                 Ok(None)
             } else {
                 value.decode().map(Some)
@@ -103,42 +179,45 @@ pub struct ExExtensionOptions {
 impl<'a> Decoder<'a> for ExExtensionOptions {
     fn decode(term: Term<'a>) -> NifResult<Self> {
         Ok(Self {
-            strikethrough: optional_field(term, "strikethrough")?,
-            tagfilter: optional_field(term, "tagfilter")?,
-            table: optional_field(term, "table")?,
-            autolink: optional_field(term, "autolink")?,
-            tasklist: optional_field(term, "tasklist")?,
-            superscript: optional_field(term, "superscript")?,
-            header_id_prefix: optional_field(term, "header_id_prefix")?,
-            header_id_prefix_in_href: optional_field(term, "header_id_prefix_in_href")?,
-            footnotes: optional_field(term, "footnotes")?,
-            inline_footnotes: optional_field(term, "inline_footnotes")?,
-            description_lists: optional_field(term, "description_lists")?,
-            front_matter_delimiter: optional_field(term, "front_matter_delimiter")?,
-            multiline_block_quotes: optional_field(term, "multiline_block_quotes")?,
-            alerts: optional_field(term, "alerts")?,
-            math_dollars: optional_field(term, "math_dollars")?,
-            math_latex: optional_field(term, "math_latex")?,
-            math_code: optional_field(term, "math_code")?,
-            shortcodes: optional_field(term, "shortcodes")?,
-            wikilinks_title_after_pipe: optional_field(term, "wikilinks_title_after_pipe")?,
-            wikilinks_title_before_pipe: optional_field(term, "wikilinks_title_before_pipe")?,
-            underline: optional_field(term, "underline")?,
-            subscript: optional_field(term, "subscript")?,
-            spoiler: optional_field(term, "spoiler")?,
-            greentext: optional_field(term, "greentext")?,
-            subtext: optional_field(term, "subtext")?,
-            highlight: optional_field(term, "highlight")?,
-            insert: optional_field(term, "insert")?,
-            image_url_rewriter: optional_field(term, "image_url_rewriter")?,
-            link_url_rewriter: optional_field(term, "link_url_rewriter")?,
-            cjk_friendly_emphasis: optional_field(term, "cjk_friendly_emphasis")?,
-            phoenix_heex: optional_field(term, "phoenix_heex")?,
-            block_directive: optional_field(term, "block_directive")?,
-            header_attributes: optional_field(term, "header_attributes")?,
-            fenced_code_attributes: optional_field(term, "fenced_code_attributes")?,
-            inline_code_attributes: optional_field(term, "inline_code_attributes")?,
-            link_attributes: optional_field(term, "link_attributes")?,
+            strikethrough: optional_field(term, atoms::strikethrough())?,
+            tagfilter: optional_field(term, atoms::tagfilter())?,
+            table: optional_field(term, atoms::table())?,
+            autolink: optional_field(term, atoms::autolink())?,
+            tasklist: optional_field(term, atoms::tasklist())?,
+            superscript: optional_field(term, atoms::superscript())?,
+            header_id_prefix: optional_field(term, atoms::header_id_prefix())?,
+            header_id_prefix_in_href: optional_field(term, atoms::header_id_prefix_in_href())?,
+            footnotes: optional_field(term, atoms::footnotes())?,
+            inline_footnotes: optional_field(term, atoms::inline_footnotes())?,
+            description_lists: optional_field(term, atoms::description_lists())?,
+            front_matter_delimiter: optional_field(term, atoms::front_matter_delimiter())?,
+            multiline_block_quotes: optional_field(term, atoms::multiline_block_quotes())?,
+            alerts: optional_field(term, atoms::alerts())?,
+            math_dollars: optional_field(term, atoms::math_dollars())?,
+            math_latex: optional_field(term, atoms::math_latex())?,
+            math_code: optional_field(term, atoms::math_code())?,
+            shortcodes: optional_field(term, atoms::shortcodes())?,
+            wikilinks_title_after_pipe: optional_field(term, atoms::wikilinks_title_after_pipe())?,
+            wikilinks_title_before_pipe: optional_field(
+                term,
+                atoms::wikilinks_title_before_pipe(),
+            )?,
+            underline: optional_field(term, atoms::underline())?,
+            subscript: optional_field(term, atoms::subscript())?,
+            spoiler: optional_field(term, atoms::spoiler())?,
+            greentext: optional_field(term, atoms::greentext())?,
+            subtext: optional_field(term, atoms::subtext())?,
+            highlight: optional_field(term, atoms::highlight())?,
+            insert: optional_field(term, atoms::insert())?,
+            image_url_rewriter: optional_field(term, atoms::image_url_rewriter())?,
+            link_url_rewriter: optional_field(term, atoms::link_url_rewriter())?,
+            cjk_friendly_emphasis: optional_field(term, atoms::cjk_friendly_emphasis())?,
+            phoenix_heex: optional_field(term, atoms::phoenix_heex())?,
+            block_directive: optional_field(term, atoms::block_directive())?,
+            header_attributes: optional_field(term, atoms::header_attributes())?,
+            fenced_code_attributes: optional_field(term, atoms::fenced_code_attributes())?,
+            inline_code_attributes: optional_field(term, atoms::inline_code_attributes())?,
+            link_attributes: optional_field(term, atoms::link_attributes())?,
         })
     }
 }
@@ -246,15 +325,15 @@ pub struct ExParseOptions {
 impl<'a> Decoder<'a> for ExParseOptions {
     fn decode(term: Term<'a>) -> NifResult<Self> {
         Ok(Self {
-            smart: optional_field(term, "smart")?,
-            default_info_string: optional_field(term, "default_info_string")?,
-            relaxed_tasklist_matching: optional_field(term, "relaxed_tasklist_matching")?,
-            relaxed_autolinks: optional_field(term, "relaxed_autolinks")?,
-            ignore_setext: optional_field(term, "ignore_setext")?,
-            tasklist_in_table: optional_field(term, "tasklist_in_table")?,
-            leave_footnote_definitions: optional_field(term, "leave_footnote_definitions")?,
-            escaped_char_spans: optional_field(term, "escaped_char_spans")?,
-            sourcepos_chars: optional_field(term, "sourcepos_chars")?,
+            smart: optional_field(term, atoms::smart())?,
+            default_info_string: optional_field(term, atoms::default_info_string())?,
+            relaxed_tasklist_matching: optional_field(term, atoms::relaxed_tasklist_matching())?,
+            relaxed_autolinks: optional_field(term, atoms::relaxed_autolinks())?,
+            ignore_setext: optional_field(term, atoms::ignore_setext())?,
+            tasklist_in_table: optional_field(term, atoms::tasklist_in_table())?,
+            leave_footnote_definitions: optional_field(term, atoms::leave_footnote_definitions())?,
+            escaped_char_spans: optional_field(term, atoms::escaped_char_spans())?,
+            sourcepos_chars: optional_field(term, atoms::sourcepos_chars())?,
         })
     }
 }
@@ -338,27 +417,27 @@ pub struct ExRenderOptions {
 impl<'a> Decoder<'a> for ExRenderOptions {
     fn decode(term: Term<'a>) -> NifResult<Self> {
         Ok(Self {
-            hardbreaks: optional_field(term, "hardbreaks")?,
-            github_pre_lang: optional_field(term, "github_pre_lang")?,
-            full_info_string: optional_field(term, "full_info_string")?,
-            width: optional_field(term, "width")?,
-            r#unsafe: optional_field(term, "unsafe")?,
-            escape: optional_field(term, "escape")?,
-            list_style: optional_field(term, "list_style")?,
-            sourcepos: optional_field(term, "sourcepos")?,
-            escaped_char_spans: optional_field(term, "escaped_char_spans")?,
-            ignore_empty_links: optional_field(term, "ignore_empty_links")?,
-            gfm_quirks: optional_field(term, "gfm_quirks")?,
-            prefer_fenced: optional_field(term, "prefer_fenced")?,
-            figure_with_caption: optional_field(term, "figure_with_caption")?,
-            tasklist_classes: optional_field(term, "tasklist_classes")?,
-            ol_width: optional_field(term, "ol_width")?,
+            hardbreaks: optional_field(term, atoms::hardbreaks())?,
+            github_pre_lang: optional_field(term, atoms::github_pre_lang())?,
+            full_info_string: optional_field(term, atoms::full_info_string())?,
+            width: optional_field(term, atoms::width())?,
+            r#unsafe: optional_field(term, atoms::unsafe_())?,
+            escape: optional_field(term, atoms::escape())?,
+            list_style: optional_field(term, atoms::list_style())?,
+            sourcepos: optional_field(term, atoms::sourcepos())?,
+            escaped_char_spans: optional_field(term, atoms::escaped_char_spans())?,
+            ignore_empty_links: optional_field(term, atoms::ignore_empty_links())?,
+            gfm_quirks: optional_field(term, atoms::gfm_quirks())?,
+            prefer_fenced: optional_field(term, atoms::prefer_fenced())?,
+            figure_with_caption: optional_field(term, atoms::figure_with_caption())?,
+            tasklist_classes: optional_field(term, atoms::tasklist_classes())?,
+            ol_width: optional_field(term, atoms::ol_width())?,
             experimental_minimize_commonmark: optional_field(
                 term,
-                "experimental_minimize_commonmark",
+                atoms::experimental_minimize_commonmark(),
             )?,
-            compact_html: optional_field(term, "compact_html")?,
-            alert_style: optional_field(term, "alert_style")?,
+            compact_html: optional_field(term, atoms::compact_html())?,
+            alert_style: optional_field(term, atoms::alert_style())?,
         })
     }
 }
@@ -407,11 +486,11 @@ pub struct ExOptions {
 impl<'a> Decoder<'a> for ExOptions {
     fn decode(term: Term<'a>) -> NifResult<Self> {
         Ok(Self {
-            extension: optional_field(term, "extension")?,
-            parse: optional_field(term, "parse")?,
-            render: optional_field(term, "render")?,
+            extension: optional_field(term, atoms::extension())?,
+            parse: optional_field(term, atoms::parse())?,
+            render: optional_field(term, atoms::render())?,
             syntax_highlight: syntax_highlight_field(term)?,
-            sanitize: optional_field(term, "sanitize")?,
+            sanitize: optional_field(term, atoms::sanitize())?,
         })
     }
 }
@@ -471,7 +550,7 @@ pub struct ExSyntectOptions {
 impl<'a> Decoder<'a> for ExSyntectOptions {
     fn decode(term: Term<'a>) -> NifResult<Self> {
         Ok(Self {
-            theme: optional_field(term, "theme")?,
+            theme: optional_field(term, atoms::theme())?,
         })
     }
 }
@@ -493,7 +572,7 @@ pub enum ExSyntaxHighlightEngineOptions {
 impl<'a> Decoder<'a> for ExLumisOptions {
     fn decode(term: Term<'a>) -> NifResult<Self> {
         Ok(Self {
-            formatter: optional_field(term, "formatter")?.unwrap_or_default(),
+            formatter: optional_field(term, atoms::formatter())?.unwrap_or_default(),
         })
     }
 }
@@ -512,14 +591,14 @@ pub struct ExSyntaxHighlightOptions {
 
 impl<'a> Decoder<'a> for ExSyntaxHighlightOptions {
     fn decode(term: Term<'a>) -> NifResult<Self> {
-        if let Some(engine) = optional_field(term, "engine")? {
+        if let Some(engine) = optional_field(term, atoms::engine())? {
             let opts = match engine {
                 ExSyntaxHighlightEngine::Lumis => {
-                    let opts = optional_field(term, "opts")?.unwrap_or_default();
+                    let opts = optional_field(term, atoms::opts())?.unwrap_or_default();
                     ExSyntaxHighlightEngineOptions::Lumis(Box::new(opts))
                 }
                 ExSyntaxHighlightEngine::Syntect => {
-                    let opts = optional_field(term, "opts")?.unwrap_or_default();
+                    let opts = optional_field(term, atoms::opts())?.unwrap_or_default();
                     ExSyntaxHighlightEngineOptions::Syntect(opts)
                 }
             };
