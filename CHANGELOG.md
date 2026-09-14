@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.2.9](https://github.com/leandrocp/mdex_native/compare/v0.2.8...v0.2.9) (2026-09-14)
+
+### Features
+
+- Update comrak to 0.55.0 by @leandrocp in [#65](https://github.com/leandrocp/mdex_native/pull/65)
+- **perf:** Render Markdown faster by @leandrocp in [#71](https://github.com/leandrocp/mdex_native/pull/71)
+
+### Bug Fixes
+
+- Declare children on Escaped AST nodes by @leandrocp in [#70](https://github.com/leandrocp/mdex_native/pull/70)
+
+### Documentation
+
+- Clarify precompiled artifact compatibility by @leandrocp in [#67](https://github.com/leandrocp/mdex_native/pull/67)
+
+### Other Changes
+
+- Remove risky runtime optimizations by @leandrocp in [#72](https://github.com/leandrocp/mdex_native/pull/72)
+
 ## [0.2.8](https://github.com/leandrocp/mdex_native/compare/v0.2.7...v0.2.8) (2026-08-13)
 
 ### Features
