@@ -5,22 +5,6 @@ extern crate rustler;
 mod lumis_adapter;
 mod types;
 
-// Comrak spends a fifth of its time in the allocator while building its AST, so
-// the system allocator is a real bottleneck here; mimalloc removes most of that.
-// Targets are opted in rather than out: the remaining release targets are
-// cross-compiled, and mimalloc does not build cleanly on all of them.
-#[cfg(any(
-    target_os = "macos",
-    all(
-        target_os = "linux",
-        target_env = "gnu",
-        any(target_arch = "x86_64", target_arch = "aarch64")
-    ),
-    all(target_os = "windows", target_env = "msvc")
-))]
-#[global_allocator]
-static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
-
 use comrak::adapters::SyntaxHighlighterAdapter;
 use comrak::format_html_with_plugins;
 use comrak::nodes::AstNode;
@@ -201,22 +185,6 @@ fn markdown_to_html_with_options<'a>(
     md: &str,
     options: ExOptions,
 ) -> NifResult<Term<'a>> {
-    Ok(render_markdown_to_html(md, options)?.encode(env))
-}
-
-/// Identical to `markdown_to_html_with_options`, but runs on a regular
-/// scheduler. Elixir routes a call here only when the input is small enough to
-/// finish well inside a time slice, which skips the dirty scheduler hand-off.
-#[rustler::nif]
-fn markdown_to_html_with_options_small<'a>(
-    env: Env<'a>,
-    md: &str,
-    options: ExOptions,
-) -> NifResult<Term<'a>> {
-    Ok(render_markdown_to_html(md, options)?.encode(env))
-}
-
-fn render_markdown_to_html(md: &str, options: ExOptions) -> NifResult<String> {
     let (comrak_options, lumis_adapter, sanitize) = render_parts(options)?;
     let escape_curly_braces_in_code = comrak_options.extension.phoenix_heex;
     let arena = Arena::new();
@@ -226,12 +194,7 @@ fn render_markdown_to_html(md: &str, options: ExOptions) -> NifResult<String> {
 
     format_html_with_plugins(root, &comrak_options, &mut buffer, &plugins)
         .expect("writing to String is infallible");
-    Ok(do_safe_html(
-        buffer,
-        &sanitize,
-        false,
-        escape_curly_braces_in_code,
-    ))
+    Ok(do_safe_html(buffer, &sanitize, false, escape_curly_braces_in_code).encode(env))
 }
 
 #[rustler::nif(schedule = "DirtyCpu")]
@@ -557,18 +520,8 @@ fn do_safe_html(
         false => html,
     };
 
-    let html = unescape_brace_entity(html, "&amp;lbrace;", "&lbrace;");
-    unescape_brace_entity(html, "&amp;rbrace;", "&rbrace;")
-}
-
-/// `replace` always walks and reallocates the whole document, but the brace
-/// entities only appear when a code block held a curly brace. Searching first
-/// keeps the common case down to a single scan with no allocation.
-fn unescape_brace_entity(html: String, escaped: &str, unescaped: &str) -> String {
-    match html.contains(escaped) {
-        true => html.replace(escaped, unescaped),
-        false => html,
-    }
+    html.replace("&amp;lbrace;", "&lbrace;")
+        .replace("&amp;rbrace;", "&rbrace;")
 }
 
 #[cfg(test)]
