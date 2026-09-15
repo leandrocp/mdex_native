@@ -65,9 +65,9 @@ MDExNative.load_language("elixir")
 
 `Lumis.Languages.load/1` warms the same store, so either call serves both.
 
-A language whose parser cannot be obtained raises, and the render fails with the
-reason Lumis gave. An unknown language name is not that case: it renders as
-plain text, as it always has.
+Rendering raises when a parser cannot be obtained, and the whole document fails
+with the reason Lumis gave. An unknown language name is not that case: it
+renders as plain text, as it always has.
 
 ## Syntect
 

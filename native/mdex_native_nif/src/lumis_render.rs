@@ -168,24 +168,19 @@ fn multi_theme_highlight_lines(
     highlight_lines: Option<ExHtmlInlineHighlightLines>,
     attributes: &HashMap<String, String>,
 ) -> Option<ExHtmlInlineHighlightLines> {
-    if let Some(lines) = inline_highlight_lines(
-        attributes,
-        Some(line_background_from_name(attributes.get("theme"))),
-    ) {
-        return Some(lines);
+    let background = line_background_from_name(attributes.get("theme"));
+
+    let mut lines =
+        inline_highlight_lines(attributes, Some(background.clone())).or(highlight_lines)?;
+
+    // `:theme` resolves against the one theme a formatter renders with, and a
+    // multi-theme block has no such theme. Both the decorator's own
+    // `highlight_lines_style="theme"` and an inherited one land here.
+    if matches!(lines.style, Some(ExHtmlInlineHighlightLinesStyle::Theme)) {
+        lines.style = Some(ExHtmlInlineHighlightLinesStyle::Style { style: background });
     }
 
-    let mut highlight_lines = highlight_lines?;
-    if matches!(
-        highlight_lines.style,
-        Some(ExHtmlInlineHighlightLinesStyle::Theme)
-    ) {
-        highlight_lines.style = Some(ExHtmlInlineHighlightLinesStyle::Style {
-            style: line_background_from_name(attributes.get("theme")),
-        });
-    }
-
-    Some(highlight_lines)
+    Some(lines)
 }
 
 fn inline_highlight_lines(
@@ -532,6 +527,24 @@ mod tests {
         );
 
         assert!(html.starts_with("<pre"), "{html}");
+    }
+
+    #[test]
+    fn a_multi_theme_block_resolves_a_decorator_theme_style() {
+        let attributes = HashMap::from([
+            ("theme".to_string(), "github_light".to_string()),
+            ("highlight_lines".to_string(), "1".to_string()),
+            ("highlight_lines_style".to_string(), "theme".to_string()),
+        ]);
+
+        let lines = multi_theme_highlight_lines(None, &attributes).unwrap();
+
+        // `:theme` has no meaning to a multi-theme formatter, so the decorator's
+        // own theme has to be resolved into a colour here.
+        assert!(matches!(
+            lines.style,
+            Some(ExHtmlInlineHighlightLinesStyle::Style { .. })
+        ));
     }
 
     #[test]
