@@ -64,7 +64,6 @@ fn parse_custom_attributes(info_string: &str) -> Option<HashMap<String, String>>
 pub struct LumisAdapter {
     formatter: ExFormatterOption,
     rainbow_brackets: bool,
-    render_unsafe: bool,
     fence: Mutex<FenceState>,
     /// Comrak's adapter trait can only answer `fmt::Error`, which says nothing
     /// about why Lumis refused a fence. Park the reason here for the NIF to
@@ -73,11 +72,10 @@ pub struct LumisAdapter {
 }
 
 impl LumisAdapter {
-    pub fn new(formatter: ExFormatterOption, rainbow_brackets: bool, render_unsafe: bool) -> Self {
+    pub fn new(formatter: ExFormatterOption, rainbow_brackets: bool) -> Self {
         Self {
             formatter,
             rainbow_brackets,
-            render_unsafe,
             fence: Mutex::new(FenceState::default()),
             failure: Mutex::new(None),
         }
@@ -138,7 +136,6 @@ impl SyntaxHighlighterAdapter for LumisAdapter {
             Some(self.formatter.clone()),
             self.rainbow_brackets,
             &fence.attributes,
-            self.render_unsafe,
         )
         .map_err(|reason| self.fail(reason))?;
 

@@ -8,7 +8,6 @@
 use std::collections::HashMap;
 
 use lumis_core::events::HighlightEvent;
-use lumis_core::formatter::html;
 use lumis_core::languages::Language;
 use lumis_wasm_runtime::RuntimeError;
 
@@ -23,7 +22,6 @@ pub fn render_code_fence(
     formatter: Option<ExFormatterOption>,
     rainbow_brackets: bool,
     attributes: &HashMap<String, String>,
-    render_unsafe: bool,
 ) -> Result<String, String> {
     // Comrak includes the code-fence terminator's newline in the literal. Its
     // adapter contract historically did not turn that into another visual line.
@@ -31,7 +29,7 @@ pub fn render_code_fence(
     // A fence without an info string stays plain. Content detection would let a
     // shebang or a doctype inside a bare fence pick a language MDEx never named.
     let language = Language::guess(Some(language.unwrap_or("plaintext")), source);
-    let formatter = with_mdex_attributes(formatter.unwrap_or_default(), attributes, render_unsafe);
+    let formatter = with_mdex_attributes(formatter.unwrap_or_default(), attributes);
     let formatter = formatter.into_formatter(language)?;
 
     let events = if language == Language::PlainText {
@@ -70,7 +68,6 @@ pub fn render_code_fence(
 fn with_mdex_attributes(
     formatter: ExFormatterOption,
     attributes: &HashMap<String, String>,
-    render_unsafe: bool,
 ) -> ExFormatterOption {
     use ExFormatterOption as F;
 
@@ -89,15 +86,14 @@ fn with_mdex_attributes(
             include_highlights,
             highlight_lines,
             attributes,
-            render_unsafe,
         ),
         F::HtmlLinked {
             pre_class,
             highlight_lines,
             header: _,
         } => F::HtmlLinked {
-            pre_class: mdex_attribute(attributes, "pre_class", render_unsafe).or(pre_class),
-            highlight_lines: linked_highlight_lines(attributes, render_unsafe).or(highlight_lines),
+            pre_class: mdex_attribute(attributes, "pre_class").or(pre_class),
+            highlight_lines: linked_highlight_lines(attributes).or(highlight_lines),
             header: None,
         },
         F::HtmlMultiThemes {
@@ -113,30 +109,26 @@ fn with_mdex_attributes(
             themes,
             default_theme,
             css_variable_prefix,
-            pre_class: mdex_attribute(attributes, "pre_class", render_unsafe).or(pre_class),
+            pre_class: mdex_attribute(attributes, "pre_class").or(pre_class),
             italic,
             include_highlights: include_highlights || attributes.contains_key("include_highlights"),
-            highlight_lines: multi_theme_highlight_lines(
-                highlight_lines,
-                attributes,
-                render_unsafe,
-            ),
+            highlight_lines: multi_theme_highlight_lines(highlight_lines, attributes),
             header: None,
         },
         // A terminal formatter cannot render into a code fence; MDEx has always
         // treated it as the inline HTML one.
         F::Terminal { theme, .. } => {
-            html_inline_with_attributes(theme, None, false, false, None, attributes, render_unsafe)
+            html_inline_with_attributes(theme, None, false, false, None, attributes)
         }
         // BBCode carries its own highlight-line shape, which the inline HTML
         // formatter cannot take. A fence's `highlight_lines` attribute is read
         // back from the decorator instead.
         F::BbcodeScoped { .. } => F::HtmlInline {
             theme: None,
-            pre_class: mdex_attribute(attributes, "pre_class", render_unsafe),
+            pre_class: mdex_attribute(attributes, "pre_class"),
             italic: false,
             include_highlights: attributes.contains_key("include_highlights"),
-            highlight_lines: inline_highlight_lines(attributes, None, render_unsafe),
+            highlight_lines: inline_highlight_lines(attributes, None),
             header: None,
         },
     }
@@ -152,7 +144,6 @@ fn html_inline_with_attributes(
     include_highlights: bool,
     highlight_lines: Option<ExHtmlInlineHighlightLines>,
     attributes: &HashMap<String, String>,
-    render_unsafe: bool,
 ) -> ExFormatterOption {
     let theme = attributes
         .get("theme")
@@ -161,15 +152,11 @@ fn html_inline_with_attributes(
         .or_else(|| Some(ThemeOrString::String("onedark".to_string())));
 
     ExFormatterOption::HtmlInline {
-        pre_class: mdex_attribute(attributes, "pre_class", render_unsafe).or(pre_class),
+        pre_class: mdex_attribute(attributes, "pre_class").or(pre_class),
         italic,
         include_highlights: include_highlights || attributes.contains_key("include_highlights"),
-        highlight_lines: inline_highlight_lines(
-            attributes,
-            Some(line_background(&theme)),
-            render_unsafe,
-        )
-        .or(highlight_lines),
+        highlight_lines: inline_highlight_lines(attributes, Some(line_background(&theme)))
+            .or(highlight_lines),
         theme,
         header: None,
     }
@@ -180,12 +167,10 @@ fn html_inline_with_attributes(
 fn multi_theme_highlight_lines(
     highlight_lines: Option<ExHtmlInlineHighlightLines>,
     attributes: &HashMap<String, String>,
-    render_unsafe: bool,
 ) -> Option<ExHtmlInlineHighlightLines> {
     if let Some(lines) = inline_highlight_lines(
         attributes,
         Some(line_background_from_name(attributes.get("theme"))),
-        render_unsafe,
     ) {
         return Some(lines);
     }
@@ -206,7 +191,6 @@ fn multi_theme_highlight_lines(
 fn inline_highlight_lines(
     attributes: &HashMap<String, String>,
     default_style: Option<String>,
-    render_unsafe: bool,
 ) -> Option<ExHtmlInlineHighlightLines> {
     let lines = parse_highlight_lines(attributes.get("highlight_lines")?)?;
     let style = attributes
@@ -214,7 +198,7 @@ fn inline_highlight_lines(
         .map(|style| match style.as_str() {
             "theme" => ExHtmlInlineHighlightLinesStyle::Theme,
             style => ExHtmlInlineHighlightLinesStyle::Style {
-                style: escape_mdex_attribute(style, render_unsafe),
+                style: style.to_string(),
             },
         })
         .or_else(|| default_style.map(|style| ExHtmlInlineHighlightLinesStyle::Style { style }));
@@ -222,26 +206,14 @@ fn inline_highlight_lines(
     Some(ExHtmlInlineHighlightLines {
         lines,
         style,
-        class: mdex_attribute(attributes, "highlight_lines_class", render_unsafe),
+        class: mdex_attribute(attributes, "highlight_lines_class"),
     })
 }
 
-fn mdex_attribute(
-    attributes: &HashMap<String, String>,
-    name: &str,
-    render_unsafe: bool,
-) -> Option<String> {
-    attributes
-        .get(name)
-        .map(|value| escape_mdex_attribute(value, render_unsafe))
-}
-
-fn escape_mdex_attribute(value: &str, render_unsafe: bool) -> String {
-    if render_unsafe {
-        value.to_string()
-    } else {
-        html::escape(value)
-    }
+/// Values go through verbatim. `lumis-core` escapes every attribute it writes,
+/// so escaping here too would render a quote as `&amp;quot;`.
+fn mdex_attribute(attributes: &HashMap<String, String>, name: &str) -> Option<String> {
+    attributes.get(name).cloned()
 }
 
 fn line_background(theme: &Option<ThemeOrString>) -> String {
@@ -314,11 +286,10 @@ fn flatten_events(
 
 fn linked_highlight_lines(
     attributes: &HashMap<String, String>,
-    render_unsafe: bool,
 ) -> Option<ExHtmlLinkedHighlightLines> {
     Some(ExHtmlLinkedHighlightLines {
         lines: parse_highlight_lines(attributes.get("highlight_lines")?)?,
-        class: mdex_attribute(attributes, "highlight_lines_class", render_unsafe)
+        class: mdex_attribute(attributes, "highlight_lines_class")
             .unwrap_or_else(|| "highlighted".to_string()),
     })
 }
@@ -364,7 +335,6 @@ mod tests {
         language: Option<&str>,
         formatter: Option<ExFormatterOption>,
         attributes: &[(&str, &str)],
-        render_unsafe: bool,
     ) -> String {
         let rainbow_brackets = false;
         let attributes = attributes
@@ -372,15 +342,7 @@ mod tests {
             .map(|(key, value)| (key.to_string(), value.to_string()))
             .collect();
 
-        render_code_fence(
-            source,
-            language,
-            formatter,
-            rainbow_brackets,
-            &attributes,
-            render_unsafe,
-        )
-        .unwrap()
+        render_code_fence(source, language, formatter, rainbow_brackets, &attributes).unwrap()
     }
 
     #[test]
@@ -453,20 +415,20 @@ mod tests {
 
     #[test]
     fn omits_the_closing_tags_comrak_writes_itself() {
-        let html = render("hello\n", Some("plaintext"), None, &[], false);
+        let html = render("hello\n", Some("plaintext"), None, &[]);
         assert!(html.starts_with("<pre"), "{html}");
         assert!(!html.contains("</code></pre>"), "{html}");
     }
 
     #[test]
     fn does_not_render_the_code_fence_terminator_as_a_line() {
-        let one_line = render("hello\n", Some("plaintext"), None, &[], false);
+        let one_line = render("hello\n", Some("plaintext"), None, &[]);
         assert_eq!(one_line.matches("data-line=").count(), 1, "{one_line}");
     }
 
     #[test]
     fn a_fence_without_an_info_string_stays_plain() {
-        let html = render("#!/usr/bin/env python\nx = 1\n", None, None, &[], false);
+        let html = render("#!/usr/bin/env python\nx = 1\n", None, None, &[]);
         assert!(html.contains("language-plaintext"), "{html}");
         assert!(!html.contains("language-python"), "{html}");
     }
@@ -478,7 +440,6 @@ mod tests {
             Some("plaintext"),
             None,
             &[("pre_class", "custom-class"), ("highlight_lines", "1")],
-            false,
         );
 
         assert!(html.contains("custom-class"), "{html}");
@@ -492,7 +453,6 @@ mod tests {
             Some("plaintext"),
             None,
             &[("theme", "github_light"), ("highlight_lines", "1")],
-            false,
         );
 
         assert!(html.contains("background-color: #e7eaf0;"), "{html}");
@@ -511,7 +471,6 @@ mod tests {
                 ("highlight_lines_class", injection),
                 ("highlight_lines_style", injection),
             ],
-            false,
         );
 
         assert!(!html.contains("onmouseover=\"alert(1)"), "{html}");
@@ -528,7 +487,6 @@ mod tests {
                 ("highlight_lines", "1"),
                 ("highlight_lines_style", "color: red;"),
             ],
-            true,
         );
 
         assert!(html.contains("color: red;"), "{html}");
@@ -546,7 +504,6 @@ mod tests {
             Some("plaintext"),
             Some(formatter),
             &[("highlight_lines", "1")],
-            false,
         );
 
         assert!(html.contains("highlighted"), "{html}");
@@ -559,7 +516,6 @@ mod tests {
             Some("plaintext"),
             None,
             &[("highlight_lines", "5-9")],
-            false,
         );
 
         assert!(!html.contains("background-color: #3b4252;"), "{html}");
@@ -573,14 +529,15 @@ mod tests {
             Some("plaintext"),
             None,
             &[("pre_class", "plain")],
-            false,
         );
 
         assert!(html.starts_with("<pre"), "{html}");
     }
 
     #[test]
-    fn escapes_decorator_attributes_in_safe_rendering() {
+    fn passes_decorator_attributes_through_for_the_formatter_to_escape() {
+        // `lumis-core` escapes every attribute value it writes. Escaping here
+        // as well rendered a quote as `&amp;quot;`.
         let attributes = HashMap::from([
             ("highlight_lines".to_string(), "1".to_string()),
             (
@@ -593,39 +550,7 @@ mod tests {
             ),
         ]);
 
-        let inline = inline_highlight_lines(&attributes, None, false).unwrap();
-        assert!(matches!(
-            inline.style,
-            Some(ExHtmlInlineHighlightLinesStyle::Style { style })
-                if style == html::escape(&attributes["highlight_lines_style"])
-        ));
-        assert_eq!(
-            inline.class,
-            Some(html::escape(&attributes["highlight_lines_class"]))
-        );
-
-        let linked = linked_highlight_lines(&attributes, false).unwrap();
-        assert_eq!(
-            linked.class,
-            html::escape(&attributes["highlight_lines_class"])
-        );
-    }
-
-    #[test]
-    fn preserves_decorator_attributes_in_unsafe_rendering() {
-        let attributes = HashMap::from([
-            ("highlight_lines".to_string(), "1".to_string()),
-            (
-                "highlight_lines_style".to_string(),
-                "color: red;\" onmouseover=\"alert(1)".to_string(),
-            ),
-            (
-                "highlight_lines_class".to_string(),
-                "line\" onmouseover=\"alert(1)".to_string(),
-            ),
-        ]);
-
-        let inline = inline_highlight_lines(&attributes, None, true).unwrap();
+        let inline = inline_highlight_lines(&attributes, None).unwrap();
         assert!(matches!(
             inline.style,
             Some(ExHtmlInlineHighlightLinesStyle::Style { style })
@@ -636,7 +561,7 @@ mod tests {
             Some(attributes["highlight_lines_class"].as_str())
         );
 
-        let linked = linked_highlight_lines(&attributes, true).unwrap();
+        let linked = linked_highlight_lines(&attributes).unwrap();
         assert_eq!(linked.class, attributes["highlight_lines_class"]);
     }
 }
