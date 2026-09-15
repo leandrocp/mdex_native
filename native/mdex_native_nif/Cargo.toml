@@ -22,15 +22,14 @@ comrak = { version = "0.55", default-features = false, features = [
   "shortcodes",
   "phoenix_heex",
 ] }
-# Until lumis-core 2.5 and lumis-wasm-runtime 0.2.1 are published, both are
-# taken from the branch that adds the `rustler` feature and `Executor`.
-# Swap back to version requirements before merging.
+# Only the formatters, themes and option decoders. The highlighter itself
+# lives in the `:lumis` NIF and is reached over dyncall. Temporary git ref
+# until lumis-core publishes the `rustler` feature; swap back before merging.
 lumis-core = { git = "https://github.com/leandrocp/lumis", branch = "refactor/share-wasm-runtime", default-features = false, features = ["all-languages", "rustler"], optional = true }
-lumis-wasm-runtime = { git = "https://github.com/leandrocp/lumis", branch = "refactor/share-wasm-runtime", optional = true }
 lol_html = "3.0"
 parking_lot = "0.12"
 phf = { version = "0.14", features = ["macros"] }
-rustler = "0.38"
+rustler = { version = "0.38", features = ["nif_version_2_16"] }
 serde = "1.0"
 shlex = "2.0.1"
 two-face = { version = "0.5", optional = true }
@@ -41,8 +40,8 @@ v_htmlescape = "0.17"
 pretty_assertions = "1.4"
 
 [features]
-default = ["nif_version_2_15"]
-lumis = ["dep:lumis-core", "dep:lumis-wasm-runtime"]
-nif_version_2_15 = ["rustler/nif_version_2_15"]
+default = ["nif_version_2_16"]
+lumis = ["dep:lumis-core"]
+nif_version_2_16 = ["rustler/nif_version_2_16"]
 syntect = ["comrak/syntect", "dep:two-face"]
 

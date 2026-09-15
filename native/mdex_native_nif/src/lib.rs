@@ -4,9 +4,9 @@ extern crate rustler;
 #[cfg(feature = "lumis")]
 mod lumis_adapter;
 #[cfg(feature = "lumis")]
-mod lumis_render;
+mod lumis_bridge;
 #[cfg(feature = "lumis")]
-mod lumis_runtime;
+mod lumis_render;
 mod types;
 
 use comrak::adapters::SyntaxHighlighterAdapter;
@@ -189,7 +189,13 @@ fn markdown_to_html_with_options<'a>(
     env: Env<'a>,
     md: &str,
     options: ExOptions,
+    bridge: Term<'a>,
 ) -> NifResult<Term<'a>> {
+    // Held for the whole render: the adapter reaches Lumis through it.
+    #[cfg(feature = "lumis")]
+    let _bridge = lumis_bridge::BridgeScope::new(env, bridge);
+    #[cfg(not(feature = "lumis"))]
+    let _ = bridge;
     let (comrak_options, lumis_adapter, sanitize) = render_parts(options)?;
     let escape_curly_braces_in_code = comrak_options.extension.phoenix_heex;
     let arena = Arena::new();
@@ -209,7 +215,13 @@ fn markdown_to_xml_with_options<'a>(
     env: Env<'a>,
     md: &str,
     options: ExOptions,
+    bridge: Term<'a>,
 ) -> NifResult<Term<'a>> {
+    // Held for the whole render: the adapter reaches Lumis through it.
+    #[cfg(feature = "lumis")]
+    let _bridge = lumis_bridge::BridgeScope::new(env, bridge);
+    #[cfg(not(feature = "lumis"))]
+    let _ = bridge;
     let (comrak_options, lumis_adapter, _sanitize) = render_parts(options)?;
     let arena = Arena::new();
     let root = comrak::parse_document(&arena, md, &comrak_options);
@@ -241,9 +253,15 @@ fn document_to_commonmark_with_options<'a>(
     env: Env<'a>,
     ex_document: Term<'a>,
     options: ExOptions,
+    bridge: Term<'a>,
 ) -> NifResult<Term<'a>> {
     let arena = Arena::new();
     let comrak_ast = document_term_to_comrak_ast(&arena, ex_document)?;
+    // Held for the whole render: the adapter reaches Lumis through it.
+    #[cfg(feature = "lumis")]
+    let _bridge = lumis_bridge::BridgeScope::new(env, bridge);
+    #[cfg(not(feature = "lumis"))]
+    let _ = bridge;
     let (comrak_options, lumis_adapter, _sanitize) = render_parts(options)?;
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
@@ -272,9 +290,15 @@ fn document_to_html_with_options<'a>(
     env: Env<'a>,
     ex_document: Term<'a>,
     options: ExOptions,
+    bridge: Term<'a>,
 ) -> NifResult<Term<'a>> {
     let arena = Arena::new();
     let comrak_ast = document_term_to_comrak_ast(&arena, ex_document)?;
+    // Held for the whole render: the adapter reaches Lumis through it.
+    #[cfg(feature = "lumis")]
+    let _bridge = lumis_bridge::BridgeScope::new(env, bridge);
+    #[cfg(not(feature = "lumis"))]
+    let _ = bridge;
     let (comrak_options, lumis_adapter, sanitize) = render_parts(options)?;
     let escape_curly_braces_in_code = comrak_options.extension.phoenix_heex;
     let mut buffer = String::new();
@@ -304,9 +328,15 @@ fn document_to_xml_with_options<'a>(
     env: Env<'a>,
     ex_document: Term<'a>,
     options: ExOptions,
+    bridge: Term<'a>,
 ) -> NifResult<Term<'a>> {
     let arena = Arena::new();
     let comrak_ast = document_term_to_comrak_ast(&arena, ex_document)?;
+    // Held for the whole render: the adapter reaches Lumis through it.
+    #[cfg(feature = "lumis")]
+    let _bridge = lumis_bridge::BridgeScope::new(env, bridge);
+    #[cfg(not(feature = "lumis"))]
+    let _ = bridge;
     let (comrak_options, lumis_adapter, _sanitize) = render_parts(options)?;
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
@@ -369,6 +399,11 @@ fn syntax_highlighter(
         ExSyntaxHighlightEngineOptions::Lumis(opts) => {
             #[cfg(feature = "lumis")]
             {
+                // The bridge is published for this call by `render_parts`.
+                if !lumis_bridge::available() {
+                    return Err(rustler::Error::Atom("lumis_bridge_missing"));
+                }
+
                 Ok(CodeFenceSyntaxHighlighter::Lumis(Box::new(
                     LumisAdapter::new(opts.formatter, opts.rainbow_brackets),
                 )))

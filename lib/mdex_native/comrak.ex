@@ -138,7 +138,7 @@ defmodule MDExNative.Comrak do
   @spec markdown_to_html(markdown(), options()) :: html()
   def markdown_to_html(markdown, options \\ []) when is_binary(markdown) do
     markdown
-    |> MDExNative.Native.markdown_to_html_with_options(options!(options))
+    |> MDExNative.Native.markdown_to_html_with_options(options!(options), lumis_bridge())
     |> check_native_output()
   end
 
@@ -148,7 +148,7 @@ defmodule MDExNative.Comrak do
   @spec document_to_html(MDExNative.Comrak.Document.t(), options()) :: html()
   def document_to_html(%MDExNative.Comrak.Document{} = document, options \\ []) do
     document
-    |> MDExNative.Native.document_to_html_with_options(options!(options))
+    |> MDExNative.Native.document_to_html_with_options(options!(options), lumis_bridge())
     |> check_native_output()
   end
 
@@ -166,7 +166,7 @@ defmodule MDExNative.Comrak do
   @spec markdown_to_xml(markdown(), options()) :: xml()
   def markdown_to_xml(markdown, options \\ []) when is_binary(markdown) do
     markdown
-    |> MDExNative.Native.markdown_to_xml_with_options(options!(options))
+    |> MDExNative.Native.markdown_to_xml_with_options(options!(options), lumis_bridge())
     |> check_native_output()
   end
 
@@ -176,7 +176,7 @@ defmodule MDExNative.Comrak do
   @spec document_to_xml(MDExNative.Comrak.Document.t(), options()) :: xml()
   def document_to_xml(%MDExNative.Comrak.Document{} = document, options \\ []) do
     document
-    |> MDExNative.Native.document_to_xml_with_options(options!(options))
+    |> MDExNative.Native.document_to_xml_with_options(options!(options), lumis_bridge())
     |> check_native_output()
   end
 
@@ -186,7 +186,7 @@ defmodule MDExNative.Comrak do
   @spec document_to_commonmark(MDExNative.Comrak.Document.t(), options()) :: markdown()
   def document_to_commonmark(%MDExNative.Comrak.Document{} = document, options \\ []) do
     document
-    |> MDExNative.Native.document_to_commonmark_with_options(options!(options))
+    |> MDExNative.Native.document_to_commonmark_with_options(options!(options), lumis_bridge())
     |> check_native_output()
   end
 
@@ -310,6 +310,14 @@ defmodule MDExNative.Comrak do
   #
   # Nothing is rescued: an invalid Lumis option should surface Lumis's own
   # message here, not decode to something the NIF quietly ignores.
+  # The resource `:lumis` hands out for `enif_dynamic_resource_call`. The
+  # highlighter lives in that NIF; this one only formats what it sends back.
+  if Code.ensure_loaded?(Lumis) and function_exported?(Lumis.Native, :mdex_bridge_v1, 0) do
+    defp lumis_bridge, do: Lumis.Native.mdex_bridge_v1()
+  else
+    defp lumis_bridge, do: nil
+  end
+
   defp normalize_opts(:lumis, opts) do
     if Keyword.keyword?(opts) do
       lumis_opts(opts)

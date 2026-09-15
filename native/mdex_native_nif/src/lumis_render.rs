@@ -9,7 +9,8 @@ use std::collections::HashMap;
 
 use lumis_core::events::HighlightEvent;
 use lumis_core::languages::Language;
-use lumis_wasm_runtime::RuntimeError;
+
+use crate::lumis_bridge::BridgeError;
 
 use lumis_core::elixir::{
     ExAppearance, ExFormatterOption, ExHtmlInlineHighlightLines, ExHtmlInlineHighlightLinesStyle,
@@ -38,13 +39,13 @@ pub fn render_code_fence(
             end: source.len(),
         }]
     } else {
-        let executor = crate::lumis_runtime::executor().map_err(|reason| format!("{reason:#}"))?;
-        match executor.highlight(source, language.id_name(), rainbow_brackets) {
+        // Highlighting happens inside the `:lumis` NIF; only events come back.
+        match crate::lumis_bridge::highlight(source, language.id_name(), rainbow_brackets) {
             Ok(events) => flatten_events(source, events),
-            Err(RuntimeError::LanguageNotLoaded(language)) => {
+            Err(BridgeError::LanguageNotLoaded(language)) => {
                 return Err(format!("language {language} is not loaded"));
             }
-            Err(runtime_error) => return Err(runtime_error.to_string()),
+            Err(BridgeError::Other(reason)) => return Err(reason),
         }
     };
 
