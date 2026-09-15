@@ -29,9 +29,8 @@ defmodule MDExNative.Integration.E2ETest do
 
     File.rm_rf!(mdex_path)
 
-    run!("git", ["clone", "--depth", "1", mdex_repo(), mdex_path], native_path(), [],
-      label: "mdex"
-    )
+    clone = ["clone", "--depth", "1"] ++ mdex_ref_args() ++ [mdex_repo(), mdex_path]
+    run!("git", clone, native_path(), [], label: "mdex")
 
     env = e2e_env("lumis", native_checkout_path, build_path: "mdex")
 
@@ -159,6 +158,9 @@ defmodule MDExNative.Integration.E2ETest do
     env = [
       {"MDEX_NATIVE_E2E_CASE", e2e_case},
       {"MDEX_NATIVE_PATH", native_checkout_path},
+      # Lumis comes from a branch until its crates publish, so there is no
+      # precompiled NIF to download for it.
+      {"LUMIS_BUILD", "1"},
       {"CARGO_TARGET_DIR", Path.join(cargo_target_path(), e2e_case)},
       {"MIX_BUILD_PATH", Path.join([workspace_path(), "_build", opts[:build_path]])},
       {"MIX_DEPS_PATH", Path.join([workspace_path(), "deps", opts[:build_path]])}
@@ -173,6 +175,16 @@ defmodule MDExNative.Integration.E2ETest do
 
   defp mdex_repo do
     System.get_env("MDEX_NATIVE_E2E_MDEX_REPO", @mdex_repo)
+  end
+
+  # MDEx tracks this NIF's output, so a change that moves it has to name the
+  # branch that adopted it or this clones a main that predates the change.
+  defp mdex_ref_args do
+    case System.get_env("MDEX_NATIVE_E2E_MDEX_REF") do
+      nil -> []
+      "" -> []
+      ref -> ["--branch", ref]
+    end
   end
 
   defp native_path do
