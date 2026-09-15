@@ -17,7 +17,7 @@ is added on the `<pre>` class.
 Add Lumis to your deps, which supplies the parsers:
 
 ```elixir
-{:lumis, "~> 0.7"}
+{:lumis, "~> 0.8"}
 ```
 
 Configure MDExNative before compiling dependencies:

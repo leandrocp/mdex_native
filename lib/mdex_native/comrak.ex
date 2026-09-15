@@ -376,7 +376,7 @@ defmodule MDExNative.Comrak do
 
     And add Lumis to your deps, which supplies the parsers:
 
-        {:lumis, "~> 0.7"}
+        {:lumis, "~> 0.8"}
 
     """
   end
