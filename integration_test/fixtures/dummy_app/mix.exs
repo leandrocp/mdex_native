@@ -20,7 +20,7 @@ defmodule MDExNativeE2E.MixProject do
       {:mdex_native, path: "../../.."},
       {:lumis,
        github: "leandrocp/lumis",
-       branch: "refactor/share-wasm-runtime",
+       branch: "lp-mdex-dyncall-bridge",
        sparse: "packages/elixir/lumis"}
     ]
   end

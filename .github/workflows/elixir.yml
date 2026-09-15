@@ -39,7 +39,7 @@ jobs:
       # Temporary, with the Lumis branches in Cargo.toml. leandrocp/mdex#410
       # adopts the output this branch produces; MDEx main still expects the
       # Lumis 0.7 line endings. Drop this when both have merged.
-      MDEX_NATIVE_E2E_MDEX_REF: lp-lumis-owns-option-conversion
+      MDEX_NATIVE_E2E_MDEX_REF: lp-lumis-dyncall-bridge
 
     steps:
       - uses: actions/checkout@v7
