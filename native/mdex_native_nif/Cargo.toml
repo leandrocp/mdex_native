@@ -17,7 +17,7 @@ crate-type = ["cdylib"]
 ammonia = "4.1"
 anyhow = "1"
 once_cell = "1.21"
-comrak = { version = "0.54", default-features = false, features = [
+comrak = { version = "0.55", default-features = false, features = [
   "attributes",
   "shortcodes",
   "phoenix_heex",

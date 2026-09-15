@@ -168,7 +168,7 @@ impl NewNode {
             | Self::ShortCode(ExShortCode { sourcepos, .. })
             | Self::Math(ExMath { sourcepos, .. })
             | Self::MultilineBlockQuote(ExMultilineBlockQuote { sourcepos, .. })
-            | Self::Escaped(ExEscaped { sourcepos })
+            | Self::Escaped(ExEscaped { sourcepos, .. })
             | Self::WikiLink(ExWikiLink { sourcepos, .. })
             | Self::Underline(ExUnderline { sourcepos, .. })
             | Self::Subscript(ExSubscript { sourcepos, .. })
@@ -213,6 +213,7 @@ impl NewNode {
             | Self::Link(ExLink { nodes, .. })
             | Self::Image(ExImage { nodes, .. })
             | Self::MultilineBlockQuote(ExMultilineBlockQuote { nodes, .. })
+            | Self::Escaped(ExEscaped { nodes, .. })
             | Self::WikiLink(ExWikiLink { nodes, .. })
             | Self::Underline(ExUnderline { nodes, .. })
             | Self::Subscript(ExSubscript { nodes, .. })
@@ -983,6 +984,7 @@ impl From<ExMultilineBlockQuote> for NodeValue {
 #[derive(Clone, Debug, NifStruct, PartialEq)]
 #[module = "MDExNative.Comrak.Escaped"]
 pub struct ExEscaped {
+    pub nodes: Vec<NewNode>,
     pub sourcepos: ExSourcepos,
 }
 
@@ -1445,7 +1447,10 @@ fn comrak_ast_to_ex_document_with_children<'a>(
             })
         }
 
-        NodeValue::Escaped => NewNode::Escaped(ExEscaped { sourcepos }),
+        NodeValue::Escaped => NewNode::Escaped(ExEscaped {
+            nodes: children,
+            sourcepos,
+        }),
 
         NodeValue::WikiLink(ref attrs) => NewNode::WikiLink(ExWikiLink {
             nodes: children,
@@ -1614,6 +1619,67 @@ mod tests {
         assert!(
             child.first_child().is_none(),
             "fallback text nodes cannot retain escaped tag children"
+        );
+    }
+
+    #[test]
+    fn escaped_conversion_preserves_children() {
+        let arena = TypedArena::new();
+        let node = ex_document_to_comrak_ast(
+            &arena,
+            NewNode::Document(ExDocument {
+                nodes: vec![NewNode::Paragraph(ExParagraph {
+                    nodes: vec![NewNode::Escaped(ExEscaped {
+                        nodes: vec![NewNode::Text(ExText {
+                            literal: "*".to_string(),
+                            sourcepos: sourcepos(),
+                        })],
+                        sourcepos: sourcepos(),
+                    })],
+                    sourcepos: sourcepos(),
+                })],
+                sourcepos: sourcepos(),
+            }),
+        );
+        let paragraph = node.first_child().expect("document should have a child");
+        let child = paragraph
+            .first_child()
+            .expect("paragraph should have a child");
+
+        assert!(matches!(child.data().value, NodeValue::Escaped));
+        assert!(matches!(
+            child
+                .first_child()
+                .expect("escaped should keep children")
+                .data()
+                .value,
+            NodeValue::Text(ref literal) if literal == "*"
+        ));
+    }
+
+    #[test]
+    fn escaped_round_trip_keeps_children() {
+        let arena = TypedArena::new();
+        let node = ex_document_to_comrak_ast(
+            &arena,
+            NewNode::Escaped(ExEscaped {
+                nodes: vec![NewNode::Text(ExText {
+                    literal: "*".to_string(),
+                    sourcepos: sourcepos(),
+                })],
+                sourcepos: sourcepos(),
+            }),
+        );
+        let child = comrak_ast_to_ex_document_shallow(
+            node.first_child().expect("escaped should have a child"),
+        );
+
+        assert_eq!(
+            comrak_ast_to_ex_document_with_children(node, vec![child.clone()]),
+            NewNode::Escaped(ExEscaped {
+                nodes: vec![child],
+                sourcepos: sourcepos(),
+            })
         );
     }
 }

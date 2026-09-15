@@ -596,8 +596,8 @@ defmodule MDExNative.Comrak.Escaped do
   Spec: https://github.github.com/gfm/#backslash-escapes
   """
 
-  @type t :: %__MODULE__{}
-  defstruct sourcepos: %MDExNative.Comrak.Sourcepos{}
+  @type t :: %__MODULE__{nodes: [MDExNative.Comrak.ast_node()]}
+  defstruct nodes: [], sourcepos: %MDExNative.Comrak.Sourcepos{}
 end
 
 defmodule MDExNative.Comrak.WikiLink do

@@ -21,6 +21,7 @@ pub fn render_code_fence(
     source: &str,
     language: Option<&str>,
     formatter: Option<ExFormatterOption>,
+    rainbow_brackets: bool,
     attributes: &HashMap<String, String>,
     render_unsafe: bool,
 ) -> Result<String, String> {
@@ -31,7 +32,7 @@ pub fn render_code_fence(
     // shebang or a doctype inside a bare fence pick a language MDEx never named.
     let language = Language::guess(Some(language.unwrap_or("plaintext")), source);
     let formatter = with_mdex_attributes(formatter.unwrap_or_default(), attributes, render_unsafe);
-    let (formatter, rainbow_brackets) = formatter.into_formatter(language)?;
+    let formatter = formatter.into_formatter(language)?;
 
     let events = if language == Language::PlainText {
         vec![HighlightEvent::Source {
@@ -79,7 +80,6 @@ fn with_mdex_attributes(
             pre_class,
             italic,
             include_highlights,
-            rainbow_brackets,
             highlight_lines,
             header: _,
         } => html_inline_with_attributes(
@@ -87,19 +87,16 @@ fn with_mdex_attributes(
             pre_class,
             italic,
             include_highlights,
-            rainbow_brackets,
             highlight_lines,
             attributes,
             render_unsafe,
         ),
         F::HtmlLinked {
             pre_class,
-            rainbow_brackets,
             highlight_lines,
             header: _,
         } => F::HtmlLinked {
             pre_class: mdex_attribute(attributes, "pre_class", render_unsafe).or(pre_class),
-            rainbow_brackets,
             highlight_lines: linked_highlight_lines(attributes, render_unsafe).or(highlight_lines),
             header: None,
         },
@@ -110,7 +107,6 @@ fn with_mdex_attributes(
             pre_class,
             italic,
             include_highlights,
-            rainbow_brackets,
             highlight_lines,
             header: _,
         } => F::HtmlMultiThemes {
@@ -120,7 +116,6 @@ fn with_mdex_attributes(
             pre_class: mdex_attribute(attributes, "pre_class", render_unsafe).or(pre_class),
             italic,
             include_highlights: include_highlights || attributes.contains_key("include_highlights"),
-            rainbow_brackets,
             highlight_lines: multi_theme_highlight_lines(
                 highlight_lines,
                 attributes,
@@ -130,26 +125,17 @@ fn with_mdex_attributes(
         },
         // A terminal formatter cannot render into a code fence; MDEx has always
         // treated it as the inline HTML one.
-        F::Terminal {
-            theme,
-            rainbow_brackets,
-            ..
-        } => html_inline_with_attributes(
-            theme,
-            None,
-            false,
-            false,
-            rainbow_brackets,
-            None,
-            attributes,
-            render_unsafe,
-        ),
-        F::BbcodeScoped { rainbow_brackets } => F::HtmlInline {
+        F::Terminal { theme, .. } => {
+            html_inline_with_attributes(theme, None, false, false, None, attributes, render_unsafe)
+        }
+        // BBCode carries its own highlight-line shape, which the inline HTML
+        // formatter cannot take. A fence's `highlight_lines` attribute is read
+        // back from the decorator instead.
+        F::BbcodeScoped { .. } => F::HtmlInline {
             theme: None,
             pre_class: mdex_attribute(attributes, "pre_class", render_unsafe),
             italic: false,
             include_highlights: attributes.contains_key("include_highlights"),
-            rainbow_brackets,
             highlight_lines: inline_highlight_lines(attributes, None, render_unsafe),
             header: None,
         },
@@ -164,7 +150,6 @@ fn html_inline_with_attributes(
     pre_class: Option<String>,
     italic: bool,
     include_highlights: bool,
-    rainbow_brackets: bool,
     highlight_lines: Option<ExHtmlInlineHighlightLines>,
     attributes: &HashMap<String, String>,
     render_unsafe: bool,
@@ -179,7 +164,6 @@ fn html_inline_with_attributes(
         pre_class: mdex_attribute(attributes, "pre_class", render_unsafe).or(pre_class),
         italic,
         include_highlights: include_highlights || attributes.contains_key("include_highlights"),
-        rainbow_brackets,
         highlight_lines: inline_highlight_lines(
             attributes,
             Some(line_background(&theme)),
@@ -290,7 +274,10 @@ fn line_background_from_name(theme: Option<&String>) -> String {
 /// injected or nested scopes. Per-character colour is the same either way; only
 /// the element structure differs, and CSS written against the flat form would
 /// break without this.
-fn flatten_events(source: &str, events: Vec<HighlightEvent>) -> Vec<HighlightEvent> {
+fn flatten_events(
+    source: &str,
+    events: Vec<HighlightEvent<'static>>,
+) -> Vec<HighlightEvent<'static>> {
     let mut flattened = Vec::with_capacity(events.len());
     let mut scopes = Vec::new();
 
@@ -316,6 +303,9 @@ fn flatten_events(source: &str, events: Vec<HighlightEvent>) -> Vec<HighlightEve
                     flattened.push(HighlightEvent::End);
                 }
             }
+            // Annotation events, which a code fence never produces: MDEx has no
+            // way to supply annotations through Comrak's adapter contract.
+            other => flattened.push(other),
         }
     }
 
@@ -350,7 +340,11 @@ fn parse_highlight_lines(spec: &str) -> Option<Vec<ExLineSpec>> {
             if start == 0 || start > end {
                 continue;
             }
-            lines.push(ExLineSpec::Range { start, end });
+            lines.push(ExLineSpec::Range {
+                start,
+                end,
+                step: 1,
+            });
         } else if let Ok(line) = part.parse() {
             if line > 0 {
                 lines.push(ExLineSpec::Single(line));
@@ -372,12 +366,21 @@ mod tests {
         attributes: &[(&str, &str)],
         render_unsafe: bool,
     ) -> String {
+        let rainbow_brackets = false;
         let attributes = attributes
             .iter()
             .map(|(key, value)| (key.to_string(), value.to_string()))
             .collect();
 
-        render_code_fence(source, language, formatter, &attributes, render_unsafe).unwrap()
+        render_code_fence(
+            source,
+            language,
+            formatter,
+            rainbow_brackets,
+            &attributes,
+            render_unsafe,
+        )
+        .unwrap()
     }
 
     #[test]
@@ -385,7 +388,14 @@ mod tests {
         let lines = parse_highlight_lines("1, 3-5, 0, 7-6").unwrap();
         assert_eq!(lines.len(), 2);
         assert!(matches!(lines[0], ExLineSpec::Single(1)));
-        assert!(matches!(lines[1], ExLineSpec::Range { start: 3, end: 5 }));
+        assert!(matches!(
+            lines[1],
+            ExLineSpec::Range {
+                start: 3,
+                end: 5,
+                step: 1
+            }
+        ));
     }
 
     #[test]
@@ -431,7 +441,14 @@ mod tests {
         let lines = parse_highlight_lines("1, oops, 3-5, 7-x").unwrap();
         assert_eq!(lines.len(), 2);
         assert!(matches!(lines[0], ExLineSpec::Single(1)));
-        assert!(matches!(lines[1], ExLineSpec::Range { start: 3, end: 5 }));
+        assert!(matches!(
+            lines[1],
+            ExLineSpec::Range {
+                start: 3,
+                end: 5,
+                step: 1
+            }
+        ));
     }
 
     #[test]
@@ -521,7 +538,6 @@ mod tests {
     fn a_linked_formatter_defaults_the_highlighted_line_class() {
         let formatter = ExFormatterOption::HtmlLinked {
             pre_class: None,
-            rainbow_brackets: false,
             highlight_lines: None,
             header: None,
         };
