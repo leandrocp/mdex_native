@@ -76,8 +76,13 @@ thread_local! {
 pub struct BridgeScope;
 
 impl BridgeScope {
+    /// `nil` when the caller has no Lumis to offer, which must not be published
+    /// as if it were a resource: dyncall would refuse it and report a bridge
+    /// failure where the real answer is that there is no bridge.
     pub fn new(env: Env<'_>, resource: Term<'_>) -> Self {
-        ACTIVE.set(Some((env.as_c_arg(), resource.as_c_arg())));
+        if !resource.is_atom() {
+            ACTIVE.set(Some((env.as_c_arg(), resource.as_c_arg())));
+        }
         Self
     }
 }

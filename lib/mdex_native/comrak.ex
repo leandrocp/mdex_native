@@ -312,7 +312,7 @@ defmodule MDExNative.Comrak do
   # message here, not decode to something the NIF quietly ignores.
   # The resource `:lumis` hands out for `enif_dynamic_resource_call`. The
   # highlighter lives in that NIF; this one only formats what it sends back.
-  if Code.ensure_loaded?(Lumis) and function_exported?(Lumis.Native, :mdex_bridge_v1, 0) do
+  if Code.ensure_loaded?(Lumis.Native) and function_exported?(Lumis.Native, :mdex_bridge_v1, 0) do
     defp lumis_bridge, do: Lumis.Native.mdex_bridge_v1()
   else
     defp lumis_bridge, do: nil
