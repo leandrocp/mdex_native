@@ -14,16 +14,15 @@ defmodule MDExNative.Application do
   # then `LUMIS_DATA_DIR`, then its own `priv`. Nothing in the environment says
   # which it picked, so re-deriving it here would miss the `priv` default and
   # give the VM two stores, downloading and compiling every parser twice.
-  defp configure_lumis_store do
-    lumis = :"Elixir.Lumis"
-
-    if Code.ensure_loaded?(lumis) and function_exported?(lumis, :data_dir, 0) do
-      MDExNative.Native.configure_lumis_store(apply(lumis, :data_dir, []))
+  if Code.ensure_loaded?(Lumis) and function_exported?(Lumis, :data_dir, 0) do
+    defp configure_lumis_store do
+      MDExNative.Native.configure_lumis_store(Lumis.data_dir())
+    rescue
+      # A NIF built without the Lumis feature does not export this one.
+      UndefinedFunctionError -> :ok
+      ErlangError -> :ok
     end
-  rescue
-    # A NIF built without the Lumis feature does not export it, and a Lumis too
-    # old to answer is the caller's problem at render time, not at boot.
-    UndefinedFunctionError -> :ok
-    ErlangError -> :ok
+  else
+    defp configure_lumis_store, do: :ok
   end
 end

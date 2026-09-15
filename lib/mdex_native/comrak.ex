@@ -311,25 +311,26 @@ defmodule MDExNative.Comrak do
   # Nothing is rescued: an invalid Lumis option should surface Lumis's own
   # message here, not decode to something the NIF quietly ignores.
   defp normalize_opts(:lumis, opts) do
-    lumis = :"Elixir.Lumis"
-
-    cond do
-      not Keyword.keyword?(opts) ->
-        Map.new(opts, &syntax_highlight_option/1)
-
-      Code.ensure_loaded?(lumis) and function_exported?(lumis, :rust_options!, 1) ->
-        opts
-        |> then(&apply(lumis, :validate_options!, [&1]))
-        |> then(&apply(lumis, :rust_options!, [&1]))
-
-      true ->
-        # Without Lumis there is nothing to convert these against, and the NIF
-        # would only report that its decode failed.
-        raise lumis_not_enabled_message()
+    if Keyword.keyword?(opts) do
+      lumis_opts(opts)
+    else
+      Map.new(opts, &syntax_highlight_option/1)
     end
   end
 
   defp normalize_opts(_engine, opts), do: Map.new(opts, &syntax_highlight_option/1)
+
+  # Resolved once, at compile time: without Lumis the call below would not
+  # compile, and with it a direct call beats reflecting on every render.
+  if Code.ensure_loaded?(Lumis) do
+    defp lumis_opts(opts) do
+      opts
+      |> Lumis.validate_options!()
+      |> Lumis.rust_options!()
+    end
+  else
+    defp lumis_opts(_opts), do: raise(lumis_not_enabled_message())
+  end
 
   defp syntax_highlight_option({:formatter, {formatter, opts}}) when is_list(opts) do
     {:formatter, {formatter, Map.new(opts)}}
