@@ -297,11 +297,26 @@ defmodule MDExNative.Comrak do
   defp syntax_highlight_options(options) do
     engine = Keyword.get(options, :engine, :lumis)
 
-    options
-    |> Map.new(fn
-      {:opts, opts} when is_list(opts) -> {:opts, normalize_opts(engine, opts)}
-      option -> syntax_highlight_option(option)
-    end)
+    cond do
+      Keyword.has_key?(options, :opts) ->
+        # An engine defaulted here has to be written down: without the key the
+        # NIF reads the legacy shape instead and ignores `:opts` entirely.
+        options
+        |> Map.new(fn
+          {:opts, opts} when is_list(opts) -> {:opts, normalize_opts(engine, opts)}
+          option -> syntax_highlight_option(option)
+        end)
+        |> Map.put(:engine, engine)
+
+      # Legacy `syntax_highlight: [formatter: ...]`, which the NIF decodes
+      # without an engine key. It still needs the engine's own conversion, or
+      # it arrives as a shape the decoder rejects.
+      Keyword.has_key?(options, :formatter) ->
+        normalize_opts(engine, options)
+
+      true ->
+        Map.new(options, &syntax_highlight_option/1)
+    end
   end
 
   # Lumis owns the shape its NIF decodes, and only it knows every formatter's
