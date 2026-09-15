@@ -59,6 +59,16 @@ defmodule MDExNative.MixProject do
   defp deps do
     [
       {:rustler, "~> 0.32", optional: not @force_build?},
+      # Optional, so a build without a highlighter does not download one. It is
+      # declared here rather than by a caller because that is what orders the
+      # two compilations: without it Mix may build this first, and the
+      # `Code.ensure_loaded?(Lumis)` branches below then bake in "not enabled"
+      # for an application that does have Lumis.
+      {:lumis,
+       github: "leandrocp/lumis",
+       branch: "refactor/share-wasm-runtime",
+       sparse: "packages/elixir/lumis",
+       optional: true},
       {:rustler_precompiled, "~> 0.8"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
