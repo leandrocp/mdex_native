@@ -31,6 +31,23 @@ defmodule MDExNativeE2E.ConfigTest do
         assert html =~ "<code class=\"language-rust\" translate=\"no\" tabindex=\"0\">"
         assert html =~ "<span style=\"color: #"
 
+        # `:opts` without an explicit engine: the default has to reach the NIF,
+        # or it reads the legacy shape and drops these options.
+        implicit =
+          MDExNative.Comrak.markdown_to_html(@rust,
+            syntax_highlight: [opts: [formatter: {:html_inline, theme: "dracula"}]]
+          )
+
+        assert implicit =~ "background-color: #282a36"
+
+        # Legacy `[formatter: ...]`, which carries no engine key at all.
+        legacy =
+          MDExNative.Comrak.markdown_to_html(@rust,
+            syntax_highlight: [formatter: {:html_inline, theme: "dracula"}]
+          )
+
+        assert legacy =~ "background-color: #282a36"
+
         error =
           assert_raise RuntimeError, fn ->
             MDExNative.Comrak.markdown_to_html(@rust, syntax_highlight: [engine: :syntect])
