@@ -10,16 +10,11 @@ defmodule MDExNativeE2E.LumisRegressionTest do
          themes: [light: "catppuccin_latte", dark: "catppuccin_mocha"],
          default_theme: "light-dark()"}
 
-      lumis_opts = [formatter: formatter] |> Lumis.validate_options!() |> Lumis.rust_options!()
-
       html =
-        MDExNative.Native.markdown_to_html_with_options(markdown, %{
-          render: %{unsafe: true},
-          syntax_highlight: %{
-            engine: :lumis,
-            opts: lumis_opts
-          }
-        })
+        MDExNative.Comrak.markdown_to_html(markdown,
+          render: [unsafe: true],
+          syntax_highlight: [engine: :lumis, opts: [formatter: formatter]]
+        )
 
       assert html =~
                "style=\"color: light-dark(#4c4f69, #cdd6f4); background-color: light-dark(#eff1f5, #1e1e2e);\""
@@ -54,9 +49,16 @@ defmodule MDExNativeE2E.LumisRegressionTest do
       end
     end
 
-    test "warming a parser reports it ready and shares the lumis store" do
+    test "warming a parser through Lumis makes it available to MDExNative" do
       assert is_binary(Lumis.data_dir())
-      assert MDExNative.load_language("elixir") == true
+      assert :ok = Lumis.Languages.load("elixir")
+
+      assert MDExNative.Comrak.markdown_to_html("```elixir\n:ok\n```",
+               syntax_highlight: [
+                 engine: :lumis,
+                 opts: [formatter: {:html_inline, theme: "onedark"}]
+               ]
+             ) =~ "<span"
     end
 
     test "an invalid Lumis option reports what Lumis said" do

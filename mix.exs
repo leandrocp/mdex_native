@@ -63,10 +63,10 @@ defmodule MDExNative.MixProject do
       # download a highlighter they never call. Declared here rather than by a
       # caller so that, when it is present, Mix compiles it before this and the
       # `Code.ensure_loaded?(Lumis)` branches below resolve to the real calls.
-      # Temporary git ref until the bridge releases; `~> 0.8` at merge.
+      # Temporary exact ref until the bridge releases; `~> 0.8.1` at merge.
       {:lumis,
        github: "leandrocp/lumis",
-       branch: "lp-mdex-dyncall-bridge",
+       ref: "3e6cba579d7a9df0b97abad8a0b011d8b6ff627b",
        sparse: "packages/elixir/lumis",
        optional: true},
       {:rustler_precompiled, "~> 0.8"},

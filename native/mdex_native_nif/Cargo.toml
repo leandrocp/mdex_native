@@ -23,9 +23,9 @@ comrak = { version = "0.55", default-features = false, features = [
   "phoenix_heex",
 ] }
 # Only the formatters, themes and option decoders. The highlighter itself
-# lives in the `:lumis` NIF and is reached over dyncall. Temporary git ref
-# until lumis-core publishes the `rustler` feature; swap back before merging.
-lumis-core = { git = "https://github.com/leandrocp/lumis", branch = "refactor/share-wasm-runtime", default-features = false, features = ["all-languages", "rustler"], optional = true }
+# lives in the `:lumis` NIF and is reached over dyncall. Temporary exact ref
+# until lumis-core 2.6.0 publishes the `rustler` feature; swap before merging.
+lumis-core = { git = "https://github.com/leandrocp/lumis", rev = "3e6cba579d7a9df0b97abad8a0b011d8b6ff627b", default-features = false, features = ["all-languages", "rustler"], optional = true }
 lol_html = "3.0"
 parking_lot = "0.12"
 phf = { version = "0.14", features = ["macros"] }
@@ -44,4 +44,3 @@ default = ["nif_version_2_16"]
 lumis = ["dep:lumis-core"]
 nif_version_2_16 = ["rustler/nif_version_2_16"]
 syntect = ["comrak/syntect", "dep:two-face"]
-

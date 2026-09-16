@@ -3,8 +3,9 @@
 //! The `:lumis` NIF exposes its executor through a resource whose `dyncall`
 //! callback this module invokes with `enif_dynamic_resource_call`. Only plain
 //! C types cross: neither NIF can see the other's Rust, and neither frees what
-//! the other allocated. `HighlightCall` and `EventC` are spelled identically in
-//! `lumis_nif` and versioned by `abi`.
+//! the other allocated. The V1 `HighlightCall` and `EventC` layouts are spelled
+//! identically in `lumis_nif` and never change; a different layout gets a new
+//! resource and function name.
 
 use std::ffi::c_void;
 
@@ -12,8 +13,9 @@ use lumis_core::events::HighlightEvent;
 use rustler::sys::{enif_dynamic_resource_call, ErlNifEnv, ERL_NIF_TERM};
 use rustler::{Env, Term};
 
-/// Must match `BRIDGE_ABI` in `lumis_nif`.
+/// Identifies a valid V1 call; it does not negotiate a different struct layout.
 const BRIDGE_ABI: u32 = 1;
+const UNKNOWN_SCOPE_INDEX: usize = usize::MAX;
 
 const EVENT_START: u8 = 0;
 const EVENT_SOURCE: u8 = 1;
@@ -31,7 +33,8 @@ mod atoms {
 #[repr(C)]
 struct EventC {
     kind: u8,
-    scope_index: u32,
+    scope: *const u8,
+    scope_len: usize,
     start: usize,
     end: usize,
     language: *const u8,
@@ -166,7 +169,7 @@ unsafe extern "C" fn collect(ctx: *mut c_void, event: EventC) {
 
     events.push(match event.kind {
         EVENT_START => HighlightEvent::Start {
-            scope_index: event.scope_index as usize,
+            scope_index: scope_index(event.scope, event.scope_len),
             language: if event.language.is_null() {
                 String::new()
             } else {
@@ -183,4 +186,138 @@ unsafe extern "C" fn collect(ctx: *mut c_void, event: EventC) {
         },
         _ => HighlightEvent::End,
     });
+}
+
+unsafe fn scope_index(scope: *const u8, scope_len: usize) -> usize {
+    if scope.is_null() {
+        return UNKNOWN_SCOPE_INDEX;
+    }
+
+    std::str::from_utf8(std::slice::from_raw_parts(scope, scope_len))
+        .ok()
+        .and_then(|scope| {
+            lumis_core::highlights::HIGHLIGHT_NAMES
+                .binary_search(&scope)
+                .ok()
+        })
+        .unwrap_or(UNKNOWN_SCOPE_INDEX)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{collect, EventC, HighlightCall, BRIDGE_ABI, EVENT_START, UNKNOWN_SCOPE_INDEX};
+    use lumis_core::events::HighlightEvent;
+    use std::ffi::c_void;
+    use std::mem::{offset_of, size_of};
+
+    fn start_event(scope: &str) -> EventC {
+        EventC {
+            kind: EVENT_START,
+            scope: scope.as_ptr(),
+            scope_len: scope.len(),
+            start: 0,
+            end: 0,
+            language: b"elixir".as_ptr(),
+            language_len: b"elixir".len(),
+        }
+    }
+
+    fn collect_event(event: EventC) -> HighlightEvent<'static> {
+        let mut events = Vec::new();
+        unsafe {
+            collect(std::ptr::from_mut(&mut events).cast::<c_void>(), event);
+        }
+        events.pop().unwrap()
+    }
+
+    #[test]
+    fn resolves_provider_scope_names_against_the_consumer_table() {
+        let event = collect_event(start_event("function"));
+        let function = lumis_core::highlights::HIGHLIGHT_NAMES
+            .binary_search(&"function")
+            .unwrap();
+
+        assert_eq!(
+            event,
+            HighlightEvent::Start {
+                scope_index: function,
+                language: "elixir".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn leaves_a_future_provider_scope_unstyled() {
+        let event = collect_event(start_event("future.scope"));
+
+        assert_eq!(
+            event,
+            HighlightEvent::Start {
+                scope_index: UNKNOWN_SCOPE_INDEX,
+                language: "elixir".to_string(),
+            }
+        );
+        assert_eq!(event.scope(), None);
+    }
+
+    #[test]
+    fn consumer_scope_names_remain_sorted_for_binary_search() {
+        assert!(lumis_core::highlights::HIGHLIGHT_NAMES
+            .windows(2)
+            .all(|names| names[0] < names[1]));
+    }
+
+    #[test]
+    fn v1_layout_is_frozen() {
+        assert_eq!(BRIDGE_ABI, 1);
+        assert_eq!(offset_of!(EventC, kind), 0);
+
+        #[cfg(target_pointer_width = "64")]
+        {
+            assert_eq!(size_of::<EventC>(), 56);
+            assert_eq!(offset_of!(EventC, scope), 8);
+            assert_eq!(offset_of!(EventC, scope_len), 16);
+            assert_eq!(offset_of!(EventC, start), 24);
+            assert_eq!(offset_of!(EventC, end), 32);
+            assert_eq!(offset_of!(EventC, language), 40);
+            assert_eq!(offset_of!(EventC, language_len), 48);
+
+            assert_eq!(size_of::<HighlightCall>(), 88);
+            assert_eq!(offset_of!(HighlightCall, abi), 0);
+            assert_eq!(offset_of!(HighlightCall, source), 8);
+            assert_eq!(offset_of!(HighlightCall, source_len), 16);
+            assert_eq!(offset_of!(HighlightCall, language), 24);
+            assert_eq!(offset_of!(HighlightCall, language_len), 32);
+            assert_eq!(offset_of!(HighlightCall, rainbow_brackets), 40);
+            assert_eq!(offset_of!(HighlightCall, sink), 48);
+            assert_eq!(offset_of!(HighlightCall, sink_ctx), 56);
+            assert_eq!(offset_of!(HighlightCall, status), 64);
+            assert_eq!(offset_of!(HighlightCall, error), 72);
+            assert_eq!(offset_of!(HighlightCall, error_len), 80);
+        }
+
+        #[cfg(target_pointer_width = "32")]
+        {
+            assert_eq!(size_of::<EventC>(), 28);
+            assert_eq!(offset_of!(EventC, scope), 4);
+            assert_eq!(offset_of!(EventC, scope_len), 8);
+            assert_eq!(offset_of!(EventC, start), 12);
+            assert_eq!(offset_of!(EventC, end), 16);
+            assert_eq!(offset_of!(EventC, language), 20);
+            assert_eq!(offset_of!(EventC, language_len), 24);
+
+            assert_eq!(size_of::<HighlightCall>(), 44);
+            assert_eq!(offset_of!(HighlightCall, abi), 0);
+            assert_eq!(offset_of!(HighlightCall, source), 4);
+            assert_eq!(offset_of!(HighlightCall, source_len), 8);
+            assert_eq!(offset_of!(HighlightCall, language), 12);
+            assert_eq!(offset_of!(HighlightCall, language_len), 16);
+            assert_eq!(offset_of!(HighlightCall, rainbow_brackets), 20);
+            assert_eq!(offset_of!(HighlightCall, sink), 24);
+            assert_eq!(offset_of!(HighlightCall, sink_ctx), 28);
+            assert_eq!(offset_of!(HighlightCall, status), 32);
+            assert_eq!(offset_of!(HighlightCall, error), 36);
+            assert_eq!(offset_of!(HighlightCall, error_len), 40);
+        }
+    }
 }

@@ -617,7 +617,7 @@ dependencies = [
 [[package]]
 name = "lumis-core"
 version = "2.5.0"
-source = "git+https://github.com/leandrocp/lumis?branch=refactor%2Fshare-wasm-runtime#f8e922cc0819ca4e78234ed5c868f38a6f848182"
+source = "git+https://github.com/leandrocp/lumis?rev=3e6cba579d7a9df0b97abad8a0b011d8b6ff627b#3e6cba579d7a9df0b97abad8a0b011d8b6ff627b"
 dependencies = [
  "derive_builder",
  "glob",

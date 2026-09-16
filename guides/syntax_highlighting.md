@@ -17,7 +17,7 @@ is added on the `<pre>` class.
 Add Lumis to your deps, which supplies the parsers:
 
 ```elixir
-{:lumis, "~> 0.8"}
+{:lumis, "~> 0.8.1"}
 ```
 
 Configure MDExNative before compiling dependencies:
@@ -60,10 +60,10 @@ That first render pays a download and a Wasmtime compile. Warm the languages a
 deployment renders:
 
 ```elixir
-MDExNative.load_language("elixir")
+Lumis.Languages.load("elixir")
 ```
 
-`Lumis.Languages.load/1` warms the same store, so either call serves both.
+MDExNative calls the same Lumis runtime, so the warmed parser serves both.
 
 Rendering raises when a parser cannot be obtained, and the whole document fails
 with the reason Lumis gave. An unknown language name is not that case: it
@@ -104,7 +104,7 @@ Bundle size depends on the selected highlighter:
 
 | Config | Compressed artifact size |
 | --- | ---: |
-| `syntax_highlighter: :lumis` | 5 MB |
+| `syntax_highlighter: :lumis` | 2.1 MB |
 | `syntax_highlighter: :syntect` | 3 MB |
 | `syntax_highlighter: nil` | - |
 
