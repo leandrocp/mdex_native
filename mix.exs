@@ -66,7 +66,7 @@ defmodule MDExNative.MixProject do
       # Temporary exact ref until the bridge releases; `~> 0.8.1` at merge.
       {:lumis,
        github: "leandrocp/lumis",
-       ref: "dc09f9a3db2a1a71d65ed764b8665f646d320782",
+       ref: "fa4de747742f6aefe7b64d062ae81493ac0e0434",
        sparse: "packages/elixir/lumis",
        optional: true},
       {:rustler_precompiled, "~> 0.8"},

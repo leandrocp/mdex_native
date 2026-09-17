@@ -617,7 +617,7 @@ dependencies = [
 [[package]]
 name = "lumis-core"
 version = "2.5.0"
-source = "git+https://github.com/leandrocp/lumis?rev=dc09f9a3db2a1a71d65ed764b8665f646d320782#dc09f9a3db2a1a71d65ed764b8665f646d320782"
+source = "git+https://github.com/leandrocp/lumis?rev=fa4de747742f6aefe7b64d062ae81493ac0e0434#fa4de747742f6aefe7b64d062ae81493ac0e0434"
 dependencies = [
  "derive_builder",
  "glob",
