@@ -18,7 +18,10 @@ defmodule MDExNativeE2E.MixProject do
   defp deps do
     [
       {:mdex_native, path: "../../.."},
-      {:lumis, "~> 0.6"}
+      {:lumis,
+       github: "leandrocp/lumis",
+       ref: "b20739c98e005f74370856eabc4a2c4dab8ce62e",
+       sparse: "packages/elixir/lumis"}
     ]
   end
 end

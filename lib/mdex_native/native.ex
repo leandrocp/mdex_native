@@ -22,7 +22,7 @@ defmodule MDExNative.Native do
       nil -> []
     end
 
-  cargo_features = ["nif_version_2_15" | syntax_highlighter_features]
+  cargo_features = ["nif_version_2_16" | syntax_highlighter_features]
 
   feature_variants = [:lumis, :syntect]
   legacy_variants = [:legacy_cpu, :legacy_cpu_lumis, :legacy_cpu_syntect]
@@ -101,23 +101,25 @@ defmodule MDExNative.Native do
     base_url: {MDExNative.Native.ArtifactURL, :url},
     targets: targets,
     variants: variants,
-    nif_versions: ["2.15"],
+    nif_versions: ["2.16"],
     mode: mode,
     default_features: false,
     features: cargo_features,
     force_build: force_build
 
   def parse_document(_md, _opts), do: :erlang.nif_error(:nif_not_loaded)
-  def markdown_to_html_with_options(_md, _opts), do: :erlang.nif_error(:nif_not_loaded)
-  def markdown_to_xml_with_options(_md, _opts), do: :erlang.nif_error(:nif_not_loaded)
+  def markdown_to_html_with_options(_md, _opts, _bridge), do: :erlang.nif_error(:nif_not_loaded)
+  def markdown_to_xml_with_options(_md, _opts, _bridge), do: :erlang.nif_error(:nif_not_loaded)
 
   def document_to_commonmark(_doc), do: :erlang.nif_error(:nif_not_loaded)
-  def document_to_commonmark_with_options(_doc, _opts), do: :erlang.nif_error(:nif_not_loaded)
+
+  def document_to_commonmark_with_options(_doc, _opts, _bridge),
+    do: :erlang.nif_error(:nif_not_loaded)
 
   def document_to_html(_doc), do: :erlang.nif_error(:nif_not_loaded)
-  def document_to_html_with_options(_doc, _opts), do: :erlang.nif_error(:nif_not_loaded)
+  def document_to_html_with_options(_doc, _opts, _bridge), do: :erlang.nif_error(:nif_not_loaded)
   def document_to_xml(_doc), do: :erlang.nif_error(:nif_not_loaded)
-  def document_to_xml_with_options(_doc, _opts), do: :erlang.nif_error(:nif_not_loaded)
+  def document_to_xml_with_options(_doc, _opts, _bridge), do: :erlang.nif_error(:nif_not_loaded)
 
   def safe_html(_unsafe_html, _sanitize, _escape_content, _escape_curly_braces_in_code),
     do: :erlang.nif_error(:nif_not_loaded)

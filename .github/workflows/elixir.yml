@@ -11,14 +11,14 @@ jobs:
     if: ${{ github.event_name != 'pull_request' || github.head_ref != 'release/elixir' }}
     uses: leandrocp/github-actions/.github/workflows/elixir-test.yml@main
     with:
-      env_vars: '{"MDEX_NATIVE_BUILD": "1"}'
+      env_vars: '{"MDEX_NATIVE_BUILD": "1", "LUMIS_BUILD": "1"}'
 
   coverage:
     if: ${{ github.event_name != 'pull_request' || github.head_ref != 'release/elixir' }}
     uses: leandrocp/github-actions/.github/workflows/elixir-test.yml@main
     with:
       pairs: '[{"name":"OTP 29, Elixir main", "elixir":"main-otp-29", "otp":"maint-29"}]'
-      env_vars: '{"MDEX_NATIVE_BUILD": "1"}'
+      env_vars: '{"MDEX_NATIVE_BUILD": "1", "LUMIS_BUILD": "1"}'
       coverage: true
 
   lint:
@@ -26,7 +26,7 @@ jobs:
     uses: leandrocp/github-actions/.github/workflows/elixir-lint.yml@main
     with:
       pairs: '[{"name":"OTP 29, Elixir main", "elixir":"main-otp-29", "otp":"maint-29"}]'
-      env_vars: '{"MDEX_NATIVE_BUILD": "1"}'
+      env_vars: '{"MDEX_NATIVE_BUILD": "1", "LUMIS_BUILD": "1"}'
       credo: true
       credo_args: '--strict'
 
@@ -34,6 +34,12 @@ jobs:
     if: ${{ github.event_name != 'pull_request' || github.head_ref != 'release/elixir' }}
     name: e2e
     runs-on: ubuntu-latest
+
+    env:
+      # Temporary. The cloned MDEx has to expect this branch's output — Lumis
+      # 0.8's line endings and the option handling in leandrocp/mdex#410 — and
+      # MDEx main does not yet. Drop this when #410 has merged.
+      MDEX_NATIVE_E2E_MDEX_REF: lp-lumis-owns-option-conversion
 
     steps:
       - uses: actions/checkout@v7

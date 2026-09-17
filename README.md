@@ -57,8 +57,8 @@ config :mdex_native, artifact_source: :cloudflare
 Since version v0.2.3 and valid values are `:github` and `:cloudflare`.
 Defaults to `:github`.
 
-Artifacts target the NIF ABI rather than individual OTP releases. The NIF 2.15
-artifacts support OTP 22 and newer.
+Artifacts target the NIF ABI rather than individual OTP releases. The NIF 2.16
+artifacts support OTP 24 and newer.
 
 ## Packages
 

@@ -14,7 +14,7 @@ defmodule MDExNativeE2E.ConfigTest do
           end
 
         assert lumis_error.message ==
-                 "Lumis is not enabled.\n\nComrak tried to syntax highlight a code block with Lumis, but this NIF was not compiled with Lumis support.\n\nEnable it in your config:\n\n    config :mdex_native, syntax_highlighter: :lumis\n\n"
+                 "Lumis is not enabled.\n\nComrak tried to syntax highlight a code block with Lumis, but this NIF was not compiled with Lumis support.\n\nEnable it in your config:\n\n    config :mdex_native, syntax_highlighter: :lumis\n\nAnd add Lumis to your deps, which supplies the parsers:\n\n    {:lumis, \"~> 0.9\"}\n\n"
 
         syntect_error =
           assert_raise RuntimeError, fn ->
@@ -30,6 +30,23 @@ defmodule MDExNativeE2E.ConfigTest do
         assert html =~ "<pre class=\"lumis\" style=\"color: #"
         assert html =~ "<code class=\"language-rust\" translate=\"no\" tabindex=\"0\">"
         assert html =~ "<span style=\"color: #"
+
+        # `:opts` without an explicit engine: the default has to reach the NIF,
+        # or it reads the legacy shape and drops these options.
+        implicit =
+          MDExNative.Comrak.markdown_to_html(@rust,
+            syntax_highlight: [opts: [formatter: {:html_inline, theme: "dracula"}]]
+          )
+
+        assert implicit =~ "background-color: #282a36"
+
+        # Legacy `[formatter: ...]`, which carries no engine key at all.
+        legacy =
+          MDExNative.Comrak.markdown_to_html(@rust,
+            syntax_highlight: [formatter: {:html_inline, theme: "dracula"}]
+          )
+
+        assert legacy =~ "background-color: #282a36"
 
         error =
           assert_raise RuntimeError, fn ->
@@ -49,7 +66,7 @@ defmodule MDExNativeE2E.ConfigTest do
           end
 
         assert error.message ==
-                 "Lumis is not enabled.\n\nComrak tried to syntax highlight a code block with Lumis, but this NIF was not compiled with Lumis support.\n\nEnable it in your config:\n\n    config :mdex_native, syntax_highlighter: :lumis\n\n"
+                 "Lumis is not enabled.\n\nComrak tried to syntax highlight a code block with Lumis, but this NIF was not compiled with Lumis support.\n\nEnable it in your config:\n\n    config :mdex_native, syntax_highlighter: :lumis\n\nAnd add Lumis to your deps, which supplies the parsers:\n\n    {:lumis, \"~> 0.9\"}\n\n"
     end
   end
 

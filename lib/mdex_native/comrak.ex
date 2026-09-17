@@ -138,7 +138,7 @@ defmodule MDExNative.Comrak do
   @spec markdown_to_html(markdown(), options()) :: html()
   def markdown_to_html(markdown, options \\ []) when is_binary(markdown) do
     markdown
-    |> MDExNative.Native.markdown_to_html_with_options(options!(options))
+    |> MDExNative.Native.markdown_to_html_with_options(options!(options), lumis_bridge())
     |> check_native_output()
   end
 
@@ -148,7 +148,7 @@ defmodule MDExNative.Comrak do
   @spec document_to_html(MDExNative.Comrak.Document.t(), options()) :: html()
   def document_to_html(%MDExNative.Comrak.Document{} = document, options \\ []) do
     document
-    |> MDExNative.Native.document_to_html_with_options(options!(options))
+    |> MDExNative.Native.document_to_html_with_options(options!(options), lumis_bridge())
     |> check_native_output()
   end
 
@@ -166,7 +166,7 @@ defmodule MDExNative.Comrak do
   @spec markdown_to_xml(markdown(), options()) :: xml()
   def markdown_to_xml(markdown, options \\ []) when is_binary(markdown) do
     markdown
-    |> MDExNative.Native.markdown_to_xml_with_options(options!(options))
+    |> MDExNative.Native.markdown_to_xml_with_options(options!(options), lumis_bridge())
     |> check_native_output()
   end
 
@@ -176,7 +176,7 @@ defmodule MDExNative.Comrak do
   @spec document_to_xml(MDExNative.Comrak.Document.t(), options()) :: xml()
   def document_to_xml(%MDExNative.Comrak.Document{} = document, options \\ []) do
     document
-    |> MDExNative.Native.document_to_xml_with_options(options!(options))
+    |> MDExNative.Native.document_to_xml_with_options(options!(options), lumis_bridge())
     |> check_native_output()
   end
 
@@ -186,7 +186,7 @@ defmodule MDExNative.Comrak do
   @spec document_to_commonmark(MDExNative.Comrak.Document.t(), options()) :: markdown()
   def document_to_commonmark(%MDExNative.Comrak.Document{} = document, options \\ []) do
     document
-    |> MDExNative.Native.document_to_commonmark_with_options(options!(options))
+    |> MDExNative.Native.document_to_commonmark_with_options(options!(options), lumis_bridge())
     |> check_native_output()
   end
 
@@ -295,11 +295,64 @@ defmodule MDExNative.Comrak do
   end
 
   defp syntax_highlight_options(options) do
-    options
-    |> Map.new(fn
-      {:opts, opts} when is_list(opts) -> {:opts, Map.new(opts, &syntax_highlight_option/1)}
-      option -> syntax_highlight_option(option)
-    end)
+    engine = Keyword.get(options, :engine, :lumis)
+
+    cond do
+      Keyword.has_key?(options, :opts) ->
+        # An engine defaulted here has to be written down: without the key the
+        # NIF reads the legacy shape instead and ignores `:opts` entirely.
+        options
+        |> Map.new(fn
+          {:opts, opts} when is_list(opts) -> {:opts, normalize_opts(engine, opts)}
+          option -> syntax_highlight_option(option)
+        end)
+        |> Map.put(:engine, engine)
+
+      # Legacy `syntax_highlight: [formatter: ...]`, which the NIF decodes
+      # without an engine key. It still needs the engine's own conversion, or
+      # it arrives as a shape the decoder rejects.
+      Keyword.has_key?(options, :formatter) ->
+        normalize_opts(engine, options)
+
+      true ->
+        Map.new(options, &syntax_highlight_option/1)
+    end
+  end
+
+  # Lumis owns the shape its NIF decodes, and only it knows every formatter's
+  # defaults. Sending it through Lumis's own conversion is what lets a caller
+  # write `{:html_inline, theme: "onedark"}` and omit the rest.
+  #
+  # Nothing is rescued: an invalid Lumis option should surface Lumis's own
+  # message here, not decode to something the NIF quietly ignores.
+  # The resource `:lumis` hands out for `enif_dynamic_resource_call`. The
+  # highlighter lives in that NIF; this one only formats what it sends back.
+  if Code.ensure_loaded?(Lumis.Native) and function_exported?(Lumis.Native, :mdex_bridge_v1, 0) do
+    defp lumis_bridge, do: Lumis.Native.mdex_bridge_v1()
+  else
+    defp lumis_bridge, do: nil
+  end
+
+  defp normalize_opts(:lumis, opts) do
+    if Keyword.keyword?(opts) do
+      lumis_opts(opts)
+    else
+      Map.new(opts, &syntax_highlight_option/1)
+    end
+  end
+
+  defp normalize_opts(_engine, opts), do: Map.new(opts, &syntax_highlight_option/1)
+
+  # Resolved once, at compile time: without Lumis the call below would not
+  # compile, and with it a direct call beats reflecting on every render.
+  if Code.ensure_loaded?(Lumis) do
+    defp lumis_opts(opts) do
+      opts
+      |> Lumis.validate_options!()
+      |> Lumis.rust_options!()
+    end
+  else
+    defp lumis_opts(_opts), do: raise(lumis_not_enabled_message())
   end
 
   defp syntax_highlight_option({:formatter, {formatter, opts}}) when is_list(opts) do
@@ -308,15 +361,25 @@ defmodule MDExNative.Comrak do
 
   defp syntax_highlight_option(option), do: option
 
-  defp check_native_output(:lumis_not_enabled) do
+  defp check_native_output({:error, {:lumis_error, reason}}) do
     raise """
-    Lumis is not enabled.
+    Lumis failed to highlight a code block.
 
-    Comrak tried to syntax highlight a code block with Lumis, but this NIF was not compiled with Lumis support.
+    #{reason}
 
-    Enable it in your config:
+    """
+  end
 
-        config :mdex_native, syntax_highlighter: :lumis
+  defp check_native_output(:lumis_not_enabled), do: raise(lumis_not_enabled_message())
+
+  defp check_native_output(:lumis_bridge_missing) do
+    raise """
+    Lumis is installed but does not expose the highlighter bridge.
+
+    This NIF calls `Lumis.Native.mdex_bridge_v1/0` rather than linking its own
+    copy of the engine, and the Lumis in this application predates it.
+
+        {:lumis, "~> 0.9"}
 
     """
   end
@@ -335,4 +398,21 @@ defmodule MDExNative.Comrak do
   end
 
   defp check_native_output(value), do: value
+
+  defp lumis_not_enabled_message do
+    """
+    Lumis is not enabled.
+
+    Comrak tried to syntax highlight a code block with Lumis, but this NIF was not compiled with Lumis support.
+
+    Enable it in your config:
+
+        config :mdex_native, syntax_highlighter: :lumis
+
+    And add Lumis to your deps, which supplies the parsers:
+
+        {:lumis, "~> 0.9"}
+
+    """
+  end
 end
