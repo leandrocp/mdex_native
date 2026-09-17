@@ -36,8 +36,9 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # Temporary while leandrocp/mdex#410 carries the matching integration.
-      # Drop this after both packages have released.
+      # Temporary. The cloned MDEx has to expect this branch's output — Lumis
+      # 0.8's line endings and the option handling in leandrocp/mdex#410 — and
+      # MDEx main does not yet. Drop this when #410 has merged.
       MDEX_NATIVE_E2E_MDEX_REF: lp-lumis-owns-option-conversion
 
     steps:

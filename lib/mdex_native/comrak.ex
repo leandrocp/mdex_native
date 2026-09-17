@@ -379,7 +379,7 @@ defmodule MDExNative.Comrak do
     This NIF calls `Lumis.Native.mdex_bridge_v1/0` rather than linking its own
     copy of the engine, and the Lumis in this application predates it.
 
-        {:lumis, "~> 0.8.1"}
+        {:lumis, "~> 0.9"}
 
     """
   end
@@ -411,7 +411,7 @@ defmodule MDExNative.Comrak do
 
     And add Lumis to your deps, which supplies the parsers:
 
-        {:lumis, "~> 0.8.1"}
+        {:lumis, "~> 0.9"}
 
     """
   end

@@ -4,8 +4,10 @@
 //! callback this module invokes with `enif_dynamic_resource_call`. Only plain
 //! C types cross: neither NIF can see the other's Rust, and neither frees what
 //! the other allocated. The V1 `HighlightCall` and `EventC` layouts are spelled
-//! identically in `lumis_nif` and never change; a different layout gets a new
-//! resource and function name.
+//! identically in `lumis_nif` and are frozen from the first Lumis release that
+//! ships the resource; after that a different layout gets a new resource and
+//! function name. Until then any change to either struct also bumps
+//! `BRIDGE_ABI`, so a stale local build fails loudly instead of misreading.
 
 use std::ffi::c_void;
 
@@ -48,7 +50,8 @@ struct HighlightCall {
     source_len: usize,
     language: *const u8,
     language_len: usize,
-    rainbow_brackets: bool,
+    /// `0` or `1`; a `u8` so no byte is an invalid value across the boundary.
+    rainbow_brackets: u8,
     sink: Option<unsafe extern "C" fn(*mut c_void, EventC)>,
     sink_ctx: *mut c_void,
     status: i32,
@@ -112,7 +115,7 @@ pub fn highlight(
             "no :lumis bridge is active for this render".to_string(),
         ));
     };
-    let mut events: Vec<HighlightEvent<'static>> = Vec::new();
+    let mut sink = Sink::default();
 
     let mut call = HighlightCall {
         abi: BRIDGE_ABI,
@@ -120,9 +123,9 @@ pub fn highlight(
         source_len: source.len(),
         language: language.as_ptr(),
         language_len: language.len(),
-        rainbow_brackets,
+        rainbow_brackets: u8::from(rainbow_brackets),
         sink: Some(collect),
-        sink_ctx: std::ptr::from_mut(&mut events).cast::<c_void>(),
+        sink_ctx: std::ptr::from_mut(&mut sink).cast::<c_void>(),
         status: -1,
         error: std::ptr::null(),
         error_len: 0,
@@ -144,11 +147,26 @@ pub fn highlight(
         ));
     }
 
+    if sink.panicked {
+        return Err(BridgeError::Other(
+            "mdex_native panicked while collecting Lumis events".to_string(),
+        ));
+    }
+
     match call.status {
-        STATUS_OK => Ok(events),
+        STATUS_OK => Ok(sink.events),
         STATUS_LANGUAGE_NOT_LOADED => Err(BridgeError::LanguageNotLoaded(read_error(&call))),
         _ => Err(BridgeError::Other(read_error(&call))),
     }
+}
+
+/// What the provider pushes into, owned by this side for the length of one call.
+#[derive(Default)]
+struct Sink {
+    events: Vec<HighlightEvent<'static>>,
+    /// Set instead of unwinding: a panic leaving `collect` would cross
+    /// `extern "C"` into the provider's frames, which aborts the VM.
+    panicked: bool,
 }
 
 fn read_error(call: &HighlightCall) -> String {
@@ -165,8 +183,18 @@ fn read_error(call: &HighlightCall) -> String {
 
 /// Called once per event, from inside Lumis's `dyncall`.
 unsafe extern "C" fn collect(ctx: *mut c_void, event: EventC) {
-    let events = &mut *ctx.cast::<Vec<HighlightEvent<'static>>>();
+    let sink = &mut *ctx.cast::<Sink>();
 
+    let pushed = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        push_event(&mut sink.events, event);
+    }));
+
+    if pushed.is_err() {
+        sink.panicked = true;
+    }
+}
+
+unsafe fn push_event(events: &mut Vec<HighlightEvent<'static>>, event: EventC) {
     events.push(match event.kind {
         EVENT_START => HighlightEvent::Start {
             scope_index: scope_index(event.scope, event.scope_len),
@@ -205,7 +233,9 @@ unsafe fn scope_index(scope: *const u8, scope_len: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::{collect, EventC, HighlightCall, BRIDGE_ABI, EVENT_START, UNKNOWN_SCOPE_INDEX};
+    use super::{
+        collect, EventC, HighlightCall, Sink, BRIDGE_ABI, EVENT_START, UNKNOWN_SCOPE_INDEX,
+    };
     use lumis_core::events::HighlightEvent;
     use std::ffi::c_void;
     use std::mem::{offset_of, size_of};
@@ -223,11 +253,43 @@ mod tests {
     }
 
     fn collect_event(event: EventC) -> HighlightEvent<'static> {
-        let mut events = Vec::new();
+        let mut sink = Sink::default();
         unsafe {
-            collect(std::ptr::from_mut(&mut events).cast::<c_void>(), event);
+            collect(std::ptr::from_mut(&mut sink).cast::<c_void>(), event);
         }
-        events.pop().unwrap()
+        assert!(!sink.panicked);
+        sink.events.pop().unwrap()
+    }
+
+    fn scope_of(event: EventC) -> usize {
+        match collect_event(event) {
+            HighlightEvent::Start { scope_index, .. } => scope_index,
+            other => panic!("expected a Start event, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_null_name_is_unknown() {
+        let mut event = start_event("function");
+        event.scope = std::ptr::null();
+        event.scope_len = 0;
+
+        assert_eq!(scope_of(event), UNKNOWN_SCOPE_INDEX);
+    }
+
+    #[test]
+    fn an_empty_name_is_unknown() {
+        assert_eq!(scope_of(start_event("")), UNKNOWN_SCOPE_INDEX);
+    }
+
+    #[test]
+    fn a_name_that_is_not_utf8_is_unknown() {
+        let bytes: &[u8] = b"\xff\xfe";
+        let mut event = start_event("function");
+        event.scope = bytes.as_ptr();
+        event.scope_len = bytes.len();
+
+        assert_eq!(scope_of(event), UNKNOWN_SCOPE_INDEX);
     }
 
     #[test]

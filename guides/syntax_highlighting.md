@@ -17,7 +17,7 @@ is added on the `<pre>` class.
 Add Lumis to your deps, which supplies the parsers:
 
 ```elixir
-{:lumis, "~> 0.8.1"}
+{:lumis, "~> 0.9"}
 ```
 
 Configure MDExNative before compiling dependencies:
@@ -100,13 +100,18 @@ Syntect theme names come from [`two-face`](https://crates.io/crates/two-face).
 
 ## Artifact size
 
-Bundle size depends on the selected highlighter:
+Bundle size depends on the selected highlighter. `:lumis` builds a small NIF
+because the highlighter itself lives in the `:lumis` package's NIF, which that
+configuration also downloads:
 
-| Config | Compressed artifact size |
-| --- | ---: |
-| `syntax_highlighter: :lumis` | 2.1 MB |
-| `syntax_highlighter: :syntect` | 3 MB |
-| `syntax_highlighter: nil` | - |
+| Config | This NIF | `:lumis` NIF | Delivered |
+| --- | ---: | ---: | ---: |
+| `syntax_highlighter: :lumis` | 2 MB | 4.7 MB | 6.7 MB |
+| `syntax_highlighter: :syntect` | 3 MB | - | 3 MB |
+| `syntax_highlighter: nil` | 1.2 MB | - | 1.2 MB |
+
+Compressed, as downloaded. Lumis parsers are fetched on demand on top of that,
+one per language rendered.
 
 ## Legacy CPUs
 

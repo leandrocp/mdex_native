@@ -2,7 +2,7 @@ defmodule MDExNativeE2E.LumisRegressionTest do
   use ExUnit.Case
 
   if Application.compile_env(:mdex_native, :syntax_highlighter) == :lumis do
-    test "native markdown_to_html_with_options includes Lumis multi-theme pre attributes (issue #32)" do
+    test "a multi-theme fence carries the Lumis pre attributes (issue #32)" do
       markdown = "```elixir\nIO.puts(:hello)\n```"
 
       formatter =
@@ -49,16 +49,26 @@ defmodule MDExNativeE2E.LumisRegressionTest do
       end
     end
 
-    test "warming a parser through Lumis makes it available to MDExNative" do
+    test "a parser warmed through Lumis is the one MDExNative renders with" do
       assert is_binary(Lumis.data_dir())
       assert :ok = Lumis.Languages.load("elixir")
+      assert "elixir" in Lumis.loaded_languages()
 
+      # Nothing here loads anything: the render finds the parser Lumis already
+      # holds, or it does not highlight at all.
       assert MDExNative.Comrak.markdown_to_html("```elixir\n:ok\n```",
                syntax_highlight: [
                  engine: :lumis,
                  opts: [formatter: {:html_inline, theme: "onedark"}]
                ]
              ) =~ "<span"
+    end
+
+    test "a render handed no bridge reports it rather than rendering" do
+      options = %{syntax_highlight: %{engine: :lumis, opts: %{}}}
+
+      assert MDExNative.Native.markdown_to_html_with_options("```elixir\n:ok\n```", options, nil) ==
+               :lumis_bridge_missing
     end
 
     test "an invalid Lumis option reports what Lumis said" do
