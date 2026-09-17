@@ -25,7 +25,7 @@ comrak = { version = "0.55", default-features = false, features = [
 # Only the formatters, themes and option decoders. The highlighter itself
 # lives in the `:lumis` NIF and is reached over dyncall. Temporary exact ref
 # until lumis-core 2.6.0 publishes the `rustler` feature; swap before merging.
-lumis-core = { git = "https://github.com/leandrocp/lumis", rev = "449f7520a0fb700db66512b82928888a12bba351", default-features = false, features = ["all-languages", "rustler"], optional = true }
+lumis-core = { git = "https://github.com/leandrocp/lumis", rev = "1a6a20e582ecf35a9127890620a6c2d055467463", default-features = false, features = ["all-languages", "rustler"], optional = true }
 lol_html = "3.0"
 parking_lot = "0.12"
 phf = { version = "0.14", features = ["macros"] }
