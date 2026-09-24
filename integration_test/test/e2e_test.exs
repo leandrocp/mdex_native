@@ -29,9 +29,8 @@ defmodule MDExNative.Integration.E2ETest do
 
     File.rm_rf!(mdex_path)
 
-    run!("git", ["clone", "--depth", "1", mdex_repo(), mdex_path], native_path(), [],
-      label: "mdex"
-    )
+    clone = ["clone", "--depth", "1"] ++ mdex_ref_args() ++ [mdex_repo(), mdex_path]
+    run!("git", clone, native_path(), [], label: "mdex")
 
     env = e2e_env("lumis", native_checkout_path, build_path: "mdex")
 
@@ -173,6 +172,16 @@ defmodule MDExNative.Integration.E2ETest do
 
   defp mdex_repo do
     System.get_env("MDEX_NATIVE_E2E_MDEX_REPO", @mdex_repo)
+  end
+
+  # MDEx tracks this NIF's output, so a change that moves it has to name the
+  # branch that adopted it or this clones a main that predates the change.
+  defp mdex_ref_args do
+    case System.get_env("MDEX_NATIVE_E2E_MDEX_REF") do
+      nil -> []
+      "" -> []
+      ref -> ["--branch", ref]
+    end
   end
 
   defp native_path do

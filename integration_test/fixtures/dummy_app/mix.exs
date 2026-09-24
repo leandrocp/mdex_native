@@ -18,7 +18,16 @@ defmodule MDExNativeE2E.MixProject do
   defp deps do
     [
       {:mdex_native, path: "../../.."},
-      {:lumis, "~> 0.6"}
+      {:lumis, "~> 0.9"},
+      # A parser is an ordinary dependency now: a language the project does not
+      # depend on is not fetched, it renders plain. These are the ones the
+      # fixture's fences name, plus the two html injects.
+      {:lumis_wasm_rust, "~> 0.26"},
+      {:lumis_wasm_elixir, "~> 0.26"},
+      {:lumis_wasm_html, "~> 0.26"},
+      {:lumis_wasm_json, "~> 0.26"},
+      {:lumis_wasm_css, "~> 0.26"},
+      {:lumis_wasm_javascript, "~> 0.26"}
     ]
   end
 end

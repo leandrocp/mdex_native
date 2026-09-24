@@ -1,23 +1,21 @@
+//! The Lumis option types as Elixir spells them.
+//!
+//! `lumis-core` carries the formatters but not their BEAM wire format: it has
+//! no `rustler` dependency, so every runtime that speaks to the BEAM declares
+//! the terms itself. These mirror `lumis_nif`'s definitions field for field —
+//! the `:lumis` application encodes the terms this decodes, so the two have to
+//! agree.
+
 #[cfg(feature = "lumis")]
 mod lumis_types {
-    use lumis::themes;
-    use rustler::types::atom::Atom;
-    use rustler::{Decoder, Error, NifResult, NifStruct, NifTaggedEnum, NifUnitEnum, Term};
+    use lumis_core::formatter::{
+        bbcode, html::AttrValue, html::SteppedLineRange, html_inline, html_linked, terminal,
+        BBCodeScopedBuilder, Formatter, HtmlElement, HtmlInlineBuilder, HtmlLinkedBuilder,
+        HtmlMultiThemesBuilder, TerminalBackground, TerminalBuilder,
+    };
+    use lumis_core::{languages::Language, themes};
+    use rustler::{NifStruct, NifTaggedEnum, NifUnitEnum, NifUntaggedEnum};
     use std::collections::HashMap;
-
-    fn optional_field<'a, T>(term: Term<'a>, key: &str) -> NifResult<Option<T>>
-    where
-        T: Decoder<'a>,
-    {
-        match term.map_get(Atom::from_str(term.get_env(), key)?) {
-            Ok(value) => value.decode(),
-            Err(_) => Ok(None),
-        }
-    }
-
-    fn atom_is(term: Term, atom: Atom, name: &str) -> NifResult<bool> {
-        Ok(atom == Atom::from_str(term.get_env(), name)?)
-    }
 
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, NifUnitEnum)]
     pub enum ExAppearance {
@@ -26,19 +24,53 @@ mod lumis_types {
         Dark,
     }
 
-    #[derive(Debug)]
+    /// An attribute value as Elixir spells it: a string, or `true`/`false` for
+    /// the boolean form and for removing one of Lumis's own attributes.
+    ///
+    /// `bool` comes first because Rustler tries the variants in order and
+    /// `true` is an atom, not a binary.
+    #[derive(Clone, Debug, NifUntaggedEnum)]
+    pub enum ExAttrValue {
+        Flag(bool),
+        Value(String),
+    }
+
+    impl From<ExAttrValue> for AttrValue {
+        fn from(value: ExAttrValue) -> Self {
+            match value {
+                ExAttrValue::Flag(flag) => Self::from(flag),
+                ExAttrValue::Value(value) => Self::Value(value),
+            }
+        }
+    }
+
+    /// Decode the attribute pairs an Elixir keyword list arrives as.
+    fn attr_values(attrs: Vec<(String, ExAttrValue)>) -> lumis_core::formatter::html::HtmlAttrs {
+        attrs
+            .into_iter()
+            .map(|(name, value)| (name, value.into()))
+            .collect()
+    }
+
+    #[derive(Clone, Debug, NifTaggedEnum)]
     pub enum ExFormatterOption {
         HtmlInline {
             theme: Option<ThemeOrString>,
             pre_class: Option<String>,
+            pre_attrs: Vec<(String, ExAttrValue)>,
+            code_attrs: Vec<(String, ExAttrValue)>,
             italic: bool,
             include_highlights: bool,
             highlight_lines: Option<ExHtmlInlineHighlightLines>,
+            line_numbers: bool,
             header: Option<ExHtmlElement>,
         },
         HtmlLinked {
             pre_class: Option<String>,
+            pre_attrs: Vec<(String, ExAttrValue)>,
+            code_attrs: Vec<(String, ExAttrValue)>,
             highlight_lines: Option<ExHtmlLinkedHighlightLines>,
+            line_numbers: bool,
             header: Option<ExHtmlElement>,
         },
         HtmlMultiThemes {
@@ -46,93 +78,30 @@ mod lumis_types {
             default_theme: Option<String>,
             css_variable_prefix: Option<String>,
             pre_class: Option<String>,
+            pre_attrs: Vec<(String, ExAttrValue)>,
+            code_attrs: Vec<(String, ExAttrValue)>,
             italic: bool,
             include_highlights: bool,
             highlight_lines: Option<ExHtmlInlineHighlightLines>,
+            line_numbers: bool,
             header: Option<ExHtmlElement>,
         },
         Terminal {
             theme: Option<ThemeOrString>,
+            background: Option<ExTerminalBackground>,
+            width: Option<usize>,
+            highlight_lines: Option<ExTerminalHighlightLines>,
+            line_numbers: bool,
+        },
+        BbcodeScoped {
+            highlight_lines: Option<ExBBCodeHighlightLines>,
         },
     }
 
-    impl<'a> Decoder<'a> for ExFormatterOption {
-        fn decode(term: Term<'a>) -> NifResult<Self> {
-            if let Ok(formatter) = Atom::decode(term) {
-                if atom_is(term, formatter, "html_inline")? {
-                    return Ok(Self::default());
-                }
-
-                if atom_is(term, formatter, "html_linked")? {
-                    return Ok(Self::HtmlLinked {
-                        pre_class: None,
-                        highlight_lines: None,
-                        header: None,
-                    });
-                }
-
-                if atom_is(term, formatter, "html_multi_themes")? {
-                    return Ok(Self::HtmlMultiThemes {
-                        themes: HashMap::new(),
-                        default_theme: None,
-                        css_variable_prefix: None,
-                        pre_class: None,
-                        italic: false,
-                        include_highlights: false,
-                        highlight_lines: None,
-                        header: None,
-                    });
-                }
-
-                if atom_is(term, formatter, "terminal")? {
-                    return Ok(Self::Terminal { theme: None });
-                }
-            }
-
-            let (formatter, opts): (Atom, Term<'a>) = term.decode()?;
-
-            if atom_is(term, formatter, "html_inline")? {
-                return Ok(Self::HtmlInline {
-                    theme: optional_field(opts, "theme")?,
-                    pre_class: optional_field(opts, "pre_class")?,
-                    italic: optional_field(opts, "italic")?.unwrap_or(false),
-                    include_highlights: optional_field(opts, "include_highlights")?
-                        .unwrap_or(false),
-                    highlight_lines: optional_field(opts, "highlight_lines")?,
-                    header: optional_field(opts, "header")?,
-                });
-            }
-
-            if atom_is(term, formatter, "html_linked")? {
-                return Ok(Self::HtmlLinked {
-                    pre_class: optional_field(opts, "pre_class")?,
-                    highlight_lines: optional_field(opts, "highlight_lines")?,
-                    header: optional_field(opts, "header")?,
-                });
-            }
-
-            if atom_is(term, formatter, "html_multi_themes")? {
-                return Ok(Self::HtmlMultiThemes {
-                    themes: optional_field(opts, "themes")?.unwrap_or_default(),
-                    default_theme: optional_field(opts, "default_theme")?,
-                    css_variable_prefix: optional_field(opts, "css_variable_prefix")?,
-                    pre_class: optional_field(opts, "pre_class")?,
-                    italic: optional_field(opts, "italic")?.unwrap_or(false),
-                    include_highlights: optional_field(opts, "include_highlights")?
-                        .unwrap_or(false),
-                    highlight_lines: optional_field(opts, "highlight_lines")?,
-                    header: optional_field(opts, "header")?,
-                });
-            }
-
-            if atom_is(term, formatter, "terminal")? {
-                return Ok(Self::Terminal {
-                    theme: optional_field(opts, "theme")?,
-                });
-            }
-
-            Err(Error::BadArg)
-        }
+    #[derive(Clone, Debug, NifTaggedEnum)]
+    pub enum ExTerminalBackground {
+        Theme,
+        String(String),
     }
 
     impl Default for ExFormatterOption {
@@ -140,43 +109,284 @@ mod lumis_types {
             Self::HtmlInline {
                 theme: None,
                 pre_class: None,
+                pre_attrs: Vec::new(),
+                code_attrs: Vec::new(),
                 italic: false,
                 include_highlights: false,
                 highlight_lines: None,
+                line_numbers: false,
                 header: None,
             }
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Clone, Debug, NifTaggedEnum)]
     pub enum ThemeOrString {
         Theme(ExTheme),
         String(String),
     }
 
-    impl<'a> Decoder<'a> for ThemeOrString {
-        fn decode(term: Term<'a>) -> NifResult<Self> {
-            if let Ok(theme) = String::decode(term) {
-                return Ok(Self::String(theme));
-            }
-
-            let (kind, value): (Atom, Term<'a>) = term.decode()?;
-
-            if atom_is(term, kind, "theme")? {
-                return Ok(Self::Theme(value.decode()?));
-            }
-
-            if atom_is(term, kind, "string")? {
-                return Ok(Self::String(value.decode()?));
-            }
-
-            Err(Error::BadArg)
-        }
-    }
-
     impl Default for ThemeOrString {
         fn default() -> Self {
             Self::String("onedark".to_string())
+        }
+    }
+
+    fn resolve_theme(theme_or_string: ThemeOrString) -> Option<themes::Theme> {
+        match theme_or_string {
+            ThemeOrString::Theme(theme) => Some(theme.into()),
+            ThemeOrString::String(name) => themes::get(&name).ok(),
+        }
+    }
+
+    #[inline]
+    fn convert_line_specs(
+        lines: Vec<ExLineSpec>,
+    ) -> (Vec<std::ops::RangeInclusive<usize>>, Vec<SteppedLineRange>) {
+        let mut contiguous = Vec::new();
+        let mut stepped = Vec::new();
+
+        for line in lines {
+            match line {
+                ExLineSpec::Single(line) => contiguous.push(line..=line),
+                ExLineSpec::Range {
+                    start,
+                    end,
+                    step: 1,
+                } if start <= end => contiguous.push(start..=end),
+                ExLineSpec::Range {
+                    start,
+                    end,
+                    step: -1,
+                } if start >= end => contiguous.push(end..=start),
+                line @ ExLineSpec::Range { .. } => {
+                    if let Some(range) = line.to_stepped_line_range() {
+                        stepped.push(range);
+                    }
+                }
+            }
+        }
+
+        (contiguous, stepped)
+    }
+
+    #[inline]
+    fn convert_inline_style(
+        style: ExHtmlInlineHighlightLinesStyle,
+    ) -> html_inline::HighlightLinesStyle {
+        match style {
+            ExHtmlInlineHighlightLinesStyle::Theme => html_inline::HighlightLinesStyle::Theme,
+            ExHtmlInlineHighlightLinesStyle::Style { style } => {
+                html_inline::HighlightLinesStyle::Style(style)
+            }
+        }
+    }
+
+    fn convert_inline_highlight_lines(
+        highlight: ExHtmlInlineHighlightLines,
+    ) -> (html_inline::HighlightLines, Vec<SteppedLineRange>) {
+        let (lines, stepped) = convert_line_specs(highlight.lines);
+        let highlight = html_inline::HighlightLines {
+            lines,
+            style: highlight.style.map(convert_inline_style),
+            class: highlight.class,
+        };
+        (highlight, stepped)
+    }
+
+    fn convert_terminal_highlight_lines(
+        highlight: ExTerminalHighlightLines,
+    ) -> (terminal::HighlightLines, Vec<SteppedLineRange>) {
+        let (lines, stepped) = convert_line_specs(highlight.lines);
+        let highlight = terminal::HighlightLines {
+            lines,
+            background: highlight.background,
+        };
+        (highlight, stepped)
+    }
+
+    fn convert_bbcode_highlight_lines(
+        highlight: ExBBCodeHighlightLines,
+    ) -> (bbcode::HighlightLines, Vec<SteppedLineRange>) {
+        let (lines, stepped) = convert_line_specs(highlight.lines);
+        (bbcode::HighlightLines { lines }, stepped)
+    }
+
+    fn convert_linked_highlight_lines(
+        highlight: ExHtmlLinkedHighlightLines,
+    ) -> (html_linked::HighlightLines, Vec<SteppedLineRange>) {
+        let (lines, stepped) = convert_line_specs(highlight.lines);
+        let highlight = html_linked::HighlightLines {
+            lines,
+            class: highlight.class,
+        };
+        (highlight, stepped)
+    }
+
+    fn split_highlight_lines<T>(
+        converted: Option<(T, Vec<SteppedLineRange>)>,
+    ) -> (Option<T>, Vec<SteppedLineRange>) {
+        converted.map_or((None, Vec::new()), |(highlight, stepped)| {
+            (Some(highlight), stepped)
+        })
+    }
+
+    impl ExFormatterOption {
+        pub fn into_formatter<T>(
+            self,
+            language: Language,
+        ) -> Result<Box<dyn Formatter<T>>, String> {
+            match self {
+                ExFormatterOption::HtmlInline {
+                    theme,
+                    pre_class,
+                    pre_attrs,
+                    code_attrs,
+                    italic,
+                    include_highlights,
+                    highlight_lines,
+                    line_numbers,
+                    header,
+                } => {
+                    let theme = theme.and_then(resolve_theme);
+
+                    let (highlight_lines, stepped_highlight_lines) =
+                        split_highlight_lines(highlight_lines.map(convert_inline_highlight_lines));
+
+                    let mut formatter = HtmlInlineBuilder::new()
+                        .language(language)
+                        .theme(theme)
+                        .pre_class(pre_class)
+                        .pre_attrs(attr_values(pre_attrs))
+                        .code_attrs(attr_values(code_attrs))
+                        .italic(italic)
+                        .include_highlights(include_highlights)
+                        .highlight_lines(highlight_lines)
+                        .line_numbers(line_numbers)
+                        .header(header.map(HtmlElement::from))
+                        .build()
+                        .map_err(|error| format!("HtmlInline builder error: {error:?}"))?;
+                    formatter.set_stepped_highlight_lines(stepped_highlight_lines);
+
+                    Ok(Box::new(formatter))
+                }
+                ExFormatterOption::HtmlLinked {
+                    pre_class,
+                    pre_attrs,
+                    code_attrs,
+                    highlight_lines,
+                    line_numbers,
+                    header,
+                } => {
+                    let (highlight_lines, stepped_highlight_lines) =
+                        split_highlight_lines(highlight_lines.map(convert_linked_highlight_lines));
+
+                    let mut formatter = HtmlLinkedBuilder::new()
+                        .language(language)
+                        .pre_class(pre_class)
+                        .pre_attrs(attr_values(pre_attrs))
+                        .code_attrs(attr_values(code_attrs))
+                        .highlight_lines(highlight_lines)
+                        .line_numbers(line_numbers)
+                        .header(header.map(HtmlElement::from))
+                        .build()
+                        .map_err(|error| format!("HtmlLinked builder error: {error:?}"))?;
+                    formatter.set_stepped_highlight_lines(stepped_highlight_lines);
+
+                    Ok(Box::new(formatter))
+                }
+                ExFormatterOption::HtmlMultiThemes {
+                    themes,
+                    default_theme,
+                    css_variable_prefix,
+                    pre_class,
+                    pre_attrs,
+                    code_attrs,
+                    italic,
+                    include_highlights,
+                    highlight_lines,
+                    line_numbers,
+                    header,
+                } => {
+                    let themes_map: HashMap<String, themes::Theme> = themes
+                        .into_iter()
+                        .map(|(name, theme)| (name, theme.into()))
+                        .collect();
+
+                    let (highlight_lines, stepped_highlight_lines) =
+                        split_highlight_lines(highlight_lines.map(convert_inline_highlight_lines));
+
+                    let mut builder = HtmlMultiThemesBuilder::new();
+                    builder
+                        .language(language)
+                        .themes(themes_map)
+                        .css_variable_prefix(css_variable_prefix.as_deref().unwrap_or("--lumis"))
+                        .pre_class(pre_class)
+                        .pre_attrs(attr_values(pre_attrs))
+                        .code_attrs(attr_values(code_attrs))
+                        .italic(italic)
+                        .include_highlights(include_highlights)
+                        .highlight_lines(highlight_lines)
+                        .line_numbers(line_numbers)
+                        .header(header.map(HtmlElement::from));
+
+                    if let Some(default_theme) = default_theme {
+                        builder.default_theme(default_theme);
+                    }
+
+                    let mut formatter = builder
+                        .build()
+                        .map_err(|error| format!("HtmlMultiThemes builder error: {error:?}"))?;
+                    formatter.set_stepped_highlight_lines(stepped_highlight_lines);
+
+                    Ok(Box::new(formatter))
+                }
+                ExFormatterOption::Terminal {
+                    theme,
+                    background,
+                    width,
+                    highlight_lines,
+                    line_numbers,
+                } => {
+                    let theme = theme.and_then(resolve_theme);
+                    let background = match background {
+                        Some(ExTerminalBackground::Theme) => TerminalBackground::Theme,
+                        Some(ExTerminalBackground::String(color)) => {
+                            TerminalBackground::Color(color)
+                        }
+                        None => TerminalBackground::Inherit,
+                    };
+                    let (highlight_lines, stepped_highlight_lines) = split_highlight_lines(
+                        highlight_lines.map(convert_terminal_highlight_lines),
+                    );
+
+                    let mut formatter = TerminalBuilder::new()
+                        .language(language)
+                        .theme(theme)
+                        .background(background)
+                        .width(width)
+                        .highlight_lines(highlight_lines)
+                        .line_numbers(line_numbers)
+                        .build()
+                        .map_err(|error| format!("Terminal builder error: {error:?}"))?;
+                    formatter.set_stepped_highlight_lines(stepped_highlight_lines);
+
+                    Ok(Box::new(formatter))
+                }
+                ExFormatterOption::BbcodeScoped { highlight_lines } => {
+                    let (highlight_lines, stepped_highlight_lines) =
+                        split_highlight_lines(highlight_lines.map(convert_bbcode_highlight_lines));
+
+                    let mut formatter = BBCodeScopedBuilder::new()
+                        .language(language)
+                        .highlight_lines(highlight_lines)
+                        .build()
+                        .map_err(|error| format!("BBCode scoped builder error: {error:?}"))?;
+                    formatter.set_stepped_highlight_lines(stepped_highlight_lines);
+
+                    Ok(Box::new(formatter))
+                }
+            }
         }
     }
 
@@ -202,18 +412,7 @@ mod lumis_types {
                 highlights: theme
                     .highlights
                     .into_iter()
-                    .map(|(k, v)| {
-                        (
-                            k,
-                            themes::Style {
-                                fg: v.fg,
-                                bg: v.bg,
-                                bold: v.bold,
-                                italic: v.italic,
-                                text_decoration: v.text_decoration.into(),
-                            },
-                        )
-                    })
+                    .map(|(name, style)| (name, style.into()))
                     .collect(),
             }
         }
@@ -228,25 +427,16 @@ mod lumis_types {
         Dashed,
     }
 
-    fn underline_style_to_ex(style: themes::UnderlineStyle) -> Option<ExUnderlineStyle> {
-        match style {
-            themes::UnderlineStyle::None => None,
-            themes::UnderlineStyle::Solid => Some(ExUnderlineStyle::Solid),
-            themes::UnderlineStyle::Wavy => Some(ExUnderlineStyle::Wavy),
-            themes::UnderlineStyle::Double => Some(ExUnderlineStyle::Double),
-            themes::UnderlineStyle::Dotted => Some(ExUnderlineStyle::Dotted),
-            themes::UnderlineStyle::Dashed => Some(ExUnderlineStyle::Dashed),
-        }
-    }
-
-    fn ex_underline_style_to_theme(style: Option<ExUnderlineStyle>) -> themes::UnderlineStyle {
-        match style {
-            None => themes::UnderlineStyle::None,
-            Some(ExUnderlineStyle::Solid) => themes::UnderlineStyle::Solid,
-            Some(ExUnderlineStyle::Wavy) => themes::UnderlineStyle::Wavy,
-            Some(ExUnderlineStyle::Double) => themes::UnderlineStyle::Double,
-            Some(ExUnderlineStyle::Dotted) => themes::UnderlineStyle::Dotted,
-            Some(ExUnderlineStyle::Dashed) => themes::UnderlineStyle::Dashed,
+    impl ExUnderlineStyle {
+        fn to_theme(style: Option<Self>) -> themes::UnderlineStyle {
+            match style {
+                None => themes::UnderlineStyle::None,
+                Some(ExUnderlineStyle::Solid) => themes::UnderlineStyle::Solid,
+                Some(ExUnderlineStyle::Wavy) => themes::UnderlineStyle::Wavy,
+                Some(ExUnderlineStyle::Double) => themes::UnderlineStyle::Double,
+                Some(ExUnderlineStyle::Dotted) => themes::UnderlineStyle::Dotted,
+                Some(ExUnderlineStyle::Dashed) => themes::UnderlineStyle::Dashed,
+            }
         }
     }
 
@@ -257,20 +447,11 @@ mod lumis_types {
         pub strikethrough: bool,
     }
 
-    impl From<themes::TextDecoration> for ExTextDecoration {
-        fn from(td: themes::TextDecoration) -> Self {
-            ExTextDecoration {
-                underline: underline_style_to_ex(td.underline),
-                strikethrough: td.strikethrough,
-            }
-        }
-    }
-
     impl From<ExTextDecoration> for themes::TextDecoration {
-        fn from(td: ExTextDecoration) -> Self {
+        fn from(decoration: ExTextDecoration) -> Self {
             themes::TextDecoration {
-                underline: ex_underline_style_to_theme(td.underline),
-                strikethrough: td.strikethrough,
+                underline: ExUnderlineStyle::to_theme(decoration.underline),
+                strikethrough: decoration.strikethrough,
             }
         }
     }
@@ -285,17 +466,53 @@ mod lumis_types {
         pub text_decoration: ExTextDecoration,
     }
 
-    #[derive(Clone, Debug, NifTaggedEnum)]
-    pub enum ExLineSpec {
-        Single(usize),
-        Range { start: usize, end: usize },
+    impl From<ExStyle> for themes::Style {
+        fn from(style: ExStyle) -> Self {
+            themes::Style {
+                fg: style.fg,
+                bg: style.bg,
+                bold: style.bold,
+                italic: style.italic,
+                text_decoration: style.text_decoration.into(),
+            }
+        }
     }
 
     #[derive(Clone, Debug, Default, NifStruct)]
-    #[module = "Lumis.HtmlElement"]
+    #[module = "Lumis.HTMLElement"]
     pub struct ExHtmlElement {
         pub open_tag: String,
         pub close_tag: String,
+    }
+
+    impl From<ExHtmlElement> for HtmlElement {
+        fn from(element: ExHtmlElement) -> Self {
+            HtmlElement {
+                open_tag: element.open_tag,
+                close_tag: element.close_tag,
+            }
+        }
+    }
+
+    #[derive(Clone, Debug, NifTaggedEnum)]
+    pub enum ExLineSpec {
+        Single(usize),
+        Range {
+            start: usize,
+            end: usize,
+            step: isize,
+        },
+    }
+
+    impl ExLineSpec {
+        fn to_stepped_line_range(&self) -> Option<SteppedLineRange> {
+            match self {
+                ExLineSpec::Single(line) => SteppedLineRange::new(*line, *line, 1),
+                ExLineSpec::Range { start, end, step } => {
+                    SteppedLineRange::new(*start, *end, *step)
+                }
+            }
+        }
     }
 
     #[derive(Clone, Debug, Default, NifTaggedEnum)]
@@ -308,7 +525,7 @@ mod lumis_types {
     }
 
     #[derive(Clone, Debug, Default, NifStruct)]
-    #[module = "Lumis.HtmlInlineHighlightLines"]
+    #[module = "Lumis.HTMLInlineHighlightLines"]
     pub struct ExHtmlInlineHighlightLines {
         pub lines: Vec<ExLineSpec>,
         pub style: Option<ExHtmlInlineHighlightLinesStyle>,
@@ -316,10 +533,55 @@ mod lumis_types {
     }
 
     #[derive(Clone, Debug, Default, NifStruct)]
-    #[module = "Lumis.HtmlLinkedHighlightLines"]
+    #[module = "Lumis.HTMLLinkedHighlightLines"]
     pub struct ExHtmlLinkedHighlightLines {
         pub lines: Vec<ExLineSpec>,
         pub class: String,
+    }
+
+    #[derive(Clone, Debug, Default, NifStruct)]
+    #[module = "Lumis.TerminalHighlightLines"]
+    pub struct ExTerminalHighlightLines {
+        pub lines: Vec<ExLineSpec>,
+        pub background: Option<String>,
+    }
+
+    #[derive(Clone, Debug, Default, NifStruct)]
+    #[module = "Lumis.BBCodeHighlightLines"]
+    pub struct ExBBCodeHighlightLines {
+        pub lines: Vec<ExLineSpec>,
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::{convert_line_specs, ExLineSpec};
+
+        #[test]
+        fn partitions_contiguous_and_genuinely_stepped_line_specs() {
+            let (contiguous, stepped) = convert_line_specs(vec![
+                ExLineSpec::Single(2),
+                ExLineSpec::Range {
+                    start: 3,
+                    end: 5,
+                    step: 1,
+                },
+                ExLineSpec::Range {
+                    start: 9,
+                    end: 7,
+                    step: -1,
+                },
+                ExLineSpec::Range {
+                    start: 1,
+                    end: 9,
+                    step: 2,
+                },
+            ]);
+
+            assert_eq!(contiguous, [2..=2, 3..=5, 7..=9]);
+            assert_eq!(stepped.len(), 1);
+            assert!(stepped[0].contains(7));
+            assert!(!stepped[0].contains(8));
+        }
     }
 }
 

@@ -1,7 +1,7 @@
 mod sanitize;
 
 #[cfg(feature = "lumis")]
-use super::elixir_types::ExFormatterOption;
+use crate::types::elixir_types::ExFormatterOption;
 use comrak::options::{AlertStyleType, Extension, ListStyleType, Options, Parse, Render};
 use rustler::types::atom::{self, Atom};
 use rustler::{Decoder, NifResult, NifUnitEnum, Term};
@@ -58,6 +58,7 @@ mod atoms {
         parse,
         phoenix_heex,
         prefer_fenced,
+        rainbow_brackets,
         relaxed_autolinks,
         relaxed_tasklist_matching,
         render,
@@ -538,6 +539,9 @@ pub enum ExSyntaxHighlightEngine {
 pub struct ExLumisOptions {
     #[cfg(feature = "lumis")]
     pub formatter: ExFormatterOption,
+    // Lumis moved this off the formatter in 0.8; it arrives alongside it.
+    #[cfg(feature = "lumis")]
+    pub rainbow_brackets: bool,
 }
 
 #[derive(Debug, Default)]
@@ -573,6 +577,7 @@ impl<'a> Decoder<'a> for ExLumisOptions {
     fn decode(term: Term<'a>) -> NifResult<Self> {
         Ok(Self {
             formatter: optional_field(term, atoms::formatter())?.unwrap_or_default(),
+            rainbow_brackets: optional_field(term, atoms::rainbow_brackets())?.unwrap_or(false),
         })
     }
 }
