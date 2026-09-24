@@ -70,10 +70,10 @@ usually a few hundred milliseconds; everything after it is fast. Calling
 compiled module lands in the shared cache, though MDExNative still has to
 register the parser with its own runtime.
 
-Why lazy? Parsers are not cheap to keep around, and the cost is lopsided:
-Elixir's is roughly 100 MB resident, while JSON and HTML are under 5 MB each.
+Why lazy? Parsers are not free to keep in memory, and they vary a lot in size.
 Loading everything you have installed, on the chance a document mentions it, is
-usually the wrong trade.
+usually the wrong trade. Per-language sizes are listed in
+[docs.lumis.sh/reference/languages](https://docs.lumis.sh/reference/languages).
 
 ## Syntect
 
