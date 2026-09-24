@@ -40,17 +40,11 @@ static STORE_PATHS: Lazy<RwLock<StorePaths>> = Lazy::new(|| RwLock::new(StorePat
 
 static EXECUTOR: Lazy<Result<Executor>> = Lazy::new(Executor::new);
 
-enum Job {
-    LoadNamed {
-        name: String,
-        reply: mpsc::SyncSender<Result<(), RuntimeError>>,
-    },
-    Highlight {
-        source: String,
-        language: String,
-        rainbow_brackets: bool,
-        reply: mpsc::SyncSender<Result<Vec<HighlightEvent<'static>>, RuntimeError>>,
-    },
+struct Job {
+    source: String,
+    language: String,
+    rainbow_brackets: bool,
+    reply: mpsc::SyncSender<Result<Vec<HighlightEvent<'static>>, RuntimeError>>,
 }
 
 pub struct Executor {
@@ -93,38 +87,14 @@ impl Executor {
                     let Ok(job) = receiver.lock().recv() else {
                         return;
                     };
-                    match job {
-                        Job::LoadNamed { name, reply } => {
-                            let _ = reply.send(runtime.load_named_language(&name));
-                        }
-                        Job::Highlight {
-                            source,
-                            language,
-                            rainbow_brackets,
-                            reply,
-                        } => {
-                            let events = runtime.highlight(&source, &language, rainbow_brackets);
-                            let _ = reply.send(events);
-                        }
-                    }
+                    let events =
+                        runtime.highlight(&job.source, &job.language, job.rainbow_brackets);
+                    let _ = job.reply.send(events);
                 })
                 .context("could not spawn a Lumis WASM worker")?;
         }
 
         Ok(Self { sender })
-    }
-
-    fn submit<T>(
-        &self,
-        job: impl FnOnce(mpsc::SyncSender<Result<T, RuntimeError>>) -> Job,
-    ) -> Result<T, RuntimeError> {
-        let (reply, answer) = mpsc::sync_channel(1);
-        self.sender.send(job(reply)).map_err(|_| {
-            RuntimeError::Highlight("the Lumis WASM executor is unavailable".into())
-        })?;
-        answer.recv().map_err(|_| {
-            RuntimeError::Highlight("the Lumis WASM executor stopped before answering".into())
-        })?
     }
 
     pub fn highlight(
@@ -133,19 +103,22 @@ impl Executor {
         language: &str,
         rainbow_brackets: bool,
     ) -> Result<Vec<HighlightEvent<'static>>, RuntimeError> {
-        self.submit(|reply| Job::Highlight {
-            source: source.to_string(),
-            language: language.to_string(),
-            rainbow_brackets,
-            reply,
-        })
-    }
+        let (reply, answer) = mpsc::sync_channel(1);
 
-    fn load_named_language(&self, name: &str) -> Result<(), RuntimeError> {
-        self.submit(|reply| Job::LoadNamed {
-            name: name.to_string(),
-            reply,
-        })
+        self.sender
+            .send(Job {
+                source: source.to_string(),
+                language: language.to_string(),
+                rainbow_brackets,
+                reply,
+            })
+            .map_err(|_| {
+                RuntimeError::Highlight("the Lumis WASM executor is unavailable".into())
+            })?;
+
+        answer.recv().map_err(|_| {
+            RuntimeError::Highlight("the Lumis WASM executor stopped before answering".into())
+        })?
     }
 }
 
@@ -187,15 +160,4 @@ fn configure_lumis_store(data_dir: Option<String>, installed_dirs: Vec<String>) 
     paths.installed_dirs = installed_dirs.into_iter().map(PathBuf::from).collect();
 
     true
-}
-
-/// Compile a parser ahead of the first render.
-///
-/// A cold parser costs a Wasmtime compile, slow enough to be worth moving off a
-/// request. The bytes are already on disk — they arrived as a dependency.
-#[rustler::nif(schedule = "DirtyCpu")]
-fn load_lumis_language(name: &str) -> bool {
-    executor()
-        .map(|executor| executor.load_named_language(name).is_ok())
-        .unwrap_or(false)
 }

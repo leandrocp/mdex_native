@@ -1,4 +1,8 @@
 defmodule MDExNative.Comrak do
+  # `:lumis` is brought by the application that highlights, not by this
+  # project, so the module is legitimately absent on most builds.
+  @compile {:no_warn_undefined, Lumis}
+
   @moduledoc ~S"""
   Markdown parsing and rendering powered by the Rust `comrak` crate.
 
@@ -335,16 +339,20 @@ defmodule MDExNative.Comrak do
 
   defp normalize_opts(_engine, opts), do: Map.new(opts, &syntax_highlight_option/1)
 
-  # Resolved once, at compile time: without Lumis the call below would not
-  # compile, and with it a direct call beats reflecting on every render.
-  if Code.ensure_loaded?(Lumis) do
-    defp lumis_opts(opts) do
-      opts
-      |> Lumis.validate_options!()
-      |> Lumis.rust_options!()
-    end
-  else
-    defp lumis_opts(_opts), do: raise(lumis_not_enabled_message())
+  # Resolved on the call rather than at compile time, so that whether this
+  # project was built before or after `:lumis` cannot decide whether Lumis is
+  # available. Nothing is rescued around the conversion itself: an invalid
+  # option should surface Lumis's own message.
+  defp lumis_opts(opts) do
+    unless lumis_available?(), do: raise(lumis_not_enabled_message())
+
+    opts
+    |> Lumis.validate_options!()
+    |> Lumis.rust_options!()
+  end
+
+  defp lumis_available? do
+    Code.ensure_loaded?(Lumis) and function_exported?(Lumis, :rust_options!, 1)
   end
 
   defp syntax_highlight_option({:formatter, {formatter, opts}}) when is_list(opts) do

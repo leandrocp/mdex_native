@@ -57,20 +57,23 @@ defmodule MDExNativeE2E.LumisRegressionTest do
       end
     end
 
-    test "warming a parser reports it ready and reads the lumis dependencies" do
-      # The same `lumis_wasm_*` dependencies Lumis itself resolves, so a parser
-      # is installed once for the VM rather than once per NIF.
+    test "a declared parser highlights, an undeclared one renders plain" do
+      # Both halves come from the store this NIF was pointed at, which is the
+      # `lumis_wasm_*` dependencies Lumis itself resolves — a parser is
+      # installed once for the VM rather than once per NIF.
       assert Lumis.Packages.installed_dirs() != []
-      assert MDExNative.load_language("elixir") == true
-    end
 
-    test "a language the project does not depend on renders plain" do
-      # Not fetched, and not an error either: one undeclared fence costs itself,
-      # not the document.
-      html = MDExNative.Comrak.markdown_to_html("```zig\nconst x = 1;\n```")
+      declared = highlight("```elixir\nIO.puts(:hello)\n```")
+      assert declared =~ "language-elixir"
+      # Scoped per token, so the source is split across spans rather than literal.
+      assert declared =~ "<span style=\"color: #"
 
-      assert html =~ "const x = 1;"
-      refute html =~ "<span style=\"color: #"
+      # `zig` is a language Lumis knows and this project does not depend on.
+      # Not fetched, and not an error either: one undeclared fence costs
+      # itself, not the document around it.
+      undeclared = highlight("```zig\nconst x = 1;\n```")
+      assert undeclared =~ "const x = 1;"
+      refute undeclared =~ "<span style=\"color: #"
     end
 
     test "an invalid Lumis option reports what Lumis said" do
@@ -82,6 +85,10 @@ defmodule MDExNativeE2E.LumisRegressionTest do
         end
 
       assert Exception.message(error) =~ "nope"
+    end
+
+    defp highlight(markdown) do
+      MDExNative.Comrak.markdown_to_html(markdown, syntax_highlight: [engine: :lumis])
     end
   end
 

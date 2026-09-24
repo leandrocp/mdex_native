@@ -22,7 +22,7 @@ Add Lumis to your deps, along with a parser for every language you highlight:
 {:lumis_wasm_elixir, "~> 0.26"}
 ```
 
-The full list is at [docs.lumis.sh/languages](https://docs.lumis.sh/languages).
+The full list is at [docs.lumis.sh/languages](https://docs.lumis.sh/reference/languages).
 
 Configure MDExNative before compiling dependencies:
 
@@ -66,16 +66,15 @@ whole VM rather than once per NIF.
 A fence naming a language the project does not depend on renders as plain text.
 It costs that one fence, not the document.
 
-The first render of a language pays a Wasmtime compile. Warm the ones a
-deployment renders:
+Languages load on demand, the first time a document names one. That first render
+pays a Wasmtime compile — a few hundred milliseconds — and every render after it
+is fast. `Lumis.Languages.load/1` halves the cost by putting the compiled module
+in the shared cache ahead of time, though MDExNative still registers the parser
+with its own runtime on first use.
 
-```elixir
-MDExNative.load_language("elixir")
-```
-
-`Lumis.Languages.load/1` warms Lumis's own runtime. The two keep separate
-runtimes and share the on-disk compile cache, so warming both is worthwhile and
-the second call is the cheaper one.
+Loading is deliberately lazy: a parser costs roughly 25 MB of resident memory, so
+a deployment that declares a dozen of them wants the ones its documents actually
+name, not all of them.
 
 ## Syntect
 
