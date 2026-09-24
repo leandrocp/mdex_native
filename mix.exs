@@ -59,10 +59,6 @@ defmodule MDExNative.MixProject do
   defp deps do
     [
       {:rustler, "~> 0.32", optional: not @force_build?},
-      # `:lumis` is deliberately absent. An application that highlights adds it
-      # and its `lumis_wasm_*` parsers itself, and nothing here resolves the
-      # module before it runs, so build order no longer decides what this
-      # project believes about it.
       {:rustler_precompiled, "~> 0.8"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]

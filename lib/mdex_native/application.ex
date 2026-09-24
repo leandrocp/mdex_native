@@ -23,12 +23,28 @@ defmodule MDExNative.Application do
   # Where this NIF looks for parsers and keeps compiled modules. Both are
   # answers only the BEAM has: a release resolves its dependencies at boot and
   # has no project directory to infer them from.
+  #
+  # Skipped unless there is something to configure. Without Lumis nothing
+  # highlights, and a NIF built without the Lumis feature does not export the
+  # function at all.
+  # Whether the NIF has a Lumis store to configure at all is fixed when it is
+  # built, and `MDExNative.Native` exports the stub either way — only calling
+  # it tells the two apart, and it answers with a `:nif_not_loaded` error. The
+  # config that selected the artifact is the honest question to ask.
+  @lumis? Application.compile_env(:mdex_native, :syntax_highlighter) == :lumis
+
   defp configure_lumis_store do
-    MDExNative.Native.configure_lumis_store(data_dir(), parser_dirs())
-  rescue
-    # A NIF built without the Lumis feature does not export this one.
-    UndefinedFunctionError -> :ok
-    ErlangError -> :ok
+    if @lumis? and lumis_loaded?() do
+      MDExNative.Native.configure_lumis_store(data_dir(), parser_dirs())
+    end
+  end
+
+  # `function_exported?/3` answers for a *loaded* module, and at boot `Lumis`
+  # has not been loaded yet. Skipping the `ensure_loaded` left a release
+  # configuring no store at all, which rendered every fence plain.
+  defp lumis_loaded? do
+    Code.ensure_loaded?(Lumis.Application) and
+      function_exported?(Lumis.Application, :data_dir, 0)
   end
 
   # `priv/parsers` of every installed `lumis_wasm_*` application.
@@ -60,10 +76,5 @@ defmodule MDExNative.Application do
   #
   # `nil` hands the decision to the NIF, which reads `LUMIS_DATA_DIR` and then
   # falls back to the user data directory — the same answer Lumis would give.
-  defp data_dir do
-    if Code.ensure_loaded?(Lumis.Application) and
-         function_exported?(Lumis.Application, :data_dir, 0) do
-      Lumis.Application.data_dir()
-    end
-  end
+  defp data_dir, do: Lumis.Application.data_dir()
 end

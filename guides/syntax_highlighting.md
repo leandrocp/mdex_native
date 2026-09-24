@@ -1,16 +1,13 @@
 # Syntax highlighting
 
-Syntax highlighting can be enabled with the `:syntax_highlight` option,
-and it's disabled by default.
-
-MDExNative supports two engines:
+Syntax highlighting is off by default and turned on with the
+`:syntax_highlight` option. Two engines are available:
 
 - `:lumis` - uses [`Lumis`](https://lumis.sh)
 - `:syntect` - uses [Syntect](https://crates.io/crates/syntect) with [`two-face`](https://crates.io/crates/two-face)
 
-It's disable by default, fenced code blocks still render as code
-blocks keeping the code content unchanged, and the language name
-is added on the `<pre>` class.
+With it off, fenced code blocks still render as code blocks with their content
+unchanged, and the language name goes on the `<pre>` class.
 
 ## Lumis
 
@@ -22,7 +19,7 @@ Add Lumis to your deps, along with a parser for every language you highlight:
 {:lumis_wasm_elixir, "~> 0.26"}
 ```
 
-The full list is at [docs.lumis.sh/languages](https://docs.lumis.sh/reference/languages).
+The full list is at [docs.lumis.sh/reference/languages](https://docs.lumis.sh/reference/languages).
 
 Configure MDExNative before compiling dependencies:
 
@@ -55,26 +52,28 @@ Lumis formatters and options are documented in [`Lumis`](https://lumis.hexdocs.p
 
 ### Parsers are dependencies
 
-A parser is a WebAssembly module shipped as a `lumis_wasm_*` package, not a
-grammar compiled into this library. Depending on one is how a project declares
-it may render that language; nothing is downloaded at runtime.
+A parser is a WebAssembly module published as a
+[`lumis_wasm_*`](https://hex.pm/packages?search=lumis_wasm_&sort=recent_downloads)
+package. None are compiled into this library and none are fetched at runtime.
+Want to highlight Elixir? Depend on `lumis_wasm_elixir`.
 
-MDExNative reads the same installed parsers and the same compiled-module cache
-as the `:lumis` application, so a parser is installed and compiled once for the
-whole VM rather than once per NIF.
+MDExNative reads those packages from the same place the `:lumis` application
+does, and shares its cache of compiled parsers, so the VM pays for each one
+once instead of once per NIF.
 
-A fence naming a language the project does not depend on renders as plain text.
-It costs that one fence, not the document.
+Name a language you haven't installed and that fence comes out as plain text.
+The rest of the document is unaffected.
 
-Languages load on demand, the first time a document names one. That first render
-pays a Wasmtime compile — a few hundred milliseconds — and every render after it
-is fast. `Lumis.Languages.load/1` halves the cost by putting the compiled module
-in the shared cache ahead of time, though MDExNative still registers the parser
-with its own runtime on first use.
+Loading happens on first use. That first fence pays for a Wasmtime compile,
+usually a few hundred milliseconds; everything after it is fast. Calling
+`Lumis.Languages.load/1` at startup wins about half of that back, since the
+compiled module lands in the shared cache, though MDExNative still has to
+register the parser with its own runtime.
 
-Loading is deliberately lazy: a parser costs roughly 25 MB of resident memory, so
-a deployment that declares a dozen of them wants the ones its documents actually
-name, not all of them.
+Why lazy? Parsers are not cheap to keep around, and the cost is lopsided:
+Elixir's is roughly 100 MB resident, while JSON and HTML are under 5 MB each.
+Loading everything you have installed, on the chance a document mentions it, is
+usually the wrong trade.
 
 ## Syntect
 
@@ -113,7 +112,10 @@ Bundle size depends on the selected highlighter:
 | --- | ---: |
 | `syntax_highlighter: :lumis` | 5 MB |
 | `syntax_highlighter: :syntect` | 3 MB |
-| `syntax_highlighter: nil` | - |
+| `syntax_highlighter: nil` | 1 MB |
+
+Parsers are not in those numbers. They arrive as their own Hex packages, so you
+only download the languages you asked for.
 
 ## Legacy CPUs
 
