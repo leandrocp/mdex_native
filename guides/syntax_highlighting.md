@@ -53,27 +53,15 @@ Lumis formatters and options are documented in [`Lumis`](https://lumis.hexdocs.p
 ### Parsers are dependencies
 
 A parser is a WebAssembly module published as a
-[`lumis_wasm_*`](https://hex.pm/packages?search=lumis_wasm_&sort=recent_downloads)
-package. None are compiled into this library and none are fetched at runtime.
-Want to highlight Elixir? Depend on `lumis_wasm_elixir`.
+[`lumis_wasm_*`](https://hex.pm/packages?sort=name&search=lumis_wasm_) package.
+Nothing is compiled in and nothing is fetched at runtime: name a language you
+haven't installed and that fence comes out as plain text.
 
-MDExNative reads those packages from the same place the `:lumis` application
-does, and shares its cache of compiled parsers, so the VM pays for each one
-once instead of once per NIF.
+MDExNative reads those packages from the same place `:lumis` does and shares
+its cache of compiled parsers, so the VM pays for each one once.
 
-Name a language you haven't installed and that fence comes out as plain text.
-The rest of the document is unaffected.
-
-Loading happens on first use. That first fence pays for a Wasmtime compile,
-usually a few hundred milliseconds; everything after it is fast. Calling
-`Lumis.Languages.load/1` at startup wins about half of that back, since the
-compiled module lands in the shared cache, though MDExNative still has to
-register the parser with its own runtime.
-
-Why lazy? Parsers are not free to keep in memory, and they vary a lot in size.
-Loading everything you have installed, on the chance a document mentions it, is
-usually the wrong trade. Per-language sizes are listed in
-[docs.lumis.sh/reference/languages](https://docs.lumis.sh/reference/languages).
+Loading happens on first use, which costs a Wasmtime compile. Call
+`Lumis.Languages.load/1` at startup to move most of that off the first request.
 
 ## Syntect
 
