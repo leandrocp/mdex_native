@@ -3,6 +3,10 @@ extern crate rustler;
 
 #[cfg(feature = "lumis")]
 mod lumis_adapter;
+#[cfg(feature = "lumis")]
+mod lumis_bridge;
+#[cfg(feature = "lumis")]
+mod lumis_render;
 mod types;
 
 use comrak::adapters::SyntaxHighlighterAdapter;
@@ -24,7 +28,8 @@ rustler::init!("Elixir.MDExNative.Native");
 
 mod atoms {
     rustler::atoms! {
-        nodes
+        nodes,
+        lumis_error
     }
 }
 
@@ -184,7 +189,13 @@ fn markdown_to_html_with_options<'a>(
     env: Env<'a>,
     md: &str,
     options: ExOptions,
+    bridge: Term<'a>,
 ) -> NifResult<Term<'a>> {
+    // Held for the whole render: the adapter reaches Lumis through it.
+    #[cfg(feature = "lumis")]
+    let _bridge = lumis_bridge::BridgeScope::new(env, bridge);
+    #[cfg(not(feature = "lumis"))]
+    let _ = bridge;
     let (comrak_options, lumis_adapter, sanitize) = render_parts(options)?;
     let escape_curly_braces_in_code = comrak_options.extension.phoenix_heex;
     let arena = Arena::new();
@@ -192,8 +203,10 @@ fn markdown_to_html_with_options<'a>(
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
 
-    format_html_with_plugins(root, &comrak_options, &mut buffer, &plugins)
-        .expect("writing to String is infallible");
+    finish_render(
+        format_html_with_plugins(root, &comrak_options, &mut buffer, &plugins),
+        &lumis_adapter,
+    )?;
     Ok(do_safe_html(buffer, &sanitize, false, escape_curly_braces_in_code).encode(env))
 }
 
@@ -202,15 +215,23 @@ fn markdown_to_xml_with_options<'a>(
     env: Env<'a>,
     md: &str,
     options: ExOptions,
+    bridge: Term<'a>,
 ) -> NifResult<Term<'a>> {
+    // Held for the whole render: the adapter reaches Lumis through it.
+    #[cfg(feature = "lumis")]
+    let _bridge = lumis_bridge::BridgeScope::new(env, bridge);
+    #[cfg(not(feature = "lumis"))]
+    let _ = bridge;
     let (comrak_options, lumis_adapter, _sanitize) = render_parts(options)?;
     let arena = Arena::new();
     let root = comrak::parse_document(&arena, md, &comrak_options);
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
 
-    comrak::format_xml_with_plugins(root, &comrak_options, &mut buffer, &plugins)
-        .expect("writing to String is infallible");
+    finish_render(
+        comrak::format_xml_with_plugins(root, &comrak_options, &mut buffer, &plugins),
+        &lumis_adapter,
+    )?;
     let xml = buffer;
     Ok(xml.encode(env))
 }
@@ -232,15 +253,23 @@ fn document_to_commonmark_with_options<'a>(
     env: Env<'a>,
     ex_document: Term<'a>,
     options: ExOptions,
+    bridge: Term<'a>,
 ) -> NifResult<Term<'a>> {
     let arena = Arena::new();
     let comrak_ast = document_term_to_comrak_ast(&arena, ex_document)?;
+    // Held for the whole render: the adapter reaches Lumis through it.
+    #[cfg(feature = "lumis")]
+    let _bridge = lumis_bridge::BridgeScope::new(env, bridge);
+    #[cfg(not(feature = "lumis"))]
+    let _ = bridge;
     let (comrak_options, lumis_adapter, _sanitize) = render_parts(options)?;
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
 
-    comrak::format_commonmark_with_plugins(comrak_ast, &comrak_options, &mut buffer, &plugins)
-        .expect("writing to String is infallible");
+    finish_render(
+        comrak::format_commonmark_with_plugins(comrak_ast, &comrak_options, &mut buffer, &plugins),
+        &lumis_adapter,
+    )?;
     let document = buffer;
     Ok(document.encode(env))
 }
@@ -261,16 +290,24 @@ fn document_to_html_with_options<'a>(
     env: Env<'a>,
     ex_document: Term<'a>,
     options: ExOptions,
+    bridge: Term<'a>,
 ) -> NifResult<Term<'a>> {
     let arena = Arena::new();
     let comrak_ast = document_term_to_comrak_ast(&arena, ex_document)?;
+    // Held for the whole render: the adapter reaches Lumis through it.
+    #[cfg(feature = "lumis")]
+    let _bridge = lumis_bridge::BridgeScope::new(env, bridge);
+    #[cfg(not(feature = "lumis"))]
+    let _ = bridge;
     let (comrak_options, lumis_adapter, sanitize) = render_parts(options)?;
     let escape_curly_braces_in_code = comrak_options.extension.phoenix_heex;
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
 
-    format_html_with_plugins(comrak_ast, &comrak_options, &mut buffer, &plugins)
-        .expect("writing to String is infallible");
+    finish_render(
+        format_html_with_plugins(comrak_ast, &comrak_options, &mut buffer, &plugins),
+        &lumis_adapter,
+    )?;
     Ok(do_safe_html(buffer, &sanitize, false, escape_curly_braces_in_code).encode(env))
 }
 
@@ -291,15 +328,23 @@ fn document_to_xml_with_options<'a>(
     env: Env<'a>,
     ex_document: Term<'a>,
     options: ExOptions,
+    bridge: Term<'a>,
 ) -> NifResult<Term<'a>> {
     let arena = Arena::new();
     let comrak_ast = document_term_to_comrak_ast(&arena, ex_document)?;
+    // Held for the whole render: the adapter reaches Lumis through it.
+    #[cfg(feature = "lumis")]
+    let _bridge = lumis_bridge::BridgeScope::new(env, bridge);
+    #[cfg(not(feature = "lumis"))]
+    let _ = bridge;
     let (comrak_options, lumis_adapter, _sanitize) = render_parts(options)?;
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
 
-    comrak::format_xml_with_plugins(comrak_ast, &comrak_options, &mut buffer, &plugins)
-        .expect("writing to String is infallible");
+    finish_render(
+        comrak::format_xml_with_plugins(comrak_ast, &comrak_options, &mut buffer, &plugins),
+        &lumis_adapter,
+    )?;
     let xml = buffer;
     Ok(xml.encode(env))
 }
@@ -340,10 +385,7 @@ fn render_parts(
 )> {
     let comrak_options = options.comrak_options();
     let syntax_highlighter = match options.syntax_highlight {
-        Some(syntax_highlight) => Some(syntax_highlighter(
-            syntax_highlight,
-            comrak_options.render.r#unsafe,
-        )?),
+        Some(syntax_highlight) => Some(syntax_highlighter(syntax_highlight)?),
         None => None,
     };
 
@@ -352,18 +394,18 @@ fn render_parts(
 
 fn syntax_highlighter(
     syntax_highlight: ExSyntaxHighlightOptions,
-    render_unsafe: bool,
 ) -> NifResult<CodeFenceSyntaxHighlighter> {
-    #[cfg(not(feature = "lumis"))]
-    let _ = render_unsafe;
-
     match syntax_highlight.opts {
         ExSyntaxHighlightEngineOptions::Lumis(opts) => {
             #[cfg(feature = "lumis")]
             {
-                Ok(CodeFenceSyntaxHighlighter::Lumis(LumisAdapter::new(
-                    opts.formatter,
-                    render_unsafe,
+                // The bridge is published for this call by `render_parts`.
+                if !lumis_bridge::available() {
+                    return Err(rustler::Error::Atom("lumis_bridge_missing"));
+                }
+
+                Ok(CodeFenceSyntaxHighlighter::Lumis(Box::new(
+                    LumisAdapter::new(opts.formatter, opts.rainbow_brackets),
                 )))
             }
 
@@ -397,9 +439,40 @@ fn syntax_highlighter(
     }
 }
 
+/// Writing into a `String` cannot fail, so a render only ends in `Err` when the
+/// syntax-highlighter adapter refused a code fence. Comrak's adapter trait can
+/// only report that as a bare `fmt::Error`, so the reason is collected from the
+/// adapter here rather than thrown away.
+fn finish_render(
+    render: std::fmt::Result,
+    syntax_highlighter: &Option<CodeFenceSyntaxHighlighter>,
+) -> NifResult<()> {
+    render.map_err(|_| {
+        let reason = syntax_highlighter
+            .as_ref()
+            .and_then(CodeFenceSyntaxHighlighter::take_failure)
+            .unwrap_or_else(|| "a syntax highlighter refused a code block".to_string());
+
+        rustler::Error::Term(Box::new((atoms::lumis_error(), reason)))
+    })
+}
+
+impl CodeFenceSyntaxHighlighter {
+    fn take_failure(&self) -> Option<String> {
+        match self {
+            #[cfg(feature = "lumis")]
+            Self::Lumis(adapter) => adapter.take_failure(),
+            #[cfg(feature = "syntect")]
+            Self::Syntect(_) => None,
+            #[cfg(not(any(feature = "lumis", feature = "syntect")))]
+            _ => None,
+        }
+    }
+}
+
 enum CodeFenceSyntaxHighlighter {
     #[cfg(feature = "lumis")]
-    Lumis(LumisAdapter),
+    Lumis(Box<LumisAdapter>),
     #[cfg(feature = "syntect")]
     Syntect(SyntectAdapter),
 }

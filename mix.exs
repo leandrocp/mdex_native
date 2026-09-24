@@ -26,7 +26,8 @@ defmodule MDExNative.MixProject do
 
   def application do
     [
-      extra_applications: [:logger]
+      extra_applications: [:logger],
+      mod: {MDExNative.Application, []}
     ]
   end
 
@@ -58,6 +59,16 @@ defmodule MDExNative.MixProject do
   defp deps do
     [
       {:rustler, "~> 0.32", optional: not @force_build?},
+      # Optional so `syntax_highlighter: nil` and `:syntect` builds do not
+      # download a highlighter they never call. Declared here rather than by a
+      # caller so that, when it is present, Mix compiles it before this and the
+      # `Code.ensure_loaded?(Lumis)` branches below resolve to the real calls.
+      # Temporary exact ref until the bridge releases; `~> 0.9` at merge.
+      {:lumis,
+       github: "leandrocp/lumis",
+       ref: "b20739c98e005f74370856eabc4a2c4dab8ce62e",
+       sparse: "packages/elixir/lumis",
+       optional: true},
       {:rustler_precompiled, "~> 0.8"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
