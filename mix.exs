@@ -64,9 +64,11 @@ defmodule MDExNative.MixProject do
       # two compilations: without it Mix may build this first, and the
       # `Code.ensure_loaded?(Lumis)` branches below then bake in "not enabled"
       # for an application that does have Lumis.
+      # TEMPORARY: `lumis` 0.9 is not on Hex yet. Swap back to
+      # `{:lumis, "~> 0.9", optional: true}` once leandrocp/lumis#1361 releases it.
       {:lumis,
        github: "leandrocp/lumis",
-       branch: "refactor/share-wasm-runtime",
+       branch: "release/hex-lumis",
        sparse: "packages/elixir/lumis",
        optional: true},
       {:rustler_precompiled, "~> 0.8"},

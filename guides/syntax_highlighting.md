@@ -14,11 +14,15 @@ is added on the `<pre>` class.
 
 ## Lumis
 
-Add Lumis to your deps, which supplies the parsers:
+Add Lumis to your deps, along with a parser for every language you highlight:
 
 ```elixir
-{:lumis, "~> 0.8"}
+{:lumis, "~> 0.9"},
+{:lumis_wasm_rust, "~> 0.26"},
+{:lumis_wasm_elixir, "~> 0.26"}
 ```
+
+The full list is at [docs.lumis.sh/languages](https://docs.lumis.sh/languages).
 
 Configure MDExNative before compiling dependencies:
 
@@ -49,25 +53,29 @@ html = MDExNative.Comrak.markdown_to_html(markdown,
 
 Lumis formatters and options are documented in [`Lumis`](https://lumis.hexdocs.pm/Lumis.html#t:formatter/0).
 
-### Parsers load on demand
+### Parsers are dependencies
 
-A parser is a WebAssembly module fetched and compiled the first time a language
-is rendered, not a grammar compiled into this library. MDExNative and the
-`:lumis` application share one store, so whichever one fetches a parser first,
-both use it.
+A parser is a WebAssembly module shipped as a `lumis_wasm_*` package, not a
+grammar compiled into this library. Depending on one is how a project declares
+it may render that language; nothing is downloaded at runtime.
 
-That first render pays a download and a Wasmtime compile. Warm the languages a
+MDExNative reads the same installed parsers and the same compiled-module cache
+as the `:lumis` application, so a parser is installed and compiled once for the
+whole VM rather than once per NIF.
+
+A fence naming a language the project does not depend on renders as plain text.
+It costs that one fence, not the document.
+
+The first render of a language pays a Wasmtime compile. Warm the ones a
 deployment renders:
 
 ```elixir
 MDExNative.load_language("elixir")
 ```
 
-`Lumis.Languages.load/1` warms the same store, so either call serves both.
-
-Rendering raises when a parser cannot be obtained, and the whole document fails
-with the reason Lumis gave. An unknown language name is not that case: it
-renders as plain text, as it always has.
+`Lumis.Languages.load/1` warms Lumis's own runtime. The two keep separate
+runtimes and share the on-disk compile cache, so warming both is worthwhile and
+the second call is the cheaper one.
 
 ## Syntect
 

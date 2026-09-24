@@ -18,10 +18,19 @@ defmodule MDExNativeE2E.MixProject do
   defp deps do
     [
       {:mdex_native, path: "../../.."},
+      # TEMPORARY: `lumis` 0.9 is not on Hex yet. Swap back to `{:lumis, "~> 0.9"}`
+      # once leandrocp/lumis#1361 releases it.
       {:lumis,
-       github: "leandrocp/lumis",
-       branch: "refactor/share-wasm-runtime",
-       sparse: "packages/elixir/lumis"}
+       github: "leandrocp/lumis", branch: "release/hex-lumis", sparse: "packages/elixir/lumis"},
+      # A parser is an ordinary dependency now: a language the project does not
+      # depend on is not fetched, it renders plain. These are the ones the
+      # fixture's fences name, plus the two html injects.
+      {:lumis_wasm_rust, "~> 0.26"},
+      {:lumis_wasm_elixir, "~> 0.26"},
+      {:lumis_wasm_html, "~> 0.26"},
+      {:lumis_wasm_json, "~> 0.26"},
+      {:lumis_wasm_css, "~> 0.26"},
+      {:lumis_wasm_javascript, "~> 0.26"}
     ]
   end
 end

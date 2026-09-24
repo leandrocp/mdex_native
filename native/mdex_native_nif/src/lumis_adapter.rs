@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::fmt::{self, Write};
 use std::sync::Mutex;
 
+use crate::types::elixir_types::ExFormatterOption;
 use comrak::adapters::SyntaxHighlighterAdapter;
-use lumis_core::elixir::ExFormatterOption;
 
 use crate::lumis_render::render_code_fence;
 

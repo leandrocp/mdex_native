@@ -43,7 +43,10 @@ defmodule MDExNativeE2E.LumisRegressionTest do
       opts = [formatter: formatter] |> Lumis.validate_options!() |> Lumis.rust_options!()
 
       for {language, source} <- @parity_samples do
-        direct = Lumis.highlight!(source, language: language, formatter: formatter)
+        {name, formatter_opts} = formatter
+
+        direct =
+          Lumis.highlight!(source, formatter: {name, [language: language] ++ formatter_opts})
 
         rendered =
           "```#{language}\n#{source}\n```"
@@ -54,9 +57,20 @@ defmodule MDExNativeE2E.LumisRegressionTest do
       end
     end
 
-    test "warming a parser reports it ready and shares the lumis store" do
-      assert is_binary(Lumis.data_dir())
+    test "warming a parser reports it ready and reads the lumis dependencies" do
+      # The same `lumis_wasm_*` dependencies Lumis itself resolves, so a parser
+      # is installed once for the VM rather than once per NIF.
+      assert Lumis.Packages.installed_dirs() != []
       assert MDExNative.load_language("elixir") == true
+    end
+
+    test "a language the project does not depend on renders plain" do
+      # Not fetched, and not an error either: one undeclared fence costs itself,
+      # not the document.
+      html = MDExNative.Comrak.markdown_to_html("```zig\nconst x = 1;\n```")
+
+      assert html =~ "const x = 1;"
+      refute html =~ "<span style=\"color: #"
     end
 
     test "an invalid Lumis option reports what Lumis said" do

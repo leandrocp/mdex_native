@@ -3,14 +3,17 @@ defmodule MDExNative do
   @moduledoc File.read!("README.md")
 
   @doc """
-  Downloads and compiles a Lumis parser before it is first needed.
+  Compiles a Lumis parser before it is first needed.
 
-  Parsers are WebAssembly modules fetched on demand, and a cold one costs a
-  download and a Wasmtime compile. Warming the languages a deployment renders
-  moves both off the first request. Returns whether the parser is ready.
+  Parsers are WebAssembly modules that arrive as `lumis_wasm_*` dependencies,
+  and a cold one costs a Wasmtime compile. Warming the languages a deployment
+  renders moves that off the first request. Returns whether the parser is ready
+  — `false` for a language the project does not depend on, and for a NIF built
+  without Lumis.
 
-  Shares its store with the `:lumis` application, so a parser either side warms
-  serves both. Answers `false` when this NIF was built without Lumis.
+  Shares its compiled-module cache with the `:lumis` application, so a language
+  `Lumis.Languages.load/1` warmed compiles faster here too. The two keep
+  separate runtimes, so each still registers the parser once.
 
   ## Examples
 

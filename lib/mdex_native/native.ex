@@ -122,7 +122,7 @@ defmodule MDExNative.Native do
   def safe_html(_unsafe_html, _sanitize, _escape_content, _escape_curly_braces_in_code),
     do: :erlang.nif_error(:nif_not_loaded)
 
-  def configure_lumis_store(_data_dir), do: :erlang.nif_error(:nif_not_loaded)
+  def configure_lumis_store(_data_dir, _installed_dirs), do: :erlang.nif_error(:nif_not_loaded)
   def load_lumis_language(_name), do: :erlang.nif_error(:nif_not_loaded)
 
   def text_to_anchor(_text), do: :erlang.nif_error(:nif_not_loaded)

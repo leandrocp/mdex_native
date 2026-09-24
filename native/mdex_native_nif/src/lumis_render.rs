@@ -11,9 +11,9 @@ use lumis_core::events::HighlightEvent;
 use lumis_core::languages::Language;
 use lumis_wasm_runtime::RuntimeError;
 
-use lumis_core::elixir::{
-    ExAppearance, ExFormatterOption, ExHtmlInlineHighlightLines, ExHtmlInlineHighlightLinesStyle,
-    ExHtmlLinkedHighlightLines, ExLineSpec, ThemeOrString,
+use crate::types::elixir_types::{
+    ExAppearance, ExAttrValue, ExFormatterOption, ExHtmlInlineHighlightLines,
+    ExHtmlInlineHighlightLinesStyle, ExHtmlLinkedHighlightLines, ExLineSpec, ThemeOrString,
 };
 
 pub fn render_code_fence(
@@ -32,18 +32,32 @@ pub fn render_code_fence(
     let formatter = with_mdex_attributes(formatter.unwrap_or_default(), attributes);
     let formatter = formatter.into_formatter(language)?;
 
-    let events = if language == Language::PlainText {
+    let plain = || {
         vec![HighlightEvent::Source {
             start: 0,
             end: source.len(),
         }]
+    };
+
+    let events = if language == Language::PlainText {
+        plain()
     } else {
         let executor = crate::lumis_runtime::executor().map_err(|reason| format!("{reason:#}"))?;
         match executor.highlight(source, language.id_name(), rainbow_brackets) {
             Ok(events) => flatten_events(source, events),
-            Err(RuntimeError::LanguageNotLoaded(language)) => {
-                return Err(format!("language {language} is not loaded"));
-            }
+            // A parser this project never installed, or one the runtime cannot
+            // reach. That costs the fence it names, not the document around it:
+            // a thousand-line post still renders when one block asks for a
+            // language nothing depends on.
+            Err(
+                RuntimeError::Store { .. }
+                | RuntimeError::LanguageNotLoaded(_)
+                | RuntimeError::LanguageNotCached(_)
+                | RuntimeError::UnknownLanguage(_)
+                | RuntimeError::LanguageStoreUnavailable,
+            ) => plain(),
+            // Anything else is a parser or a runtime at fault rather than an
+            // absent dependency, and is worth surfacing.
             Err(runtime_error) => return Err(runtime_error.to_string()),
         }
     };
@@ -75,25 +89,39 @@ fn with_mdex_attributes(
         F::HtmlInline {
             theme,
             pre_class,
+            pre_attrs,
+            code_attrs,
             italic,
             include_highlights,
             highlight_lines,
+            line_numbers,
             header: _,
         } => html_inline_with_attributes(
-            theme,
-            pre_class,
-            italic,
-            include_highlights,
-            highlight_lines,
+            InlineFormatter {
+                theme,
+                pre_class,
+                pre_attrs,
+                code_attrs,
+                italic,
+                include_highlights,
+                highlight_lines,
+                line_numbers,
+            },
             attributes,
         ),
         F::HtmlLinked {
             pre_class,
+            pre_attrs,
+            code_attrs,
             highlight_lines,
+            line_numbers,
             header: _,
         } => F::HtmlLinked {
             pre_class: mdex_attribute(attributes, "pre_class").or(pre_class),
+            pre_attrs,
+            code_attrs,
             highlight_lines: linked_highlight_lines(attributes).or(highlight_lines),
+            line_numbers,
             header: None,
         },
         F::HtmlMultiThemes {
@@ -101,62 +129,93 @@ fn with_mdex_attributes(
             default_theme,
             css_variable_prefix,
             pre_class,
+            pre_attrs,
+            code_attrs,
             italic,
             include_highlights,
             highlight_lines,
+            line_numbers,
             header: _,
         } => F::HtmlMultiThemes {
             themes,
             default_theme,
             css_variable_prefix,
             pre_class: mdex_attribute(attributes, "pre_class").or(pre_class),
+            pre_attrs,
+            code_attrs,
             italic,
             include_highlights: include_highlights || attributes.contains_key("include_highlights"),
             highlight_lines: multi_theme_highlight_lines(highlight_lines, attributes),
+            line_numbers,
             header: None,
         },
         // A terminal formatter cannot render into a code fence; MDEx has always
         // treated it as the inline HTML one.
-        F::Terminal { theme, .. } => {
-            html_inline_with_attributes(theme, None, false, false, None, attributes)
-        }
+        F::Terminal {
+            theme,
+            line_numbers,
+            ..
+        } => html_inline_with_attributes(
+            InlineFormatter {
+                theme,
+                line_numbers,
+                ..InlineFormatter::default()
+            },
+            attributes,
+        ),
         // BBCode carries its own highlight-line shape, which the inline HTML
         // formatter cannot take. A fence's `highlight_lines` attribute is read
         // back from the decorator instead.
         F::BbcodeScoped { .. } => F::HtmlInline {
             theme: None,
             pre_class: mdex_attribute(attributes, "pre_class"),
+            pre_attrs: Vec::new(),
+            code_attrs: Vec::new(),
             italic: false,
             include_highlights: attributes.contains_key("include_highlights"),
             highlight_lines: inline_highlight_lines(attributes, None),
+            line_numbers: false,
             header: None,
         },
     }
 }
 
-/// `header` is always dropped: Comrak owns the closing tags, so an outer header
-/// could never be closed by its syntax-highlighter adapter contract.
-#[allow(clippy::too_many_arguments)]
-fn html_inline_with_attributes(
+/// The inline HTML formatter's settings, as they stand before MDEx's
+/// info-string decorators are applied over them.
+#[derive(Default)]
+struct InlineFormatter {
     theme: Option<ThemeOrString>,
     pre_class: Option<String>,
+    pre_attrs: Vec<(String, ExAttrValue)>,
+    code_attrs: Vec<(String, ExAttrValue)>,
     italic: bool,
     include_highlights: bool,
     highlight_lines: Option<ExHtmlInlineHighlightLines>,
+    line_numbers: bool,
+}
+
+/// `header` is always dropped: Comrak owns the closing tags, so an outer header
+/// could never be closed by its syntax-highlighter adapter contract.
+fn html_inline_with_attributes(
+    formatter: InlineFormatter,
     attributes: &HashMap<String, String>,
 ) -> ExFormatterOption {
     let theme = attributes
         .get("theme")
         .map(|name| ThemeOrString::String(name.clone()))
-        .or(theme)
+        .or(formatter.theme)
         .or_else(|| Some(ThemeOrString::String("onedark".to_string())));
 
     ExFormatterOption::HtmlInline {
-        pre_class: mdex_attribute(attributes, "pre_class").or(pre_class),
-        italic,
-        include_highlights: include_highlights || attributes.contains_key("include_highlights"),
+        pre_class: mdex_attribute(attributes, "pre_class").or(formatter.pre_class),
+        pre_attrs: formatter.pre_attrs,
+        code_attrs: formatter.code_attrs,
+        italic: formatter.italic,
+        include_highlights: formatter.include_highlights
+            || attributes.contains_key("include_highlights"),
         highlight_lines: inline_highlight_lines(attributes, Some(line_background(&theme)))
-            .or(highlight_lines),
+            .or(formatter.highlight_lines),
+        line_numbers: formatter.line_numbers,
         theme,
         header: None,
     }
@@ -491,7 +550,10 @@ mod tests {
     fn a_linked_formatter_defaults_the_highlighted_line_class() {
         let formatter = ExFormatterOption::HtmlLinked {
             pre_class: None,
+            pre_attrs: Vec::new(),
+            code_attrs: Vec::new(),
             highlight_lines: None,
+            line_numbers: false,
             header: None,
         };
         let html = render(

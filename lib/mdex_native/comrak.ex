@@ -389,9 +389,11 @@ defmodule MDExNative.Comrak do
 
         config :mdex_native, syntax_highlighter: :lumis
 
-    And add Lumis to your deps, which supplies the parsers:
+    And add Lumis to your deps, along with a parser for every language you
+    highlight:
 
-        {:lumis, "~> 0.8"}
+        {:lumis, "~> 0.9"},
+        {:lumis_wasm_elixir, "~> 0.26"}
 
     """
   end

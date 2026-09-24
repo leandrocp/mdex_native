@@ -22,11 +22,10 @@ comrak = { version = "0.55", default-features = false, features = [
   "shortcodes",
   "phoenix_heex",
 ] }
-# Until lumis-core 2.5 and lumis-wasm-runtime 0.2.1 are published, both are
-# taken from the branch that adds the `rustler` feature and `Executor`.
-# Swap back to version requirements before merging.
-lumis-core = { git = "https://github.com/leandrocp/lumis", branch = "refactor/share-wasm-runtime", default-features = false, features = ["all-languages", "rustler"], optional = true }
-lumis-wasm-runtime = { git = "https://github.com/leandrocp/lumis", branch = "refactor/share-wasm-runtime", optional = true }
+# The same two crates `lumis_nif` links, so the `:lumis` application and this
+# NIF share one WASM runtime and one parser store.
+lumis-core = { version = "3.0.0", default-features = false, features = ["all-languages"], optional = true }
+lumis-wasm-runtime = { version = "0.3.0", optional = true }
 lol_html = "3.0"
 parking_lot = "0.12"
 phf = { version = "0.14", features = ["macros"] }

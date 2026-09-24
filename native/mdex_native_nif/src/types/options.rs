@@ -1,8 +1,8 @@
 mod sanitize;
 
-use comrak::options::{AlertStyleType, Extension, ListStyleType, Options, Parse, Render};
 #[cfg(feature = "lumis")]
-use lumis_core::elixir::ExFormatterOption;
+use crate::types::elixir_types::ExFormatterOption;
+use comrak::options::{AlertStyleType, Extension, ListStyleType, Options, Parse, Render};
 use rustler::types::atom::{self, Atom};
 use rustler::{Decoder, NifResult, NifUnitEnum, Term};
 pub use sanitize::*;
