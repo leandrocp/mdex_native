@@ -1,6 +1,12 @@
-Mix.install([
-  {:mdex_native, path: Path.expand("..", __DIR__)}
-])
+Mix.install(
+  [
+    {:mdex_native, path: Path.expand("..", __DIR__)},
+    {:lumis, "~> 0.9"},
+    {:lumis_wasm_markdown, "~> 0.26"},
+    {:lumis_wasm_rust, "~> 0.26"}
+  ],
+  config: [mdex_native: [syntax_highlighter: :lumis]]
+)
 
 markdown = """
 # Lumis
@@ -13,25 +19,6 @@ impl<T> Option<T> {
         match self {
             None => false,
             Some(x) => f(x),
-        }
-    }
-
-    #[inline]
-    pub const fn as_ref(&self) -> Option<&T> {
-        match *self {
-            Some(ref x) => Some(x),
-            None => None,
-        }
-    }
-
-    #[inline]
-    pub const fn map<U, F>(self, f: F) -> Option<U>
-    where
-        F: FnOnce(T) -> U,
-    {
-        match self {
-            Some(x) => Some(f(x)),
-            None => None,
         }
     }
 }
@@ -47,6 +34,5 @@ options = [
   ]
 ]
 
-markdown
-|> MDExNative.Comrak.markdown_to_html(options)
-|> IO.puts()
+output = MDExNative.Comrak.markdown_to_html(markdown, options)
+IO.puts(output)
