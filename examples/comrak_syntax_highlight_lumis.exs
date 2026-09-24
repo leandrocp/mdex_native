@@ -35,5 +35,4 @@ options = [
 ]
 
 output = MDExNative.Comrak.markdown_to_html(markdown, options)
-File.write!("demo.html", output)
 IO.puts(output)

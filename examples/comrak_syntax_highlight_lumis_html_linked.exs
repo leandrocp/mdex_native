@@ -57,5 +57,4 @@ html = """
 </html>
 """
 
-File.write!("demo2.html", html)
 IO.puts(html)
