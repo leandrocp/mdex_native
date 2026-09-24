@@ -17,10 +17,6 @@
 - Clarify precompiled artifact compatibility by @leandrocp in [#67](https://github.com/leandrocp/mdex_native/pull/67)
 - Lumis 0.9 by @leandrocp in [#75](https://github.com/leandrocp/mdex_native/pull/75)
 
-### Other Changes
-
-- Remove risky runtime optimizations by @leandrocp in [#72](https://github.com/leandrocp/mdex_native/pull/72)
-
 ## [0.2.8](https://github.com/leandrocp/mdex_native/compare/v0.2.7...v0.2.8) (2026-08-13)
 
 ### Features
