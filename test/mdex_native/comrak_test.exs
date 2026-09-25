@@ -124,6 +124,47 @@ defmodule MDExNative.ComrakTest do
            } = document
   end
 
+  test "renders node attributes on links and images when unsafe" do
+    markdown =
+      "[link](https://example.com){#docs .external rel=nofollow} `code`{.lang} ![i](i.png){width=1}"
+
+    extension = [inline_code_attributes: true, link_attributes: true]
+
+    assert MDExNative.Comrak.markdown_to_html(markdown,
+             extension: extension,
+             render: [unsafe: true]
+           ) ==
+             ~s(<p><a href="https://example.com" id="docs" class="external" rel="nofollow">link</a> ) <>
+               ~s(<code>code</code> ) <>
+               ~s(<img src="i.png" alt="i" width="1" /></p>\n)
+
+    assert MDExNative.Comrak.markdown_to_html(markdown, extension: extension) ==
+             ~s(<p><a href="https://example.com">link</a> <code>code</code> <img src="i.png" alt="i" /></p>\n)
+  end
+
+  test "renders node attributes set on a document, skipping unsafe keys" do
+    document = %Document{
+      nodes: [
+        %Paragraph{
+          nodes: [
+            %Link{
+              url: "https://example.com",
+              title: "",
+              nodes: [%Text{literal: "link"}],
+              attrs: %Attributes{pairs: [{"target", "_blank"}, {~s(bad" onclick="x), "y"}]}
+            }
+          ]
+        }
+      ]
+    }
+
+    assert MDExNative.Comrak.document_to_html(document, render: [unsafe: true]) ==
+             ~s(<p><a href="https://example.com" target="_blank">link</a></p>\n)
+
+    assert MDExNative.Comrak.document_to_html(document) ==
+             ~s(<p><a href="https://example.com">link</a></p>\n)
+  end
+
   test "renders alerts with semantic HTML" do
     markdown = "> [!note]\n> Something of note"
 
