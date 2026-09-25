@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate rustler;
 
+mod html_formatter;
 #[cfg(feature = "lumis")]
 mod lumis_adapter;
 #[cfg(feature = "lumis")]
@@ -10,12 +11,12 @@ mod lumis_runtime;
 mod types;
 
 use comrak::adapters::SyntaxHighlighterAdapter;
-use comrak::format_html_with_plugins;
 use comrak::nodes::AstNode;
 use comrak::options::Plugins;
 #[cfg(feature = "syntect")]
 use comrak::plugins::syntect::{SyntectAdapter, SyntectAdapterBuilder};
 use comrak::{Anchorizer, Arena, Options};
+use html_formatter::MdexFormatter;
 use lol_html::html_content::ContentType;
 use lol_html::{rewrite_str, text, RewriteStrSettings};
 #[cfg(feature = "lumis")]
@@ -198,7 +199,7 @@ fn markdown_to_html_with_options<'a>(
     let plugins = plugins(&lumis_adapter);
 
     finish_render(
-        format_html_with_plugins(root, &comrak_options, &mut buffer, &plugins),
+        MdexFormatter::format_document_with_plugins(root, &comrak_options, &mut buffer, &plugins),
         &lumis_adapter,
     )?;
     Ok(do_safe_html(buffer, &sanitize, false, escape_curly_braces_in_code).encode(env))
@@ -262,8 +263,13 @@ fn document_to_html<'a>(env: Env<'a>, ex_document: Term<'a>) -> NifResult<Term<'
     let comrak_ast = document_term_to_comrak_ast(&arena, ex_document)?;
     let mut buffer = String::new();
     let options = Options::default();
-    format_html_with_plugins(comrak_ast, &options, &mut buffer, &Plugins::default())
-        .expect("writing to String is infallible");
+    MdexFormatter::format_document_with_plugins(
+        comrak_ast,
+        &options,
+        &mut buffer,
+        &Plugins::default(),
+    )
+    .expect("writing to String is infallible");
     Ok(buffer.encode(env))
 }
 
@@ -281,7 +287,12 @@ fn document_to_html_with_options<'a>(
     let plugins = plugins(&lumis_adapter);
 
     finish_render(
-        format_html_with_plugins(comrak_ast, &comrak_options, &mut buffer, &plugins),
+        MdexFormatter::format_document_with_plugins(
+            comrak_ast,
+            &comrak_options,
+            &mut buffer,
+            &plugins,
+        ),
         &lumis_adapter,
     )?;
     Ok(do_safe_html(buffer, &sanitize, false, escape_curly_braces_in_code).encode(env))
@@ -639,8 +650,13 @@ mod tests {
     fn render_html<'a>(root: &'a AstNode<'a>, options: &Options) -> String {
         let mut output = String::new();
 
-        format_html_with_plugins(root, options, &mut output, &Plugins::default())
-            .expect("writing to String is infallible");
+        MdexFormatter::format_document_with_plugins(
+            root,
+            options,
+            &mut output,
+            &Plugins::default(),
+        )
+        .expect("writing to String is infallible");
 
         output
     }
