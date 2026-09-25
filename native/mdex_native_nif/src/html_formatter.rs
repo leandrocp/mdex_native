@@ -14,6 +14,22 @@
 //! those: nothing is written unless `render.unsafe` is set. Values are escaped
 //! and keys that are not valid HTML attribute names are skipped even then,
 //! since comrak never emits structurally broken markup.
+//!
+//! # Where the mirrored code comes from
+//!
+//! `render_link` and `render_image` below are comrak's own, with a call to
+//! `write_attrs` added before the opening tag is closed. comrak keeps them
+//! private, so they cannot be called or wrapped. Upstream at comrak 0.55.0,
+//! which is the version `Cargo.toml` pins:
+//!
+//! - [`render_link`](https://github.com/kivikakk/comrak/blob/6fbe87fafde3953a9f3bc582804318593d703805/src/html.rs#L818-L852)
+//! - [`render_image`](https://github.com/kivikakk/comrak/blob/6fbe87fafde3953a9f3bc582804318593d703805/src/html.rs#L743-L783)
+//!
+//! Both are byte-for-byte identical on `kivikakk/comrak@main` as of
+//! 2026-09-25. When comrak is upgraded, re-read those two functions and mirror
+//! any change here. `mirrors_comrak_for_empty_attrs` is what catches drift: it
+//! renders links and images carrying empty attributes, so this code runs and
+//! adds nothing, and compares the result against `comrak::format_html`.
 
 use comrak::create_formatter;
 use comrak::html::{self, ChildRendering, Context};
@@ -40,11 +56,14 @@ fn writes_attrs<T>(context: &Context<T>, node: Node<'_>) -> bool {
     context.options.render.r#unsafe && node.data().attrs.is_some()
 }
 
-/// Mirrors comrak's `render_link`, adding attributes to the opening tag.
+/// Mirrors [comrak's `render_link`][upstream], adding attributes to the opening
+/// tag.
 ///
 /// Nodes without attributes go to `format_node_default`, the same function the
 /// generated formatter falls back to for every node type not handled here, so
 /// comrak keeps ownership of link rendering unless there is something to add.
+///
+/// [upstream]: https://github.com/kivikakk/comrak/blob/6fbe87fafde3953a9f3bc582804318593d703805/src/html.rs#L818-L852
 fn render_link<T>(
     context: &mut Context<T>,
     node: Node<'_>,
@@ -88,11 +107,14 @@ fn render_link<T>(
     Ok(ChildRendering::HTML)
 }
 
-/// Mirrors comrak's `render_image`, adding attributes to the `<img>` tag.
+/// Mirrors [comrak's `render_image`][upstream], adding attributes to the `<img>`
+/// tag.
 ///
 /// The children of an image render as its `alt` text, which is why entering
 /// returns `ChildRendering::Plain` and the tag is closed on exit. As with
 /// `render_link`, nodes without attributes are left to comrak.
+///
+/// [upstream]: https://github.com/kivikakk/comrak/blob/6fbe87fafde3953a9f3bc582804318593d703805/src/html.rs#L743-L783
 fn render_image<T>(
     context: &mut Context<T>,
     node: Node<'_>,
@@ -465,6 +487,63 @@ mod tests {
                 render(markdown, &options),
                 comrak_html(markdown, &options),
                 "output diverged from comrak"
+            );
+        }
+    }
+
+    /// Catches drift in the copies of comrak's `render_link` and `render_image`.
+    ///
+    /// Links and images carry empty attributes here, so `writes_attrs` holds and
+    /// the mirrored code runs, but it has nothing to add — meaning any byte it
+    /// writes differently from comrak shows up as a failure. comrak ignores
+    /// `attrs` entirely, so its output is the reference.
+    #[test]
+    fn mirrors_comrak_for_empty_attrs() {
+        let markdown = concat!(
+            "[plain](https://example.com) and [titled](https://example.com \"a title\").\n\n",
+            "![img](image.png) and ![titled img](image.png \"image title\").\n\n",
+            "[empty]() and [dangerous](javascript:alert(1)) and <https://auto.link>.\n\n",
+            "![](\"\") and [nested [link](inner) text](outer).\n",
+        );
+
+        for options in [
+            unsafe_options(),
+            Options {
+                render: Render {
+                    r#unsafe: true,
+                    sourcepos: true,
+                    figure_with_caption: true,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            Options {
+                render: Render {
+                    sourcepos: true,
+                    ignore_empty_links: true,
+                    ..Default::default()
+                },
+                extension: Extension {
+                    autolink: true,
+                    ..Default::default()
+                },
+                parse: comrak::options::Parse {
+                    relaxed_autolinks: true,
+                    ..Default::default()
+                },
+            },
+        ] {
+            let with_empty_attrs = render_with_attrs(
+                markdown,
+                &options,
+                |value| matches!(value, NodeValue::Link(..) | NodeValue::Image(..)),
+                attributes(None, &[], &[]),
+            );
+
+            assert_eq!(
+                with_empty_attrs,
+                comrak_html(markdown, &options),
+                "mirrored render_link/render_image diverged from comrak"
             );
         }
     }
