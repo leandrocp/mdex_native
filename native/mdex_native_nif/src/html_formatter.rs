@@ -3,23 +3,24 @@
 //! comrak parses `{#id .class key=value}` into `Ast::attrs` but leaves rendering
 //! to custom formatters (see comrak PR #814), so its own HTML formatter ignores
 //! the field. This formatter delegates every node to `format_node_default`
-//! except the ones that can carry attributes, where it writes the same markup
-//! comrak would, plus the attributes.
+//! except `Link` and `Image`, where it writes the same markup comrak would,
+//! plus the attributes.
 //!
 //! Attribute pairs are written verbatim rather than `data-` prefixed, so
-//! `{target=_blank}` renders as `target="_blank"`. Values are escaped; keys that
-//! are not valid HTML attribute names are skipped, since a plugin can put
-//! anything in `pairs`.
+//! `{target=_blank}` renders as `target="_blank"`.
+//!
+//! Attributes are document content that can execute, in the same class as raw
+//! HTML and `javascript:` links, so they follow the rule comrak applies to
+//! those: nothing is written unless `render.unsafe` is set. Values are escaped
+//! and keys that are not valid HTML attribute names are skipped even then,
+//! since comrak never emits structurally broken markup.
 
 use comrak::create_formatter;
 use comrak::html::{self, ChildRendering, Context};
-use comrak::nodes::{Node, NodeCode, NodeLink, NodeValue};
+use comrak::nodes::{Node, NodeLink, NodeValue};
 use std::fmt::{self, Write};
 
 create_formatter!(MdexFormatter, {
-    NodeValue::Code(ref nc) => |context, node, entering| {
-        render_code(context, node, entering, nc)?;
-    },
     NodeValue::Image(ref nl) => |context, node, entering| {
         return render_image(context, node, entering, nl);
     },
@@ -116,27 +117,16 @@ fn render_image<T>(
     Ok(ChildRendering::HTML)
 }
 
-/// Mirrors comrak's `render_code`, adding attributes to the `<code>` tag.
-fn render_code<T>(
-    context: &mut Context<T>,
-    node: Node<'_>,
-    entering: bool,
-    nc: &NodeCode,
-) -> fmt::Result {
-    if entering {
-        context.write_str("<code")?;
-        html::render_sourcepos(context, node)?;
-        write_attrs(context, node)?;
-        context.write_str(">")?;
-        context.escape(&nc.literal)?;
-        context.write_str("</code>")?;
+/// Writes `id`, `class` and key/value attributes from the node's `attrs`.
+///
+/// Gated on `render.unsafe`, as comrak gates raw HTML and dangerous links: an
+/// attribute name is arbitrary document content, so `{onclick=alert(1)}` is the
+/// same kind of input as `<script>` in the source.
+fn write_attrs<T>(context: &mut Context<T>, node: Node<'_>) -> fmt::Result {
+    if !context.options.render.r#unsafe {
+        return Ok(());
     }
 
-    Ok(())
-}
-
-/// Writes `id`, `class` and key/value attributes from the node's `attrs`.
-fn write_attrs<T>(context: &mut Context<T>, node: Node<'_>) -> fmt::Result {
     let ast = node.data();
     let Some(attrs) = ast.attrs.as_deref() else {
         return Ok(());
@@ -245,6 +235,8 @@ mod tests {
         buffer
     }
 
+    /// Attribute extensions on, `unsafe` on, which is what it takes for
+    /// attributes to reach the output.
     fn attr_options() -> Options<'static> {
         Options {
             extension: Extension {
@@ -252,6 +244,22 @@ mod tests {
                 fenced_code_attributes: true,
                 inline_code_attributes: true,
                 link_attributes: true,
+                ..Default::default()
+            },
+            render: Render {
+                r#unsafe: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    /// `unsafe` on, no extensions: the plugin case, where attributes are set on
+    /// the AST rather than parsed.
+    fn unsafe_options() -> Options<'static> {
+        Options {
+            render: Render {
+                r#unsafe: true,
                 ..Default::default()
             },
             ..Default::default()
@@ -288,11 +296,42 @@ mod tests {
         );
     }
 
+    /// Only Link and Image are handled, so inline code keeps comrak's output
+    /// even with `inline_code_attributes` and `unsafe` on.
     #[test]
-    fn renders_parsed_inline_code_attributes() {
+    fn leaves_inline_code_to_comrak() {
         assert_eq!(
             render("`:ok`{.language-elixir}\n", &attr_options()),
-            "<p><code class=\"language-elixir\">:ok</code></p>\n"
+            "<p><code>:ok</code></p>\n"
+        );
+    }
+
+    /// Without `render.unsafe` attributes are dropped, the way comrak drops raw
+    /// HTML and `javascript:` hrefs. This is what keeps `{onclick=alert(1)}` out
+    /// of the default output.
+    #[test]
+    fn omits_attributes_unless_unsafe() {
+        let safe_options = Options {
+            extension: attr_options().extension,
+            ..Default::default()
+        };
+
+        assert_eq!(
+            render(
+                "[link](https://example.com){#docs .external rel=nofollow}\n",
+                &safe_options
+            ),
+            "<p><a href=\"https://example.com\">link</a></p>\n"
+        );
+
+        assert_eq!(
+            render_with_attrs(
+                "[link](https://example.com)\n",
+                &Options::default(),
+                |value| matches!(value, NodeValue::Link(..)),
+                attributes(Some("i"), &["c"], &[("onclick", "alert(1)")]),
+            ),
+            "<p><a href=\"https://example.com\">link</a></p>\n"
         );
     }
 
@@ -303,7 +342,7 @@ mod tests {
         assert_eq!(
             render_with_attrs(
                 "[link](https://example.com)\n",
-                &Options::default(),
+                &unsafe_options(),
                 |value| matches!(value, NodeValue::Link(..)),
                 attributes(None, &[], &[("target", "_blank"), ("rel", "noopener")]),
             ),
@@ -316,7 +355,7 @@ mod tests {
         assert_eq!(
             render_with_attrs(
                 "[link](https://example.com)\n",
-                &Options::default(),
+                &unsafe_options(),
                 |value| matches!(value, NodeValue::Link(..)),
                 attributes(
                     Some("a\"b"),
@@ -334,7 +373,7 @@ mod tests {
         assert_eq!(
             render_with_attrs(
                 "[link](https://example.com)\n",
-                &Options::default(),
+                &unsafe_options(),
                 |value| matches!(value, NodeValue::Link(..)),
                 attributes(
                     None,
@@ -356,7 +395,7 @@ mod tests {
         assert_eq!(
             render_with_attrs(
                 "[link](https://example.com \"A title\")\n",
-                &Options::default(),
+                &unsafe_options(),
                 |value| matches!(value, NodeValue::Link(..)),
                 attributes(None, &[], &[("target", "_blank")]),
             ),
