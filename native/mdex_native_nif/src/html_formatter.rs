@@ -29,13 +29,32 @@ create_formatter!(MdexFormatter, {
     },
 });
 
+/// Whether this node has attributes that are going to be written.
+///
+/// Attributes are document content that can execute, in the same class as raw
+/// HTML and `javascript:` links, so they follow the rule comrak applies to
+/// those: nothing is written unless `render.unsafe` is set.
+///
+/// When this is false there is nothing to add, and rendering is comrak's to do.
+fn writes_attrs<T>(context: &Context<T>, node: Node<'_>) -> bool {
+    context.options.render.r#unsafe && node.data().attrs.is_some()
+}
+
 /// Mirrors comrak's `render_link`, adding attributes to the opening tag.
+///
+/// Nodes without attributes go to `format_node_default`, the same function the
+/// generated formatter falls back to for every node type not handled here, so
+/// comrak keeps ownership of link rendering unless there is something to add.
 fn render_link<T>(
     context: &mut Context<T>,
     node: Node<'_>,
     entering: bool,
     nl: &NodeLink,
 ) -> Result<ChildRendering, fmt::Error> {
+    if !writes_attrs(context, node) {
+        return html::format_node_default(context, node, entering);
+    }
+
     let parent_is_link = node
         .parent()
         .is_some_and(|parent| matches!(parent.data().value, NodeValue::Link(..)));
@@ -72,13 +91,18 @@ fn render_link<T>(
 /// Mirrors comrak's `render_image`, adding attributes to the `<img>` tag.
 ///
 /// The children of an image render as its `alt` text, which is why entering
-/// returns `ChildRendering::Plain` and the tag is closed on exit.
+/// returns `ChildRendering::Plain` and the tag is closed on exit. As with
+/// `render_link`, nodes without attributes are left to comrak.
 fn render_image<T>(
     context: &mut Context<T>,
     node: Node<'_>,
     entering: bool,
     nl: &NodeLink,
 ) -> Result<ChildRendering, fmt::Error> {
+    if !writes_attrs(context, node) {
+        return html::format_node_default(context, node, entering);
+    }
+
     if entering {
         if context.options.render.figure_with_caption {
             context.write_str("<figure>")?;
@@ -119,14 +143,11 @@ fn render_image<T>(
 
 /// Writes `id`, `class` and key/value attributes from the node's `attrs`.
 ///
-/// Gated on `render.unsafe`, as comrak gates raw HTML and dangerous links: an
-/// attribute name is arbitrary document content, so `{onclick=alert(1)}` is the
-/// same kind of input as `<script>` in the source.
+/// Only called when `writes_attrs` holds. Name/value pairs are written the way
+/// comrak's `write_opening_tag` writes them — ` name="escaped value"` — which is
+/// not reusable directly because it also emits the tag name and the closing `>`,
+/// and an `href` needs `escape_href` rather than `escape`.
 fn write_attrs<T>(context: &mut Context<T>, node: Node<'_>) -> fmt::Result {
-    if !context.options.render.r#unsafe {
-        return Ok(());
-    }
-
     let ast = node.data();
     let Some(attrs) = ast.attrs.as_deref() else {
         return Ok(());
@@ -315,13 +336,18 @@ mod tests {
             extension: attr_options().extension,
             ..Default::default()
         };
+        let markdown = "[link](https://example.com){#docs .external rel=nofollow}\n";
 
         assert_eq!(
-            render(
-                "[link](https://example.com){#docs .external rel=nofollow}\n",
-                &safe_options
-            ),
+            render(markdown, &safe_options),
             "<p><a href=\"https://example.com\">link</a></p>\n"
+        );
+
+        // With nothing to add the node goes to `format_node_default`, so this is
+        // comrak's own output rather than a copy of it.
+        assert_eq!(
+            render(markdown, &safe_options),
+            comrak_html(markdown, &safe_options)
         );
 
         assert_eq!(
