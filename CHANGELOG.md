@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.10](https://github.com/leandrocp/mdex_native/compare/v0.2.9...v0.2.10) (2026-09-26)
+
+### Features
+
+- Render node attributes in HTML output by @leandrocp in [#76](https://github.com/leandrocp/mdex_native/pull/76)
+
+### Bug Fixes
+
+- Configure the Lumis store on first use, not only at startup by @leandrocp in [#79](https://github.com/leandrocp/mdex_native/pull/79)
+- Cache compiled parsers under the Lumis data directory by @leandrocp in [#80](https://github.com/leandrocp/mdex_native/pull/80)
+
+### Documentation
+
+- Link the upstream comrak source used in formatter by @leandrocp in [#78](https://github.com/leandrocp/mdex_native/pull/78)
+
 ## [0.2.9](https://github.com/leandrocp/mdex_native/compare/v0.2.8...v0.2.9) (2026-09-24)
 
 ### Features
