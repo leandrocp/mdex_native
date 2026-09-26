@@ -76,6 +76,11 @@ defmodule MDExNativeE2E.LumisRegressionTest do
       refute undeclared =~ "<span style=\"color: #"
     end
 
+    test "a fence rendered at compile time is highlighted" do
+      assert MDExNativeE2E.CompileTimeRender.from_keyword() =~ "<span style=\"color: #"
+      assert MDExNativeE2E.CompileTimeRender.from_map() =~ "<span style=\"color: #"
+    end
+
     test "an invalid Lumis option reports what Lumis said" do
       error =
         assert_raise NimbleOptions.ValidationError, fn ->
