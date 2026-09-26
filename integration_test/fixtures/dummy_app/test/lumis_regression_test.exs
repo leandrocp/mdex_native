@@ -92,6 +92,57 @@ defmodule MDExNativeE2E.LumisRegressionTest do
       assert Exception.message(error) =~ "nope"
     end
 
+    # Compiled modules go under the Lumis data directory, where `:lumis` keeps
+    # its own, so a parser is compiled once rather than once per NIF.
+    @tag :tmp_dir
+    test "modules this NIF compiles go under the Lumis data directory", %{tmp_dir: tmp_dir} do
+      compiled = Path.join([tmp_dir, "data", "compiled"])
+
+      output =
+        run_before_start("""
+        Application.put_env(:lumis, :data_dir, #{inspect(Path.join(tmp_dir, "data"))})
+        {:ok, _} = Application.ensure_all_started(:mdex_native)
+        MDExNative.Comrak.markdown_to_html("```elixir\\nIO.puts(:hello)\\n```", syntax_highlight: [engine: :lumis])
+        IO.write("compiled_in_data_dir=" <> inspect(File.dir?(#{inspect(compiled)})))
+        """)
+
+      assert output =~ "compiled_in_data_dir=true"
+    end
+
+    # A render with no fence configures the store without building it, and
+    # `config/runtime.exs` runs after compilation, before :mdex_native starts.
+    # The directory it sets still has to reach the store.
+    @tag :tmp_dir
+    test "config set after a render that built no store applies when :mdex_native starts", %{
+      tmp_dir: tmp_dir
+    } do
+      compiled = Path.join([tmp_dir, "data", "compiled"])
+
+      output =
+        run_before_start("""
+        MDExNative.Comrak.parse_document("# Hello")
+        Application.put_env(:lumis, :data_dir, #{inspect(Path.join(tmp_dir, "data"))})
+        {:ok, _} = Application.ensure_all_started(:mdex_native)
+        MDExNative.Comrak.markdown_to_html("```elixir\\nIO.puts(:hello)\\n```", syntax_highlight: [engine: :lumis])
+        IO.write("compiled_in_data_dir=" <> inspect(File.dir?(#{inspect(compiled)})))
+        """)
+
+      assert output =~ "compiled_in_data_dir=true"
+    end
+
+    # The store and its engine are built once per VM, and this suite's VM built
+    # them already, so each of these needs a VM of its own.
+    defp run_before_start(script) do
+      {output, status} =
+        System.cmd("mix", ["run", "--no-start", "--no-compile", "-e", script],
+          env: [{"MIX_ENV", "test"}],
+          stderr_to_stdout: true
+        )
+
+      assert status == 0, output
+      output
+    end
+
     defp highlight(markdown) do
       MDExNative.Comrak.markdown_to_html(markdown, syntax_highlight: [engine: :lumis])
     end
