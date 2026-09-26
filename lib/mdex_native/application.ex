@@ -33,10 +33,20 @@ defmodule MDExNative.Application do
   # config that selected the artifact is the honest question to ask.
   @lumis? Application.compile_env(:mdex_native, :syntax_highlighter) == :lumis
 
-  defp configure_lumis_store do
-    if @lumis? and lumis_loaded?() do
+  @configured {__MODULE__, :lumis_store_configured}
+
+  @doc false
+  # The NIF reads these once, when its store is built, and refuses to change them
+  # after. A render can build it before this application starts — `mix compile`
+  # rendering a template runs no application at all — so `MDExNative.Comrak`
+  # calls this before every render that highlights, not only `start/2`.
+  def configure_lumis_store do
+    if @lumis? and not :persistent_term.get(@configured, false) and lumis_loaded?() do
       MDExNative.Native.configure_lumis_store(data_dir(), parser_dirs())
+      :persistent_term.put(@configured, true)
     end
+
+    :ok
   end
 
   # `function_exported?/3` answers for a *loaded* module, and at boot `Lumis`

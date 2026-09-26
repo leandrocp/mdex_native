@@ -283,6 +283,8 @@ defmodule MDExNative.Comrak do
   end
 
   defp options!(options) do
+    MDExNative.Application.configure_lumis_store()
+
     Map.new(options, fn
       {key, value} when key in [:extension, :parse, :render] and is_list(value) ->
         {key, Map.new(value)}
