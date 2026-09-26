@@ -15,7 +15,10 @@ defmodule MDExNative.Application do
 
   @impl true
   def start(_type, _args) do
-    configure_lumis_store()
+    # Past the guard in `configure_lumis_store/0`: a render before this may have
+    # configured the store without building it, and `config/runtime.exs` has
+    # run since. The NIF refuses once the store is built.
+    put_lumis_store()
 
     Supervisor.start_link([], strategy: :one_for_one, name: MDExNative.Supervisor)
   end
@@ -41,12 +44,16 @@ defmodule MDExNative.Application do
   # rendering a template runs no application at all — so `MDExNative.Comrak`
   # calls this before every render that highlights, not only `start/2`.
   def configure_lumis_store do
-    if @lumis? and not :persistent_term.get(@configured, false) and lumis_loaded?() do
+    if @lumis? and not :persistent_term.get(@configured, false), do: put_lumis_store()
+
+    :ok
+  end
+
+  defp put_lumis_store do
+    if @lumis? and lumis_loaded?() do
       MDExNative.Native.configure_lumis_store(data_dir(), parser_dirs())
       :persistent_term.put(@configured, true)
     end
-
-    :ok
   end
 
   # `function_exported?/3` answers for a *loaded* module, and at boot `Lumis`

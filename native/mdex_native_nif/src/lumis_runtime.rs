@@ -62,7 +62,11 @@ impl Executor {
             .name("mdex-lumis-init".into())
             .stack_size(8 * 1024 * 1024)
             .spawn(move || -> Result<Runtime, RuntimeError> {
-                let runtime = Runtime::with_worker_limit(workers)?.with_store(language_store());
+                // Before the runtime: the engine is process-global and reads
+                // the compile cache directory once, when it is built, and the
+                // store is what sets that directory.
+                let store = language_store();
+                let runtime = Runtime::with_worker_limit(workers)?.with_store(store);
                 for language in catalog::LANGUAGES {
                     runtime.declare_language(language.id, language.aliases);
                 }
@@ -123,6 +127,9 @@ impl Executor {
 }
 
 /// The store the `:lumis` application persists under, resolved the same way.
+///
+/// Compiled modules go under the same directory, but only when this runs
+/// before the first [`Runtime`] is built; after that the engine keeps its own.
 ///
 /// `installed_dirs` is always `Some`: an Elixir project declares the languages
 /// it may render by depending on them, so the store never reaches past that set
