@@ -1,7 +1,7 @@
 Mix.install(
   [
     {:mdex_native, path: Path.expand("..", __DIR__)},
-    {:lumis, "~> 0.9"},
+    {:lumis, "~> 0.10"},
     {:lumis_wasm_markdown, "~> 0.26"},
     {:lumis_wasm_rust, "~> 0.26"}
   ],

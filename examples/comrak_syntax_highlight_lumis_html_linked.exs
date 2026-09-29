@@ -1,7 +1,7 @@
 Mix.install(
   [
     {:mdex_native, path: Path.expand("..", __DIR__)},
-    {:lumis, "~> 0.9"},
+    {:lumis, "~> 0.10"},
     {:lumis_wasm_markdown, "~> 0.26"},
     {:lumis_wasm_elixir, "~> 0.26"}
   ],
@@ -36,7 +36,7 @@ options = [
 output = MDExNative.Comrak.markdown_to_html(markdown, options)
 
 theme_css =
-  "https://cdn.jsdelivr.net/gh/leandrocp/lumis@hex-lumis/v0.9.0/packages/elixir/lumis/priv/static/css/catppuccin_macchiato.css"
+  "https://cdn.jsdelivr.net/gh/leandrocp/lumis@hex-lumis/v0.10.0/packages/elixir/lumis/priv/static/css/catppuccin_macchiato.css"
 
 html = """
 <!DOCTYPE html>
