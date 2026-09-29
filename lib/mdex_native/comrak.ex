@@ -402,7 +402,7 @@ defmodule MDExNative.Comrak do
     And add Lumis to your deps, along with a parser for every language you
     highlight:
 
-        {:lumis, "~> 0.9"},
+        {:lumis, "~> 0.10"},
         {:lumis_wasm_elixir, "~> 0.26"}
 
     """

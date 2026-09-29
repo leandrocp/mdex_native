@@ -14,7 +14,7 @@ unchanged, and the language name goes on the `<pre>` class.
 Add Lumis to your deps, along with a parser for every language you highlight:
 
 ```elixir
-{:lumis, "~> 0.9"},
+{:lumis, "~> 0.10"},
 {:lumis_wasm_rust, "~> 0.26"},
 {:lumis_wasm_elixir, "~> 0.26"}
 ```
