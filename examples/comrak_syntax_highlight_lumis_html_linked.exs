@@ -36,7 +36,7 @@ options = [
 output = MDExNative.Comrak.markdown_to_html(markdown, options)
 
 theme_css =
-  "https://cdn.jsdelivr.net/gh/leandrocp/lumis@hex-lumis/v0.9.0/packages/elixir/lumis/priv/static/css/catppuccin_macchiato.css"
+  "https://cdn.jsdelivr.net/gh/leandrocp/lumis@hex-lumis/v0.10.0/packages/elixir/lumis/priv/static/css/catppuccin_macchiato.css"
 
 html = """
 <!DOCTYPE html>
