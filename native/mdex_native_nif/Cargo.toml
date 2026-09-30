@@ -22,8 +22,8 @@ comrak = { version = "0.55", default-features = false, features = [
   "shortcodes",
   "phoenix_heex",
 ] }
-# The same two crates `lumis_nif` links, so the `:lumis` application and this
-# NIF share one WASM runtime and one parser store.
+# The same two crates `lumis_nif` links. The two NIFs share parser files and
+# the compile cache on disk, not the runtime; see ARCHITECTURE.md.
 lumis-core = { version = "4.0.0", default-features = false, features = ["all-languages"], optional = true }
 lumis-wasm-runtime = { version = "0.4.0", optional = true }
 lol_html = "3.0"
