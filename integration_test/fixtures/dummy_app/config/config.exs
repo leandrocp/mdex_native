@@ -7,7 +7,7 @@ case System.fetch_env!("MDEX_NATIVE_E2E_CASE") do
   "cloudflare" ->
     config :mdex_native, artifact_source: :cloudflare
 
-  "lumis" ->
+  lumis when lumis in ["lumis", "lumis_standalone"] ->
     config :mdex_native, syntax_highlighter: :lumis
 
   "syntect" ->

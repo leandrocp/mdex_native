@@ -1,8 +1,8 @@
 mod sanitize;
 
-#[cfg(feature = "lumis")]
-use crate::types::elixir_types::ExFormatterOption;
 use comrak::options::{AlertStyleType, Extension, ListStyleType, Options, Parse, Render};
+#[cfg(feature = "lumis")]
+use lumis_core::elixir::ExFormatterOption;
 use rustler::types::atom::{self, Atom};
 use rustler::{Decoder, NifResult, NifUnitEnum, Term};
 pub use sanitize::*;
@@ -117,7 +117,9 @@ where
             if is_atom(value, atom::nil()) {
                 Ok(None)
             } else {
-                value.decode()
+                // Decoding `Option<T>` would turn `T`'s error into a bare
+                // `:badarg`, losing the message that names the bad option.
+                value.decode::<T>().map(Some)
             }
         }
         Err(_) => Ok(None),
@@ -572,19 +574,30 @@ pub enum ExSyntaxHighlightEngineOptions {
     Syntect(ExSyntectOptions),
 }
 
+/// Every option `Lumis.highlight/2` takes is accepted, decoded by the same
+/// code as the `:lumis` NIF, deprecated ones included. A code fence decides its
+/// own language and has nothing to annotate or budget, so `:language`,
+/// `:annotations` and `:budget` are read and left unused.
+///
+/// `context` names where the options sat in the caller's own call, so an error
+/// reads `invalid value for :syntax_highlight option: ...`.
 #[cfg(feature = "lumis")]
-impl<'a> Decoder<'a> for ExLumisOptions {
-    fn decode(term: Term<'a>) -> NifResult<Self> {
+impl ExLumisOptions {
+    fn from_term(term: Term<'_>, context: &str) -> NifResult<Self> {
+        let options = lumis_core::elixir::ExLumisOptions::from_term(term)
+            .map_err(|error| lumis_core::elixir::argument_error(format!("{context}{error}")))?;
+
         Ok(Self {
-            formatter: optional_field(term, atoms::formatter())?.unwrap_or_default(),
-            rainbow_brackets: optional_field(term, atoms::rainbow_brackets())?.unwrap_or(false),
+            formatter: options.formatter,
+            rainbow_brackets: options.rainbow_brackets,
         })
     }
 }
 
 #[cfg(not(feature = "lumis"))]
-impl<'a> Decoder<'a> for ExLumisOptions {
-    fn decode(_term: Term<'a>) -> NifResult<Self> {
+impl ExLumisOptions {
+    #[allow(clippy::unnecessary_wraps)]
+    fn from_term(_term: Term<'_>, _context: &str) -> NifResult<Self> {
         Ok(Self {})
     }
 }
@@ -599,7 +612,13 @@ impl<'a> Decoder<'a> for ExSyntaxHighlightOptions {
         if let Some(engine) = optional_field(term, atoms::engine())? {
             let opts = match engine {
                 ExSyntaxHighlightEngine::Lumis => {
-                    let opts = optional_field(term, atoms::opts())?.unwrap_or_default();
+                    let opts = match term.map_get(atoms::opts()) {
+                        Ok(opts) if !is_atom(opts, atom::nil()) => ExLumisOptions::from_term(
+                            opts,
+                            "invalid value for :syntax_highlight option: invalid value for :opts option: ",
+                        )?,
+                        _ => ExLumisOptions::default(),
+                    };
                     ExSyntaxHighlightEngineOptions::Lumis(Box::new(opts))
                 }
                 ExSyntaxHighlightEngine::Syntect => {
@@ -613,7 +632,10 @@ impl<'a> Decoder<'a> for ExSyntaxHighlightOptions {
 
         // Legacy shape: syntax_highlight: [formatter: ...]
         Ok(Self {
-            opts: ExSyntaxHighlightEngineOptions::Lumis(Box::new(term.decode()?)),
+            opts: ExSyntaxHighlightEngineOptions::Lumis(Box::new(ExLumisOptions::from_term(
+                term,
+                "invalid value for :syntax_highlight option: ",
+            )?)),
         })
     }
 }

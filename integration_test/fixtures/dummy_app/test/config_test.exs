@@ -14,7 +14,7 @@ defmodule MDExNativeE2E.ConfigTest do
           end
 
         assert lumis_error.message ==
-                 "Lumis is not enabled.\n\nComrak tried to syntax highlight a code block with Lumis, but this NIF was not compiled with Lumis support.\n\nEnable it in your config:\n\n    config :mdex_native, syntax_highlighter: :lumis\n\nAnd add Lumis to your deps, along with a parser for every language you\nhighlight:\n\n    {:lumis, \"~> 0.9\"},\n    {:lumis_wasm_elixir, \"~> 0.26\"}\n\n"
+                 "Lumis is not enabled.\n\nComrak tried to syntax highlight a code block with Lumis, but this NIF was not compiled with Lumis support.\n\nEnable it in your config:\n\n    config :mdex_native, syntax_highlighter: :lumis\n\nAnd add a parser package to your deps for every language you highlight:\n\n    {:lumis_wasm_elixir, \"~> 0.26\"}\n\n"
 
         syntect_error =
           assert_raise RuntimeError, fn ->
@@ -24,7 +24,7 @@ defmodule MDExNativeE2E.ConfigTest do
         assert syntect_error.message ==
                  "Syntect is not enabled.\n\nComrak tried to syntax highlight a code block with Syntect, but this NIF was not compiled with Syntect support.\n\nEnable it in your config:\n\n    config :mdex_native, syntax_highlighter: :syntect\n\n"
 
-      "lumis" ->
+      lumis when lumis in ["lumis", "lumis_standalone"] ->
         html = lumis_html(@rust)
 
         assert html =~ "<pre class=\"lumis\" style=\"color: #"
@@ -66,7 +66,7 @@ defmodule MDExNativeE2E.ConfigTest do
           end
 
         assert error.message ==
-                 "Lumis is not enabled.\n\nComrak tried to syntax highlight a code block with Lumis, but this NIF was not compiled with Lumis support.\n\nEnable it in your config:\n\n    config :mdex_native, syntax_highlighter: :lumis\n\nAnd add Lumis to your deps, along with a parser for every language you\nhighlight:\n\n    {:lumis, \"~> 0.9\"},\n    {:lumis_wasm_elixir, \"~> 0.26\"}\n\n"
+                 "Lumis is not enabled.\n\nComrak tried to syntax highlight a code block with Lumis, but this NIF was not compiled with Lumis support.\n\nEnable it in your config:\n\n    config :mdex_native, syntax_highlighter: :lumis\n\nAnd add a parser package to your deps for every language you highlight:\n\n    {:lumis_wasm_elixir, \"~> 0.26\"}\n\n"
     end
   end
 

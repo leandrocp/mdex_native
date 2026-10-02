@@ -292,6 +292,9 @@ defmodule MDExNative.Comrak do
       {:syntax_highlight, value} when is_list(value) ->
         {:syntax_highlight, syntax_highlight_options(value)}
 
+      {:syntax_highlight, value} when is_map(value) ->
+        {:syntax_highlight, legacy_syntax_highlight(value)}
+
       {:sanitize, value} ->
         {:sanitize, MDExNative.Sanitize.normalize(value)}
 
@@ -310,13 +313,13 @@ defmodule MDExNative.Comrak do
         options
         |> Map.new(fn
           {:opts, opts} when is_list(opts) -> {:opts, normalize_opts(engine, opts)}
+          {:opts, %{} = opts} -> {:opts, legacy_opts(opts)}
           option -> syntax_highlight_option(option)
         end)
         |> Map.put(:engine, engine)
 
       # Legacy `syntax_highlight: [formatter: ...]`, which the NIF decodes
-      # without an engine key. It still needs the engine's own conversion, or
-      # it arrives as a shape the decoder rejects.
+      # without an engine key, as the Lumis options themselves.
       Keyword.has_key?(options, :formatter) ->
         normalize_opts(engine, options)
 
@@ -325,37 +328,81 @@ defmodule MDExNative.Comrak do
     end
   end
 
-  # Lumis owns the shape its NIF decodes, and only it knows every formatter's
-  # defaults. Sending it through Lumis's own conversion is what lets a caller
-  # write `{:html_inline, theme: "onedark"}` and omit the rest.
-  #
-  # Nothing is rescued: an invalid Lumis option should surface Lumis's own
-  # message here, not decode to something the NIF quietly ignores.
+  # Lumis options cross as written, `[formatter: {:html_inline, theme: "onedark"}]`.
+  # The NIF decodes them with the decoder the `:lumis` NIF uses, so it accepts
+  # the same options, fills in the same defaults and raises the same
+  # `ArgumentError` for a bad one.
   defp normalize_opts(:lumis, opts) do
-    if Keyword.keyword?(opts) do
-      lumis_opts(opts)
-    else
-      Map.new(opts, &syntax_highlight_option/1)
-    end
+    if Keyword.keyword?(opts),
+      do: opts,
+      else: Map.new(opts, &syntax_highlight_option/1)
   end
 
   defp normalize_opts(_engine, opts), do: Map.new(opts, &syntax_highlight_option/1)
 
-  # Resolved on the call rather than at compile time, so that whether this
-  # project was built before or after `:lumis` cannot decide whether Lumis is
-  # available. Nothing is rescued around the conversion itself: an invalid
-  # option should surface Lumis's own message.
-  defp lumis_opts(opts) do
-    unless lumis_available?(), do: raise(lumis_not_enabled_message())
+  # MDEx 0.14.1 and earlier convert Lumis options with `Lumis.rust_options!/1`
+  # before calling here and send the map it returns, with the formatter in the
+  # wire format `lumis_nif` decoded through Lumis 0.10. So do projects that
+  # copied that, as `syntax_highlight: [engine: :lumis, opts: rust_options]`.
+  # Those versions and projects accept this release of mdex_native, so the
+  # formatter is read back into the shape a caller writes, which is the only
+  # one the NIF decodes now.
+  @doc false
+  def legacy_syntax_highlight(%{opts: %{} = opts} = options),
+    do: %{options | opts: legacy_opts(opts)}
 
-    opts
-    |> Lumis.validate_options!()
-    |> Lumis.rust_options!()
+  def legacy_syntax_highlight(%{formatter: _} = options), do: legacy_opts(options)
+  def legacy_syntax_highlight(options), do: options
+
+  defp legacy_opts(%{formatter: formatter} = opts),
+    do: %{opts | formatter: legacy_formatter(formatter)}
+
+  defp legacy_opts(opts), do: opts
+
+  defp legacy_formatter({name, %{} = opts}) when is_atom(name),
+    do: {name, Enum.map(opts, &legacy_formatter_option/1)}
+
+  defp legacy_formatter(formatter), do: formatter
+
+  defp legacy_formatter_option({key, {:string, value}}) when key in [:theme, :background],
+    do: {key, value}
+
+  defp legacy_formatter_option({:theme, {:theme, theme}}), do: {:theme, theme}
+
+  defp legacy_formatter_option({key, attrs}) when key in [:pre_attrs, :code_attrs],
+    do: {key, Enum.map(attrs, fn {name, value} -> {legacy_key(name), value} end)}
+
+  defp legacy_formatter_option({:themes, %{} = themes}),
+    do: {:themes, Enum.map(themes, fn {id, theme} -> {legacy_key(id), theme} end)}
+
+  defp legacy_formatter_option({:header, %{open_tag: open_tag, close_tag: close_tag}}),
+    do: {:header, %{open_tag: open_tag, close_tag: close_tag}}
+
+  defp legacy_formatter_option({:highlight_lines, %{lines: lines} = highlight_lines}) do
+    highlight_lines =
+      highlight_lines
+      |> Map.delete(:__struct__)
+      |> Map.put(:lines, Enum.map(lines, &legacy_line/1))
+      |> Map.replace_lazy(:style, &legacy_line_style/1)
+
+    {:highlight_lines, highlight_lines}
   end
 
-  defp lumis_available? do
-    Code.ensure_loaded?(Lumis) and function_exported?(Lumis, :rust_options!, 1)
-  end
+  defp legacy_formatter_option(option), do: option
+
+  # Atoms in the caller's options before Lumis turned them into strings.
+  defp legacy_key(key) when is_binary(key), do: String.to_existing_atom(key)
+  defp legacy_key(key), do: key
+
+  defp legacy_line({:single, line}), do: line
+
+  defp legacy_line({:range, %{start: first, end: last, step: step}}),
+    do: Range.new(first, last, step)
+
+  defp legacy_line(line), do: line
+
+  defp legacy_line_style({:style, %{style: style}}), do: style
+  defp legacy_line_style(style), do: style
 
   defp syntax_highlight_option({:formatter, {formatter, opts}}) when is_list(opts) do
     {:formatter, {formatter, Map.new(opts)}}
@@ -399,10 +446,8 @@ defmodule MDExNative.Comrak do
 
         config :mdex_native, syntax_highlighter: :lumis
 
-    And add Lumis to your deps, along with a parser for every language you
-    highlight:
+    And add a parser package to your deps for every language you highlight:
 
-        {:lumis, "~> 0.10"},
         {:lumis_wasm_elixir, "~> 0.26"}
 
     """

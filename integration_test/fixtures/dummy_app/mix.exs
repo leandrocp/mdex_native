@@ -15,19 +15,29 @@ defmodule MDExNativeE2E.MixProject do
     [extra_applications: [:logger]]
   end
 
+  # `lumis_standalone` highlights with Lumis and leaves the `:lumis` package
+  # out, which is how a project that only renders Markdown runs.
+  defp lumis do
+    if System.get_env("MDEX_NATIVE_E2E_CASE") == "lumis_standalone",
+      do: [],
+      else: [{:lumis, "~> 0.10"}]
+  end
+
   defp deps do
     [
-      {:mdex_native, path: "../../.."},
-      {:lumis, "~> 0.10"},
-      # A parser is an ordinary dependency now: a language the project does not
-      # depend on is not fetched, it renders plain. These are the ones the
-      # fixture's fences name, plus the two html injects.
-      {:lumis_wasm_rust, "~> 0.26"},
-      {:lumis_wasm_elixir, "~> 0.26"},
-      {:lumis_wasm_html, "~> 0.26"},
-      {:lumis_wasm_json, "~> 0.26"},
-      {:lumis_wasm_css, "~> 0.26"},
-      {:lumis_wasm_javascript, "~> 0.26"}
-    ]
+      {:mdex_native, path: "../../.."}
+    ] ++
+      lumis() ++
+      [
+        # A parser is an ordinary dependency now: a language the project does not
+        # depend on is not fetched, it renders plain. These are the ones the
+        # fixture's fences name, plus the two html injects.
+        {:lumis_wasm_rust, "~> 0.26"},
+        {:lumis_wasm_elixir, "~> 0.26"},
+        {:lumis_wasm_html, "~> 0.26"},
+        {:lumis_wasm_json, "~> 0.26"},
+        {:lumis_wasm_css, "~> 0.26"},
+        {:lumis_wasm_javascript, "~> 0.26"}
+      ]
   end
 end
