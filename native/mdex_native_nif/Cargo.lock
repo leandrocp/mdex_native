@@ -1084,7 +1084,7 @@ dependencies = [
 [[package]]
 name = "lumis-core"
 version = "4.0.1"
-source = "git+https://github.com/leandrocp/lumis?branch=refactor-elixir-options-in-lumis-core#2419086a73a474132b66cfe0373ce09ec734b8ad"
+source = "git+https://github.com/leandrocp/lumis?rev=b238c140dfb52ce6f5c6c996a8e01f5a84391ed8#b238c140dfb52ce6f5c6c996a8e01f5a84391ed8"
 dependencies = [
  "derive_builder",
  "glob",

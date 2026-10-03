@@ -47,7 +47,8 @@ syntect = ["comrak/syntect", "dep:two-face"]
 
 
 # Temporary, until lumis-core 4.1.0 publishes with the `rustler` feature
-# (leandrocp/lumis#1664). Patching crates.io keeps one lumis-core for this
-# crate and for lumis-wasm-runtime. Remove it and require "4.1.0" at release.
+# (leandrocp/lumis#1664), pinned to the commit that added it. Patching
+# crates.io keeps one lumis-core for this crate and for lumis-wasm-runtime.
+# Remove it and require "4.1.0" at release.
 [patch.crates-io]
-lumis-core = { git = "https://github.com/leandrocp/lumis", branch = "refactor-elixir-options-in-lumis-core" }
+lumis-core = { git = "https://github.com/leandrocp/lumis", rev = "b238c140dfb52ce6f5c6c996a8e01f5a84391ed8" }

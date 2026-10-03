@@ -29,8 +29,10 @@ defmodule MDExNative.Integration.E2ETest do
     native_checkout_path = prepare_native_checkout!("native/lumis")
 
     for ref <- mdex_refs() do
-      mdex_path = Path.join([workspace_path(), "mdex", ref])
-      build_path = "mdex/#{ref}"
+      # A ref names a directory below; `feature/x` or `..` must not leave it.
+      directory = String.replace(ref, ~r/[^A-Za-z0-9._-]|\.\./, "_")
+      mdex_path = Path.join([workspace_path(), "mdex", directory])
+      build_path = "mdex/#{directory}"
       File.rm_rf!(mdex_path)
 
       clone = ["clone", "--depth", "1", "--branch", ref, mdex_repo(), mdex_path]
@@ -199,7 +201,12 @@ defmodule MDExNative.Integration.E2ETest do
   end
 
   defp latest_mdex_release do
-    {output, 0} = System.cmd("git", ["ls-remote", "--tags", "--refs", mdex_repo(), "v*"])
+    {output, status} =
+      System.cmd("git", ["ls-remote", "--tags", "--refs", mdex_repo(), "v*"],
+        stderr_to_stdout: true
+      )
+
+    if status != 0, do: flunk("git ls-remote failed for #{mdex_repo()}:\n\n#{output}")
 
     output
     |> String.split("\n", trim: true)
@@ -210,8 +217,10 @@ defmodule MDExNative.Integration.E2ETest do
         _ -> []
       end
     end)
-    |> Enum.max_by(&elem(&1, 0), Version)
-    |> elem(1)
+    |> case do
+      [] -> flunk("no release tag v* found in #{mdex_repo()}")
+      releases -> releases |> Enum.max_by(&elem(&1, 0), Version) |> elem(1)
+    end
   end
 
   defp native_path do

@@ -52,12 +52,12 @@ defmodule MDExNativeE2E.LumisRegressionTest do
           render("```elixir\n:ok\n```", formatter: {:html_inline, them: "dracula"})
         end
 
-      assert error.message ==
-               "invalid value for :syntax_highlight option: invalid value for :opts option: " <>
-                 "invalid value for :formatter option: invalid options given to html_inline: " <>
-                 "unknown option :them (did you mean :theme?), valid options are: " <>
-                 "[:language, :structure, :theme, :pre_class, :pre_attrs, :code_attrs, :italic, " <>
-                 ":include_highlights, :highlight_lines, :line_numbers, :header]"
+      # Where the option sat is this library's; the rest is lumis-core's, and
+      # its list of valid options grows with Lumis.
+      assert error.message =~
+               ~r/^invalid value for :syntax_highlight option: invalid value for :opts option: /
+
+      assert error.message =~ "unknown option :them (did you mean :theme?)"
     end
 
     test "compiled parsers go where :lumis keeps its own, or in this application without it" do
