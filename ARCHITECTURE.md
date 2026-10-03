@@ -26,7 +26,9 @@ Markdown, or an MDEx document term
 
 The `lumis` feature compiles [`lumis-core`][lumis-core] and [`lumis-wasm-runtime`][lumis-wasm-runtime] into the NIF. Parsers are not compiled in. They are WASM modules shipped in `lumis_wasm_*` dependencies.
 
-[`MDExNative.Application`][application.ex] asks the `:lumis` application for its data directory ([`Lumis.Application.data_dir/0`][lumis-data-dir]), collects `priv/parsers` from every `lumis_wasm_*` application on the code path, and hands both to the NIF. It does this at boot and again before the first render that highlights, because templates can be rendered during `mix compile`, when no application is running.
+[`MDExNative.Application`][application.ex] collects `priv/parsers` from every `lumis_wasm_*` application on the code path and hands them to the NIF, with the directory for compiled parsers. That is the directory the `:lumis` application would use, `config :lumis, :data_dir`, then `LUMIS_DATA_DIR`, then its `priv/lumis`, resolved through OTP without loading Lumis code; without `:lumis` it is this application's `priv/lumis`. It does this at boot and again before the first render that highlights, because templates can be rendered during `mix compile`, when no application is running.
+
+The NIF decodes the `:formatter` option with [`lumis_core::elixir`][lumis-core-elixir], the decoder `lumis_nif` uses, so options are read as callers write them and get the same defaults and errors. Nothing in the `:lumis` application is called, and it does not have to be installed.
 
 A fence goes through [`lumis_adapter.rs`][lumis_adapter], which implements comrak's [`SyntaxHighlighterAdapter`][adapter-trait], then [`lumis_runtime.rs`][lumis_runtime], which turns the source into highlight events, then [`lumis_render.rs`][lumis_render], which applies MDEx's info-string decorators and writes the HTML with a lumis-core formatter. Highlighting runs on the runtime's own threads with 8 MiB stacks, since nested injections recurse once per layer and overflow a dirty scheduler's stack.
 
@@ -54,7 +56,7 @@ The `syntect` feature uses comrak's [`SyntectAdapter`][syntect-adapter] with the
 [Lumis]: https://lumis.sh
 [lumis-core]: https://docs.rs/lumis-core
 [lumis-wasm-runtime]: https://docs.rs/lumis-wasm-runtime
-[lumis-data-dir]: https://github.com/leandrocp/lumis/blob/hex-lumis/v0.10.0/packages/elixir/lumis/lib/lumis/application.ex
+[lumis-core-elixir]: https://github.com/leandrocp/lumis/blob/main/crates/lumis-core/src/elixir.rs
 [wasmtime]: https://wasmtime.dev
 [wasmstore]: https://docs.rs/tree-sitter/latest/tree_sitter/struct.WasmStore.html
 [dyncall]: https://www.erlang.org/doc/apps/erts/erl_nif.html#enif_dynamic_resource_call

@@ -802,4 +802,102 @@ defmodule MDExNative.ComrakTest do
     assert MDExNative.Comrak.markdown_to_html(@code_block_markdown, syntax_highlight: false) ==
              "<pre><code class=\"language-elixir\">IO.puts(&quot;Hello&quot;)\n</code></pre>\n"
   end
+
+  # What MDEx 0.14.1 sends after `Lumis.rust_options!/1` from Lumis 0.10.
+  describe "legacy_syntax_highlight/1" do
+    test "reads the Lumis 0.10 wire format back into the options a caller writes" do
+      theme = %{__struct__: Lumis.Theme, name: "dracula"}
+
+      wire = %{
+        engine: :lumis,
+        opts: %{
+          language: nil,
+          rainbow_brackets: true,
+          formatter:
+            {:html_inline,
+             %{
+               structure: :block,
+               theme: {:string, "dracula"},
+               pre_class: nil,
+               pre_attrs: [{"id", "x"}],
+               code_attrs: [],
+               italic: false,
+               include_highlights: false,
+               highlight_lines: %{
+                 __struct__: Lumis.HTMLInlineHighlightLines,
+                 lines: [{:single, 1}, {:range, %{start: 3, end: 9, step: 2}}],
+                 style: {:style, %{style: "color: red"}},
+                 class: nil
+               },
+               line_numbers: false,
+               header: %{__struct__: Lumis.HTMLElement, open_tag: "<div>", close_tag: "</div>"}
+             }}
+        }
+      }
+
+      assert %{engine: :lumis, opts: %{rainbow_brackets: true, formatter: {:html_inline, opts}}} =
+               MDExNative.Comrak.legacy_syntax_highlight(wire)
+
+      assert opts[:theme] == "dracula"
+      assert opts[:pre_attrs] == [id: "x"]
+      assert opts[:highlight_lines] == %{lines: [1, 3..9//2], style: "color: red", class: nil}
+      assert opts[:header] == %{open_tag: "<div>", close_tag: "</div>"}
+
+      assert %{opts: %{formatter: {:html_inline, opts}}} =
+               MDExNative.Comrak.legacy_syntax_highlight(
+                 put_in(wire, [:opts, :formatter], {:html_inline, %{theme: {:theme, theme}}})
+               )
+
+      assert opts == [theme: theme]
+    end
+
+    test "keeps a linked formatter's highlight lines without a style" do
+      wire = %{
+        formatter:
+          {:html_linked,
+           %{
+             highlight_lines: %{
+               __struct__: Lumis.HTMLLinkedHighlightLines,
+               lines: [{:single, 2}],
+               class: "l-highlighted"
+             }
+           }}
+      }
+
+      assert %{formatter: {:html_linked, [highlight_lines: highlight_lines]}} =
+               MDExNative.Comrak.legacy_syntax_highlight(wire)
+
+      assert highlight_lines == %{lines: [2], class: "l-highlighted"}
+    end
+
+    test "reads multi-theme ids and a terminal background" do
+      theme = %{__struct__: Lumis.Theme, name: "github_light"}
+
+      assert %{opts: %{formatter: {:html_multi_themes, [themes: [light: ^theme]]}}} =
+               MDExNative.Comrak.legacy_syntax_highlight(%{
+                 opts: %{formatter: {:html_multi_themes, %{themes: %{"light" => theme}}}}
+               })
+
+      assert %{opts: %{formatter: {:terminal, [background: "#ffffff"]}}} =
+               MDExNative.Comrak.legacy_syntax_highlight(%{
+                 opts: %{formatter: {:terminal, %{background: {:string, "#ffffff"}}}}
+               })
+    end
+
+    test "reads the wire format inside a keyword :syntax_highlight too" do
+      # `syntax_highlight: [engine: :lumis, opts: Lumis.rust_options!(...)]`
+      wire = %{
+        formatter: {:html_inline, %{theme: {:string, "dracula"}, pre_attrs: [{"id", "x"}]}}
+      }
+
+      options = MDExNative.Comrak.legacy_syntax_highlight(%{engine: :lumis, opts: wire})
+      assert %{opts: %{formatter: {:html_inline, opts}}} = options
+      assert Enum.sort(opts) == [pre_attrs: [id: "x"], theme: "dracula"]
+    end
+
+    test "leaves options in the shape a caller writes alone" do
+      options = %{engine: :syntect, opts: %{theme: "Catppuccin Macchiato"}}
+      assert MDExNative.Comrak.legacy_syntax_highlight(options) == options
+    end
+  end
 end

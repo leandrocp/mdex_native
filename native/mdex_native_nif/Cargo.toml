@@ -22,9 +22,9 @@ comrak = { version = "0.55", default-features = false, features = [
   "shortcodes",
   "phoenix_heex",
 ] }
-# The same two crates `lumis_nif` links. The two NIFs share parser files and
-# the compile cache on disk, not the runtime; see ARCHITECTURE.md.
-lumis-core = { version = "4.0.0", default-features = false, features = ["all-languages"], optional = true }
+# The same two crates `lumis_nif` links, with `rustler` for the option
+# decoders the two NIFs share. They share no runtime; see ARCHITECTURE.md.
+lumis-core = { version = "4.0.0", default-features = false, features = ["all-languages", "rustler"], optional = true }
 lumis-wasm-runtime = { version = "0.4.0", optional = true }
 lol_html = "3.0"
 parking_lot = "0.12"
@@ -45,3 +45,10 @@ lumis = ["dep:lumis-core", "dep:lumis-wasm-runtime"]
 nif_version_2_15 = ["rustler/nif_version_2_15"]
 syntect = ["comrak/syntect", "dep:two-face"]
 
+
+# Temporary, until lumis-core 4.1.0 publishes with the `rustler` feature
+# (leandrocp/lumis#1664), pinned to the commit that added it. Patching
+# crates.io keeps one lumis-core for this crate and for lumis-wasm-runtime.
+# Remove it and require "4.1.0" at release.
+[patch.crates-io]
+lumis-core = { git = "https://github.com/leandrocp/lumis", rev = "b238c140dfb52ce6f5c6c996a8e01f5a84391ed8" }

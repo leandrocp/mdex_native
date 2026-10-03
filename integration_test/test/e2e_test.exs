@@ -12,7 +12,7 @@ defmodule MDExNative.Integration.E2ETest do
   end
 
   test "syntax highlighter compile-time options" do
-    for e2e_case <- ~w(default lumis syntect) do
+    for e2e_case <- ~w(default lumis lumis_standalone syntect) do
       native_checkout_path = prepare_native_checkout!("native/#{e2e_case}")
       dummy_app_path = prepare_dummy_app!(e2e_case, native_checkout_path)
       env = e2e_env(e2e_case, native_checkout_path, build_path: "dummy_app/#{e2e_case}")
@@ -23,20 +23,26 @@ defmodule MDExNative.Integration.E2ETest do
     end
   end
 
+  # MDEx's `main` tracks this NIF, and its latest release is what most
+  # projects run: a release of this NIF must keep that one working too.
   test "mdex test suite passes against this checkout" do
-    mdex_path = Path.join(workspace_path(), "mdex")
     native_checkout_path = prepare_native_checkout!("native/lumis")
 
-    File.rm_rf!(mdex_path)
+    for ref <- mdex_refs() do
+      # A ref names a directory below; `feature/x` or `..` must not leave it.
+      directory = String.replace(ref, ~r/[^A-Za-z0-9._-]|\.\./, "_")
+      mdex_path = Path.join([workspace_path(), "mdex", directory])
+      build_path = "mdex/#{directory}"
+      File.rm_rf!(mdex_path)
 
-    clone = ["clone", "--depth", "1"] ++ mdex_ref_args() ++ [mdex_repo(), mdex_path]
-    run!("git", clone, native_path(), [], label: "mdex")
+      clone = ["clone", "--depth", "1", "--branch", ref, mdex_repo(), mdex_path]
+      run!("git", clone, native_path(), [], label: build_path)
 
-    env = e2e_env("lumis", native_checkout_path, build_path: "mdex")
-
-    run_mix!(mdex_path, ["deps.get"], env, label: "mdex")
-    run_mix!(mdex_path, ["compile"], env, label: "mdex")
-    run_mix!(mdex_path, ["test"], env, label: "mdex")
+      env = e2e_env("lumis", native_checkout_path, build_path: build_path)
+      run_mix!(mdex_path, ["deps.get"], env, label: build_path)
+      run_mix!(mdex_path, ["compile"], env, label: build_path)
+      run_mix!(mdex_path, ["test"], env, label: build_path)
+    end
   end
 
   @tag :cloudflare
@@ -176,11 +182,44 @@ defmodule MDExNative.Integration.E2ETest do
 
   # MDEx tracks this NIF's output, so a change that moves it has to name the
   # branch that adopted it or this clones a main that predates the change.
-  defp mdex_ref_args do
-    case System.get_env("MDEX_NATIVE_E2E_MDEX_REF") do
-      nil -> []
-      "" -> []
-      ref -> ["--branch", ref]
+  # `MDEX_NATIVE_E2E_MDEX_REFS` lists refs to test, `latest` naming the newest
+  # release tag; `MDEX_NATIVE_E2E_MDEX_REF` still picks a single one.
+  defp mdex_refs do
+    refs =
+      case System.get_env("MDEX_NATIVE_E2E_MDEX_REF") do
+        ref when ref not in [nil, ""] -> ref
+        _ -> System.get_env("MDEX_NATIVE_E2E_MDEX_REFS", "main latest")
+      end
+
+    refs
+    |> String.split([" ", ","], trim: true)
+    |> Enum.map(fn
+      "latest" -> latest_mdex_release()
+      ref -> ref
+    end)
+    |> Enum.uniq()
+  end
+
+  defp latest_mdex_release do
+    {output, status} =
+      System.cmd("git", ["ls-remote", "--tags", "--refs", mdex_repo(), "v*"],
+        stderr_to_stdout: true
+      )
+
+    if status != 0, do: flunk("git ls-remote failed for #{mdex_repo()}:\n\n#{output}")
+
+    output
+    |> String.split("\n", trim: true)
+    |> Enum.map(&(&1 |> String.split("refs/tags/") |> List.last()))
+    |> Enum.flat_map(fn tag ->
+      case Version.parse(String.trim_leading(tag, "v")) do
+        {:ok, %Version{pre: []} = version} -> [{version, tag}]
+        _ -> []
+      end
+    end)
+    |> case do
+      [] -> flunk("no release tag v* found in #{mdex_repo()}")
+      releases -> releases |> Enum.max_by(&elem(&1, 0), Version) |> elem(1)
     end
   end
 

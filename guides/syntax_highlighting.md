@@ -11,10 +11,9 @@ unchanged, and the language name goes on the `<pre>` class.
 
 ## Lumis
 
-Add Lumis to your deps, along with a parser for every language you highlight:
+Add a parser to your deps for every language you highlight:
 
 ```elixir
-{:lumis, "~> 0.10"},
 {:lumis_wasm_rust, "~> 0.26"},
 {:lumis_wasm_elixir, "~> 0.26"}
 ```
@@ -49,6 +48,9 @@ html = MDExNative.Comrak.markdown_to_html(markdown,
 ````
 
 Lumis formatters and options are documented in [`Lumis`](https://lumis.hexdocs.pm/Lumis.html#t:formatter/0).
+MDExNative reads `:formatter` and `:rainbow_brackets`, and decodes them with the
+same Rust code as the `:lumis` package, so the `:lumis` package itself is not
+needed. Install it only to build a custom `%Lumis.Theme{}`.
 
 ### Parsers are dependencies
 
@@ -57,11 +59,11 @@ A parser is a WebAssembly module published as a
 Nothing is compiled in and nothing is fetched at runtime: name a language you
 haven't installed and that fence comes out as plain text.
 
-MDExNative reads those packages from the same place `:lumis` does and shares
-its cache of compiled parsers, so the VM pays for each one once.
-
-Loading happens on first use, which costs a Wasmtime compile. Call
-`Lumis.Languages.load/1` at startup to move most of that off the first request.
+Loading happens on first use, which costs a Wasmtime compile the first time.
+Compiled parsers are cached where `:lumis` keeps its own, `config :lumis,
+:data_dir` or `LUMIS_DATA_DIR` or the `:lumis` application's `priv`, so later
+runs skip the compile and a project that also uses `:lumis` compiles each
+parser once. Without `:lumis`, the cache is in MDExNative's `priv`.
 
 ## Syntect
 
