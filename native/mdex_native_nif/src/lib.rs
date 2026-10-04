@@ -381,7 +381,7 @@ fn syntax_highlighter(
             #[cfg(feature = "lumis")]
             {
                 Ok(CodeFenceSyntaxHighlighter::Lumis(Box::new(
-                    LumisAdapter::new(opts.formatter, opts.rainbow_brackets),
+                    LumisAdapter::new(opts.formatter, opts.rainbow_brackets, opts.budget),
                 )))
             }
 

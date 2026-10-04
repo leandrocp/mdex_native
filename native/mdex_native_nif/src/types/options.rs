@@ -1,4 +1,9 @@
+#[cfg(feature = "lumis")]
+mod budget;
 mod sanitize;
+
+#[cfg(feature = "lumis")]
+pub use budget::ExBudget;
 
 #[cfg(feature = "lumis")]
 use crate::types::elixir_types::ExFormatterOption;
@@ -16,6 +21,7 @@ mod atoms {
         alerts,
         autolink,
         block_directive,
+        budget,
         cjk_friendly_emphasis,
         compact_html,
         default_info_string,
@@ -542,6 +548,8 @@ pub struct ExLumisOptions {
     // Lumis moved this off the formatter in 0.8; it arrives alongside it.
     #[cfg(feature = "lumis")]
     pub rainbow_brackets: bool,
+    #[cfg(feature = "lumis")]
+    pub budget: ExBudget,
 }
 
 #[derive(Debug, Default)]
@@ -578,6 +586,7 @@ impl<'a> Decoder<'a> for ExLumisOptions {
         Ok(Self {
             formatter: optional_field(term, atoms::formatter())?.unwrap_or_default(),
             rainbow_brackets: optional_field(term, atoms::rainbow_brackets())?.unwrap_or(false),
+            budget: optional_field(term, atoms::budget())?.unwrap_or_default(),
         })
     }
 }

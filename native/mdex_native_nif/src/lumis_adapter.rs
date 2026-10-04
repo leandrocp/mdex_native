@@ -3,6 +3,7 @@ use std::fmt::{self, Write};
 use std::sync::Mutex;
 
 use crate::types::elixir_types::ExFormatterOption;
+use crate::types::options::ExBudget;
 use comrak::adapters::SyntaxHighlighterAdapter;
 
 use crate::lumis_render::render_code_fence;
@@ -64,6 +65,7 @@ fn parse_custom_attributes(info_string: &str) -> Option<HashMap<String, String>>
 pub struct LumisAdapter {
     formatter: ExFormatterOption,
     rainbow_brackets: bool,
+    budget: ExBudget,
     fence: Mutex<FenceState>,
     /// Comrak's adapter trait can only answer `fmt::Error`, which says nothing
     /// about why Lumis refused a fence. Park the reason here for the NIF to
@@ -72,10 +74,11 @@ pub struct LumisAdapter {
 }
 
 impl LumisAdapter {
-    pub fn new(formatter: ExFormatterOption, rainbow_brackets: bool) -> Self {
+    pub fn new(formatter: ExFormatterOption, rainbow_brackets: bool, budget: ExBudget) -> Self {
         Self {
             formatter,
             rainbow_brackets,
+            budget,
             fence: Mutex::new(FenceState::default()),
             failure: Mutex::new(None),
         }
@@ -135,6 +138,7 @@ impl SyntaxHighlighterAdapter for LumisAdapter {
             language,
             Some(self.formatter.clone()),
             self.rainbow_brackets,
+            self.budget,
             &fence.attributes,
         )
         .map_err(|reason| self.fail(reason))?;

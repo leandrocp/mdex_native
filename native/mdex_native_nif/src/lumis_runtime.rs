@@ -17,10 +17,11 @@ use std::sync::Arc;
 use std::thread;
 
 use anyhow::{anyhow, Context, Result};
-use lumis_core::events::HighlightEvent;
-use lumis_wasm_runtime::{catalog, store, Runtime, RuntimeError};
+use lumis_wasm_runtime::{catalog, store, HighlightOutput, Runtime, RuntimeError};
 use once_cell::sync::Lazy;
 use parking_lot::{Mutex, RwLock};
+
+use crate::types::options::ExBudget;
 
 /// Directories the store reads, as `MDExNative.Application` configured them.
 ///
@@ -44,7 +45,8 @@ struct Job {
     source: String,
     language: String,
     rainbow_brackets: bool,
-    reply: mpsc::SyncSender<Result<Vec<HighlightEvent<'static>>, RuntimeError>>,
+    budget: ExBudget,
+    reply: mpsc::SyncSender<Result<HighlightOutput, RuntimeError>>,
 }
 
 pub struct Executor {
@@ -91,9 +93,12 @@ impl Executor {
                     let Ok(job) = receiver.lock().recv() else {
                         return;
                     };
-                    let events =
-                        runtime.highlight(&job.source, &job.language, job.rainbow_brackets);
-                    let _ = job.reply.send(events);
+                    let highlighted = runtime.highlight_with(
+                        &job.source,
+                        &job.language,
+                        &job.budget.highlight_options(job.rainbow_brackets),
+                    );
+                    let _ = job.reply.send(highlighted);
                 })
                 .context("could not spawn a Lumis WASM worker")?;
         }
@@ -106,7 +111,8 @@ impl Executor {
         source: &str,
         language: &str,
         rainbow_brackets: bool,
-    ) -> Result<Vec<HighlightEvent<'static>>, RuntimeError> {
+        budget: ExBudget,
+    ) -> Result<HighlightOutput, RuntimeError> {
         let (reply, answer) = mpsc::sync_channel(1);
 
         self.sender
@@ -114,6 +120,7 @@ impl Executor {
                 source: source.to_string(),
                 language: language.to_string(),
                 rainbow_brackets,
+                budget,
                 reply,
             })
             .map_err(|_| {
