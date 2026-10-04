@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.11](https://github.com/leandrocp/mdex_native/compare/v0.2.10...v0.2.11) (2026-10-04)
+
+### Bug Fixes
+
+- Forward Lumis highlighting budgets in [\#89](https://github.com/leandrocp/mdex_native/pull/89)
+
+### Performance Improvements
+
+- Strip symbols from the release NIF in [\#87](https://github.com/leandrocp/mdex_native/pull/87)
+
+### Documentation
+
+- Add an architecture overview in [\#84](https://github.com/leandrocp/mdex_native/pull/84)
+
 ## [0.2.10](https://github.com/leandrocp/mdex_native/compare/v0.2.9...v0.2.10) (2026-09-29)
 
 ### Features
