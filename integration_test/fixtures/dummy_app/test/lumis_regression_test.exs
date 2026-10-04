@@ -2,6 +2,63 @@ defmodule MDExNativeE2E.LumisRegressionTest do
   use ExUnit.Case
 
   if Application.compile_env(:mdex_native, :syntax_highlighter) == :lumis do
+    test "a time budget returns the whole fence escaped and marks every HTML formatter" do
+      line = "let value = a < b && c > d;"
+      source = "fn main() {\n" <> String.duplicate(line <> "\n", 4_000) <> "}"
+
+      for formatter <- [
+            :html_linked,
+            {:html_inline, theme: "onedark"},
+            {:html_multi_themes, themes: [dark: "onedark"], default_theme: "dark"}
+          ] do
+        html =
+          MDExNative.Comrak.markdown_to_html("```rust\n#{source}\n```",
+            syntax_highlight: [
+              engine: :lumis,
+              opts: [formatter: formatter, budget: [time_limit: 1]]
+            ]
+          )
+
+        assert html =~ ~s(data-lumis-budget="time")
+        assert length(Regex.scan(~r/let value = a &lt; b &amp;&amp; c &gt; d;/, html)) == 4_000
+        assert length(Regex.scan(~r/<span\b/, html)) == 4_002
+        refute html =~ "a < b"
+      end
+    end
+
+    test "a match budget preserves highlighting and reports dropped matches" do
+      source = "fn main() { let value = (1 + (2 * (3 - 4))); }"
+
+      html =
+        MDExNative.Comrak.markdown_to_html("```rust\n#{source}\n```",
+          syntax_highlight: [
+            engine: :lumis,
+            opts: [formatter: :html_linked, budget: [time_limit: 0, match_limit: 1]]
+          ]
+        )
+
+      assert html =~ ~s(data-lumis-budget="matches")
+      assert length(Regex.scan(~r/<span\b/, html)) > 1
+      assert html |> String.replace(~r/<[^>]*>/, "") |> String.trim() == source
+    end
+
+    test "omitted and nil limits use defaults, and zero disables the time limit" do
+      markdown = "```rust\nfn main() {}\n```"
+
+      for budget <- [[], [time_limit: nil, match_limit: nil], [time_limit: 0]] do
+        html =
+          MDExNative.Comrak.markdown_to_html(markdown,
+            syntax_highlight: [
+              engine: :lumis,
+              opts: [formatter: :html_linked, budget: budget]
+            ]
+          )
+
+        refute html =~ "data-lumis-budget"
+        assert html =~ ~s(class="l-keyword-function")
+      end
+    end
+
     test "native markdown_to_html_with_options includes Lumis multi-theme pre attributes (issue #32)" do
       markdown = "```elixir\nIO.puts(:hello)\n```"
 

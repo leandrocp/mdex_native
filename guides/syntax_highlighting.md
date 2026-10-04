@@ -50,6 +50,32 @@ html = MDExNative.Comrak.markdown_to_html(markdown,
 
 Lumis formatters and options are documented in [`Lumis`](https://lumis.hexdocs.pm/Lumis.html#t:formatter/0).
 
+### Highlighting budgets
+
+Pass a budget in the engine options to bound each code block:
+
+```elixir
+MDExNative.Comrak.markdown_to_html(markdown,
+  syntax_highlight: [
+    engine: :lumis,
+    opts: [
+      formatter: :html_linked,
+      budget: [time_limit: 1_000, match_limit: 4096]
+    ]
+  ]
+)
+```
+
+Omitted or `nil` limits use Lumis's defaults: 5000 milliseconds and 8192
+in-progress query matches. `time_limit: 0` disables the time limit. The time
+budget covers parsing and highlighting each block, excluding language loading;
+it is checked cooperatively, so it is not a hard deadline for the Markdown render.
+
+When time runs out, the whole block is rendered as escaped plain text with
+`data-lumis-budget="time"` on its `<pre>`. Reaching the match limit keeps the
+block highlighted, with some scopes missing, and marks it
+`data-lumis-budget="matches"`.
+
 ### Parsers are dependencies
 
 A parser is a WebAssembly module published as a
