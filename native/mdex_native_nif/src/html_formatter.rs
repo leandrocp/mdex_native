@@ -50,8 +50,8 @@ create_formatter!(MdexFormatter, {
 });
 
 impl MdexFormatter {
-    /// Retains the deprecated tag filter on raw HTML nodes only.
-    pub fn format_with_tagfilter<'a, 'o, 'c: 'o>(
+    /// Formats HTML, applying the deprecated tag filter only when requested.
+    pub fn format_html<'a, 'o, 'c: 'o>(
         root: Node<'a>,
         options: &'o comrak::Options<'c>,
         output: &'o mut dyn Write,

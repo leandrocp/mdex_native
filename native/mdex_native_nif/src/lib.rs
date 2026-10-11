@@ -200,13 +200,7 @@ fn markdown_to_html_with_options<'a>(
     let plugins = plugins(&lumis_adapter);
 
     finish_render(
-        MdexFormatter::format_with_tagfilter(
-            root,
-            &comrak_options,
-            &mut buffer,
-            &plugins,
-            tagfilter,
-        ),
+        MdexFormatter::format_html(root, &comrak_options, &mut buffer, &plugins, tagfilter),
         &lumis_adapter,
     )?;
     Ok(do_safe_html(buffer, &sanitize, false, escape_curly_braces_in_code).encode(env))
@@ -295,7 +289,7 @@ fn document_to_html_with_options<'a>(
     let plugins = plugins(&lumis_adapter);
 
     finish_render(
-        MdexFormatter::format_with_tagfilter(
+        MdexFormatter::format_html(
             comrak_ast,
             &comrak_options,
             &mut buffer,
