@@ -191,6 +191,7 @@ fn markdown_to_html_with_options<'a>(
     md: &str,
     options: ExOptions,
 ) -> NifResult<Term<'a>> {
+    let tagfilter = options.tagfilter();
     let (comrak_options, lumis_adapter, sanitize) = render_parts(options)?;
     let escape_curly_braces_in_code = comrak_options.extension.phoenix_heex;
     let arena = Arena::new();
@@ -199,7 +200,13 @@ fn markdown_to_html_with_options<'a>(
     let plugins = plugins(&lumis_adapter);
 
     finish_render(
-        MdexFormatter::format_document_with_plugins(root, &comrak_options, &mut buffer, &plugins),
+        MdexFormatter::format_with_tagfilter(
+            root,
+            &comrak_options,
+            &mut buffer,
+            &plugins,
+            tagfilter,
+        ),
         &lumis_adapter,
     )?;
     Ok(do_safe_html(buffer, &sanitize, false, escape_curly_braces_in_code).encode(env))
@@ -279,6 +286,7 @@ fn document_to_html_with_options<'a>(
     ex_document: Term<'a>,
     options: ExOptions,
 ) -> NifResult<Term<'a>> {
+    let tagfilter = options.tagfilter();
     let arena = Arena::new();
     let comrak_ast = document_term_to_comrak_ast(&arena, ex_document)?;
     let (comrak_options, lumis_adapter, sanitize) = render_parts(options)?;
@@ -287,11 +295,12 @@ fn document_to_html_with_options<'a>(
     let plugins = plugins(&lumis_adapter);
 
     finish_render(
-        MdexFormatter::format_document_with_plugins(
+        MdexFormatter::format_with_tagfilter(
             comrak_ast,
             &comrak_options,
             &mut buffer,
             &plugins,
+            tagfilter,
         ),
         &lumis_adapter,
     )?;

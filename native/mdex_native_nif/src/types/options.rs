@@ -146,6 +146,7 @@ fn syntax_highlight_field(term: Term) -> NifResult<Option<ExSyntaxHighlightOptio
 #[derive(Clone, Debug, Default)]
 pub struct ExExtensionOptions {
     pub strikethrough: Option<bool>,
+    // Deprecated compatibility option; rendered locally since Comrak 0.56.
     pub tagfilter: Option<bool>,
     pub table: Option<bool>,
     pub autolink: Option<bool>,
@@ -229,7 +230,6 @@ impl<'a> Decoder<'a> for ExExtensionOptions {
     }
 }
 
-#[allow(deprecated)]
 impl ExExtensionOptions {
     pub fn apply(mut self, extension: &mut Extension<'static>) {
         self.apply_common_options(extension);
@@ -239,7 +239,6 @@ impl ExExtensionOptions {
 
     fn apply_common_options(&mut self, extension: &mut Extension<'static>) {
         overwrite(&mut extension.strikethrough, self.strikethrough);
-        overwrite(&mut extension.tagfilter, self.tagfilter);
         overwrite(&mut extension.table, self.table);
         overwrite(&mut extension.autolink, self.autolink);
         overwrite(&mut extension.tasklist, self.tasklist);
@@ -503,6 +502,13 @@ impl<'a> Decoder<'a> for ExOptions {
 }
 
 impl ExOptions {
+    pub fn tagfilter(&self) -> bool {
+        self.extension
+            .as_ref()
+            .and_then(|extension| extension.tagfilter)
+            .unwrap_or(false)
+    }
+
     pub fn comrak_options(&self) -> Options<'static> {
         let mut options = Options::default();
         if let Some(extension) = self.extension.clone() {
