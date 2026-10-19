@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+repo_root="$PWD"
+otp_version=29.1.2
+elixir_version=1.20.4
+rust_version=1.99.1
+toolchains="$HOME/.local/share/mdex-native-orb"
+otp_home="$toolchains/otp-$otp_version"
+elixir_home="$toolchains/elixir-$elixir_version"
+TIMEFORMAT='Completed in %R seconds'
+
+echo '==> Checking system packages'
+packages=()
+for package in build-essential ca-certificates curl unzip libssl-dev libncurses6; do
+  if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -qx 'install ok installed'; then
+    packages+=("$package")
+  fi
+done
+if ((${#packages[@]})); then
+  sudo apt-get update -qq
+  sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${packages[@]}"
+fi
+
+# Hex's Ubuntu 22.04 builds use OpenSSL 3 and run on Debian 12 without
+# compiling OTP. Keep archives and toolchains out of the checkout.
+echo "==> Installing Erlang/OTP $otp_version and Elixir $elixir_version"
+time {
+  mkdir -p "$toolchains"
+  if [[ ! -x "$otp_home/bin/erl" ]]; then
+    archive="$toolchains/otp.tar.gz"
+    curl -fsSL --retry 3 "https://builds.hex.pm/builds/otp/amd64/ubuntu-22.04/OTP-$otp_version.tar.gz" -o "$archive"
+    echo "1df9e6285b4d14319a789176db60c273131abebdfa6b5474a084dba49b0e54a2  $archive" | sha256sum -c -
+    mkdir -p "$otp_home"
+    tar -xzf "$archive" --strip-components=1 -C "$otp_home"
+    (cd "$otp_home" && ./Install -minimal "$otp_home")
+    rm "$archive"
+  fi
+  if [[ ! -x "$elixir_home/bin/elixir" ]]; then
+    archive="$toolchains/elixir.zip"
+    curl -fsSL --retry 3 "https://builds.hex.pm/builds/elixir/v$elixir_version-otp-29.zip" -o "$archive"
+    echo "7863c546cda13fecc949e562e326042451dacf8fd8698a36783cb71eeb223b46  $archive" | sha256sum -c -
+    mkdir -p "$elixir_home"
+    unzip -qo "$archive" -d "$elixir_home"
+    rm "$archive"
+  fi
+}
+
+echo "==> Installing Rust $rust_version with rustfmt and clippy"
+time {
+  if [[ ! -x "$HOME/.cargo/bin/rustup" ]]; then
+    installer="$(mktemp)"
+    curl -fsSL --retry 3 https://sh.rustup.rs -o "$installer"
+    sh "$installer" -y --profile minimal --default-toolchain none --no-modify-path
+    rm "$installer"
+  fi
+  export PATH="$otp_home/bin:$elixir_home/bin:$HOME/.cargo/bin:$PATH"
+  export RUSTUP_TOOLCHAIN="$rust_version"
+  rustup toolchain install "$rust_version" --profile minimal --component rustfmt --component clippy
+}
+
+# Amp and supervised services use non-interactive login shells. Persist the
+# source-build flag as well as PATH so Mix never falls back to a release NIF.
+profile="$HOME/.bash_profile"
+marker="# mdex_native orb toolchain $otp_version/$elixir_version/$rust_version"
+if ! grep -Fqx "$marker" "$profile" 2>/dev/null; then
+  cat >> "$profile" <<EOF
+
+$marker
+if [[ "\$PWD" == "$repo_root" || "\$PWD" == "$repo_root/"* ]]; then
+  export PATH="$otp_home/bin:$elixir_home/bin:\$HOME/.cargo/bin:\$PATH"
+  export RUSTUP_TOOLCHAIN="$rust_version"
+  export MDEX_NATIVE_BUILD=1
+fi
+EOF
+fi
+export MDEX_NATIVE_BUILD=1
+
+echo '==> Installing Hex and Rebar (only if missing)'
+time {
+  if ! compgen -G "$HOME/.mix/archives/hex-*" > /dev/null; then
+    mix local.hex --force
+  fi
+  if ! compgen -G "$HOME/.mix/elixir/*/rebar3" > /dev/null; then
+    mix local.rebar --force
+  fi
+}
+
+echo '==> Fetching locked Mix and Cargo dependencies (including optional highlighters)'
+time {
+  mix deps.get --check-locked
+  cargo fetch --locked --manifest-path native/mdex_native_nif/Cargo.toml
+}
+
+echo '==> Warming development and test builds'
+time {
+  mix compile
+  MIX_ENV=test mix compile
+  cargo test --locked --no-run --manifest-path native/mdex_native_nif/Cargo.toml
+}
+echo '==> Orb setup ready'
