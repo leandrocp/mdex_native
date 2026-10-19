@@ -63,7 +63,7 @@ time {
 # Amp and supervised services use non-interactive login shells. Persist the
 # source-build flag as well as PATH so Mix never falls back to a release NIF.
 profile="$HOME/.bash_profile"
-marker="# mdex_native orb toolchain $otp_version/$elixir_version/$rust_version"
+marker="# mdex_native orb toolchain $repo_root $otp_version/$elixir_version/$rust_version"
 if ! grep -Fqx "$marker" "$profile" 2>/dev/null; then
   cat >> "$profile" <<EOF
 
