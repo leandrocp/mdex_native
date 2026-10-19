@@ -163,7 +163,7 @@ pub fn executor() -> Result<&'static Executor> {
 ///
 /// Answers `false` once the executor has been built, because the store it was
 /// given cannot be swapped underneath it.
-#[rustler::nif]
+#[cfg_attr(not(test), rustler::nif)]
 fn configure_lumis_store(data_dir: Option<String>, installed_dirs: Vec<String>) -> bool {
     if Lazy::get(&EXECUTOR).is_some() {
         return false;
