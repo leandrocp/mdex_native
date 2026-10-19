@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.12](https://github.com/leandrocp/mdex_native/compare/v0.2.11...v0.2.12) (2026-10-19)
+
+### Bug Fixes
+
+- **nif:** Bump MSRV and Rustler in [\#101](https://github.com/leandrocp/mdex_native/pull/101)
+
+### Dependencies
+
+- Update Comrak to 0.56.0 in [\#94](https://github.com/leandrocp/mdex_native/pull/94)
+
+### Other Changes
+
+- Prepare cached Elixir and Rust toolchains for Amp orbs in [\#100](https://github.com/leandrocp/mdex_native/pull/100)
+
 ## [0.2.11](https://github.com/leandrocp/mdex_native/compare/v0.2.10...v0.2.11) (2026-10-04)
 
 ### Bug Fixes
