@@ -16,10 +16,10 @@ jobs:
     uses: leandrocp/github-actions/.github/workflows/rust-test.yml@main
     with:
       manifest-path: "native/mdex_native_nif/Cargo.toml"
-      msrv: "1.91"
+      msrv: "1.95"
 
   lint:
     uses: leandrocp/github-actions/.github/workflows/rust-lint.yml@main
     with:
       manifest-path: "native/mdex_native_nif/Cargo.toml"
-      msrv: "1.91"
+      msrv: "1.95"

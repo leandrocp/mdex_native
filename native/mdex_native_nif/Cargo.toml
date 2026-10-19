@@ -3,7 +3,7 @@ name = "mdex_native_nif"
 version = "0.1.0"
 authors = ["Leandro Pereira"]
 edition = "2021"
-rust-version = "1.91"
+rust-version = "1.95"
 
 [lints.clippy]
 cognitive_complexity = "deny"
