@@ -32,4 +32,6 @@ comrak-*.tar
 /.e2e/
 .expert/
 /native/comrak_nif/target/
+/native/mdex_native_nif/target/
 checksum-*.exs
+/.amp/portals/*

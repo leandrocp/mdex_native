@@ -5,6 +5,8 @@
 //! the field. This formatter delegates every node to `format_node_default`
 //! except `Link` and `Image`, where it writes the same markup comrak would,
 //! plus the attributes.
+//! The optional compatibility entry point also retains deprecated tag filtering
+//! for raw HTML nodes.
 //!
 //! Attribute pairs are written verbatim rather than `data-` prefixed, so
 //! `{target=_blank}` renders as `target="_blank"`.
@@ -19,14 +21,14 @@
 //!
 //! `render_link` and `render_image` below are comrak's own, with a call to
 //! `write_attrs` added before the opening tag is closed. comrak keeps them
-//! private, so they cannot be called or wrapped. Upstream at comrak 0.55.0,
-//! which is the version `Cargo.toml` pins:
+//! private, so they cannot be called or wrapped. The original source was
+//! comrak 0.55.0:
 //!
 //! - [`render_link`](https://github.com/kivikakk/comrak/blob/6fbe87fafde3953a9f3bc582804318593d703805/src/html.rs#L818-L852)
 //! - [`render_image`](https://github.com/kivikakk/comrak/blob/6fbe87fafde3953a9f3bc582804318593d703805/src/html.rs#L743-L783)
 //!
-//! Both are byte-for-byte identical on `kivikakk/comrak@main` as of
-//! 2026-09-25. When comrak is upgraded, re-read those two functions and mirror
+//! Both remain unchanged in comrak 0.56.0. When comrak is upgraded,
+//! re-read those two functions and mirror
 //! any change here. `mirrors_comrak_for_empty_attrs` is what catches drift: it
 //! renders links and images carrying empty attributes, so this code runs and
 //! adds nothing, and compares the result against `comrak::format_html`.
@@ -36,6 +38,8 @@ use comrak::html::{self, ChildRendering, Context};
 use comrak::nodes::{Node, NodeLink, NodeValue};
 use std::fmt::{self, Write};
 
+mod tagfilter;
+
 create_formatter!(MdexFormatter, {
     NodeValue::Image(ref nl) => |context, node, entering| {
         return render_image(context, node, entering, nl);
@@ -44,6 +48,40 @@ create_formatter!(MdexFormatter, {
         return render_link(context, node, entering, nl);
     },
 });
+
+impl MdexFormatter {
+    /// Formats HTML, applying the deprecated tag filter only when requested.
+    pub fn format_html<'a, 'o, 'c: 'o>(
+        root: Node<'a>,
+        options: &'o comrak::Options<'c>,
+        output: &'o mut dyn Write,
+        plugins: &'o comrak::options::Plugins<'o>,
+        tagfilter: bool,
+    ) -> fmt::Result {
+        if !tagfilter || !options.render.r#unsafe || options.render.escape {
+            return Self::format_document_with_plugins(root, options, output, plugins);
+        }
+        html::format_document_with_formatter(
+            root,
+            options,
+            output,
+            plugins,
+            |context, node, entering| {
+                match &node.data().value {
+                    NodeValue::HtmlBlock(block) => {
+                        return tagfilter::render_block(context, entering, &block.literal);
+                    }
+                    NodeValue::HtmlInline(literal) => {
+                        return tagfilter::render_inline(context, entering, literal);
+                    }
+                    _ => {}
+                }
+                Self::formatter(context, node, entering)
+            },
+            (),
+        )
+    }
+}
 
 /// Whether this node has attributes that are going to be written.
 ///

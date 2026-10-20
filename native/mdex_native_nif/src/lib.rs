@@ -1,3 +1,6 @@
+// Without NIF registration, BEAM-only entry points are unused in Rust tests.
+#![cfg_attr(test, allow(dead_code))]
+
 #[macro_use]
 extern crate rustler;
 
@@ -25,6 +28,8 @@ use rustler::types::list::ListIterator;
 use rustler::{Encoder, Env, NifResult, Term};
 use types::{document::*, options::*};
 
+// Standalone Rust tests have no BEAM host to resolve NIF symbols.
+#[cfg(not(test))]
 rustler::init!("Elixir.MDExNative.Native");
 
 mod atoms {
@@ -177,7 +182,7 @@ fn comrak_ast_to_document_term<'a, 'b>(env: Env<'a>, root: &'b AstNode<'b>) -> N
     }
 }
 
-#[rustler::nif(schedule = "DirtyCpu")]
+#[cfg_attr(not(test), rustler::nif(schedule = "DirtyCpu"))]
 fn parse_document<'a>(env: Env<'a>, md: &str, options: ExOptions) -> NifResult<Term<'a>> {
     let comrak_options = options.comrak_options();
     let arena = Arena::new();
@@ -185,12 +190,13 @@ fn parse_document<'a>(env: Env<'a>, md: &str, options: ExOptions) -> NifResult<T
     comrak_ast_to_document_term(env, root)
 }
 
-#[rustler::nif(schedule = "DirtyCpu")]
+#[cfg_attr(not(test), rustler::nif(schedule = "DirtyCpu"))]
 fn markdown_to_html_with_options<'a>(
     env: Env<'a>,
     md: &str,
     options: ExOptions,
 ) -> NifResult<Term<'a>> {
+    let tagfilter = options.tagfilter();
     let (comrak_options, lumis_adapter, sanitize) = render_parts(options)?;
     let escape_curly_braces_in_code = comrak_options.extension.phoenix_heex;
     let arena = Arena::new();
@@ -199,13 +205,13 @@ fn markdown_to_html_with_options<'a>(
     let plugins = plugins(&lumis_adapter);
 
     finish_render(
-        MdexFormatter::format_document_with_plugins(root, &comrak_options, &mut buffer, &plugins),
+        MdexFormatter::format_html(root, &comrak_options, &mut buffer, &plugins, tagfilter),
         &lumis_adapter,
     )?;
     Ok(do_safe_html(buffer, &sanitize, false, escape_curly_braces_in_code).encode(env))
 }
 
-#[rustler::nif(schedule = "DirtyCpu")]
+#[cfg_attr(not(test), rustler::nif(schedule = "DirtyCpu"))]
 fn markdown_to_xml_with_options<'a>(
     env: Env<'a>,
     md: &str,
@@ -225,7 +231,7 @@ fn markdown_to_xml_with_options<'a>(
     Ok(xml.encode(env))
 }
 
-#[rustler::nif(schedule = "DirtyCpu")]
+#[cfg_attr(not(test), rustler::nif(schedule = "DirtyCpu"))]
 fn document_to_commonmark<'a>(env: Env<'a>, ex_document: Term<'a>) -> NifResult<Term<'a>> {
     let arena = Arena::new();
     let comrak_ast = document_term_to_comrak_ast(&arena, ex_document)?;
@@ -237,7 +243,7 @@ fn document_to_commonmark<'a>(env: Env<'a>, ex_document: Term<'a>) -> NifResult<
     Ok(commonmark.encode(env))
 }
 
-#[rustler::nif(schedule = "DirtyCpu")]
+#[cfg_attr(not(test), rustler::nif(schedule = "DirtyCpu"))]
 fn document_to_commonmark_with_options<'a>(
     env: Env<'a>,
     ex_document: Term<'a>,
@@ -257,7 +263,7 @@ fn document_to_commonmark_with_options<'a>(
     Ok(document.encode(env))
 }
 
-#[rustler::nif(schedule = "DirtyCpu")]
+#[cfg_attr(not(test), rustler::nif(schedule = "DirtyCpu"))]
 fn document_to_html<'a>(env: Env<'a>, ex_document: Term<'a>) -> NifResult<Term<'a>> {
     let arena = Arena::new();
     let comrak_ast = document_term_to_comrak_ast(&arena, ex_document)?;
@@ -273,12 +279,13 @@ fn document_to_html<'a>(env: Env<'a>, ex_document: Term<'a>) -> NifResult<Term<'
     Ok(buffer.encode(env))
 }
 
-#[rustler::nif(schedule = "DirtyCpu")]
+#[cfg_attr(not(test), rustler::nif(schedule = "DirtyCpu"))]
 fn document_to_html_with_options<'a>(
     env: Env<'a>,
     ex_document: Term<'a>,
     options: ExOptions,
 ) -> NifResult<Term<'a>> {
+    let tagfilter = options.tagfilter();
     let arena = Arena::new();
     let comrak_ast = document_term_to_comrak_ast(&arena, ex_document)?;
     let (comrak_options, lumis_adapter, sanitize) = render_parts(options)?;
@@ -287,18 +294,19 @@ fn document_to_html_with_options<'a>(
     let plugins = plugins(&lumis_adapter);
 
     finish_render(
-        MdexFormatter::format_document_with_plugins(
+        MdexFormatter::format_html(
             comrak_ast,
             &comrak_options,
             &mut buffer,
             &plugins,
+            tagfilter,
         ),
         &lumis_adapter,
     )?;
     Ok(do_safe_html(buffer, &sanitize, false, escape_curly_braces_in_code).encode(env))
 }
 
-#[rustler::nif(schedule = "DirtyCpu")]
+#[cfg_attr(not(test), rustler::nif(schedule = "DirtyCpu"))]
 fn document_to_xml<'a>(env: Env<'a>, ex_document: Term<'a>) -> NifResult<Term<'a>> {
     let arena = Arena::new();
     let comrak_ast = document_term_to_comrak_ast(&arena, ex_document)?;
@@ -310,7 +318,7 @@ fn document_to_xml<'a>(env: Env<'a>, ex_document: Term<'a>) -> NifResult<Term<'a
     Ok(xml.encode(env))
 }
 
-#[rustler::nif(schedule = "DirtyCpu")]
+#[cfg_attr(not(test), rustler::nif(schedule = "DirtyCpu"))]
 fn document_to_xml_with_options<'a>(
     env: Env<'a>,
     ex_document: Term<'a>,
@@ -330,17 +338,17 @@ fn document_to_xml_with_options<'a>(
     Ok(xml.encode(env))
 }
 
-#[rustler::nif(schedule = "DirtyCpu")]
+#[cfg_attr(not(test), rustler::nif(schedule = "DirtyCpu"))]
 pub fn text_to_anchor(text: &str) -> String {
     Anchorizer::new().anchorize(text)
 }
 
-#[rustler::nif]
+#[cfg_attr(not(test), rustler::nif)]
 pub fn dangerous_url(url: &str) -> bool {
     comrak::html::dangerous_url(url)
 }
 
-#[rustler::nif(schedule = "DirtyCpu")]
+#[cfg_attr(not(test), rustler::nif(schedule = "DirtyCpu"))]
 pub fn safe_html(
     env: Env<'_>,
     unsafe_html: String,
@@ -381,7 +389,7 @@ fn syntax_highlighter(
             #[cfg(feature = "lumis")]
             {
                 Ok(CodeFenceSyntaxHighlighter::Lumis(Box::new(
-                    LumisAdapter::new(opts.formatter, opts.rainbow_brackets),
+                    LumisAdapter::new(opts.formatter, opts.rainbow_brackets, opts.budget),
                 )))
             }
 

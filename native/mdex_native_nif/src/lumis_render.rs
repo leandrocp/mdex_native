@@ -11,6 +11,7 @@ use lumis_core::events::HighlightEvent;
 use lumis_core::languages::Language;
 use lumis_wasm_runtime::RuntimeError;
 
+use crate::types::options::ExBudget;
 use lumis_core::elixir::{
     ExAppearance, ExAttrValue, ExFormatterOption, ExHtmlInlineHighlightLines,
     ExHtmlInlineHighlightLinesStyle, ExHtmlLinkedHighlightLines, ExHtmlStructure, ExLineSpec,
@@ -22,6 +23,7 @@ pub fn render_code_fence(
     language: Option<&str>,
     formatter: Option<ExFormatterOption>,
     rainbow_brackets: bool,
+    budget: ExBudget,
     attributes: &HashMap<String, String>,
 ) -> Result<String, String> {
     // Comrak includes the code-fence terminator's newline in the literal. Its
@@ -40,12 +42,12 @@ pub fn render_code_fence(
         }]
     };
 
-    let events = if language == Language::PlainText {
-        plain()
+    let (events, exhausted) = if language == Language::PlainText {
+        (plain(), None)
     } else {
         let executor = crate::lumis_runtime::executor().map_err(|reason| format!("{reason:#}"))?;
-        match executor.highlight(source, language.id_name(), rainbow_brackets) {
-            Ok(events) => flatten_events(source, events),
+        match executor.highlight(source, language.id_name(), rainbow_brackets, budget) {
+            Ok(output) => (flatten_events(source, output.events), output.budget),
             // A parser this project never installed, or one the runtime cannot
             // reach. That costs the fence it names, not the document around it:
             // a thousand-line post still renders when one block asks for a
@@ -56,7 +58,7 @@ pub fn render_code_fence(
                 | RuntimeError::LanguageNotCached(_)
                 | RuntimeError::UnknownLanguage(_)
                 | RuntimeError::LanguageStoreUnavailable,
-            ) => plain(),
+            ) => (plain(), None),
             // Anything else is a parser or a runtime at fault rather than an
             // absent dependency, and is worth surfacing.
             Err(runtime_error) => return Err(runtime_error.to_string()),
@@ -65,7 +67,7 @@ pub fn render_code_fence(
 
     let mut output = Vec::new();
     formatter
-        .render(source, &events, &mut output)
+        .render_budgeted_or(source, &events, &mut output, exhausted)
         .map_err(|error| error.to_string())?;
     let output = String::from_utf8(output).map_err(|error| error.to_string())?;
 
@@ -406,7 +408,15 @@ mod tests {
             .map(|(key, value)| (key.to_string(), value.to_string()))
             .collect();
 
-        render_code_fence(source, language, formatter, rainbow_brackets, &attributes).unwrap()
+        render_code_fence(
+            source,
+            language,
+            formatter,
+            rainbow_brackets,
+            ExBudget::default(),
+            &attributes,
+        )
+        .unwrap()
     }
 
     #[test]

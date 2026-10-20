@@ -12,6 +12,9 @@ defmodule MDExNative.Comrak do
   and use keyword lists. MDExNative also accepts `:sanitize` and
   `:syntax_highlight`.
 
+  The `:tagfilter` extension is deprecated but retains its existing behavior
+  for compatibility. Use `:sanitize` to clean rendered HTML instead.
+
   ## Examples
 
       iex> MDExNative.Comrak.markdown_to_html("# Hello")

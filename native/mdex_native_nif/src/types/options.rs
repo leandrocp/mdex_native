@@ -1,4 +1,9 @@
+#[cfg(feature = "lumis")]
+mod budget;
 mod sanitize;
+
+#[cfg(feature = "lumis")]
+pub use budget::ExBudget;
 
 use comrak::options::{AlertStyleType, Extension, ListStyleType, Options, Parse, Render};
 #[cfg(feature = "lumis")]
@@ -16,6 +21,7 @@ mod atoms {
         alerts,
         autolink,
         block_directive,
+        budget,
         cjk_friendly_emphasis,
         compact_html,
         default_info_string,
@@ -142,6 +148,7 @@ fn syntax_highlight_field(term: Term) -> NifResult<Option<ExSyntaxHighlightOptio
 #[derive(Clone, Debug, Default)]
 pub struct ExExtensionOptions {
     pub strikethrough: Option<bool>,
+    // Deprecated compatibility option; rendered locally since Comrak 0.56.
     pub tagfilter: Option<bool>,
     pub table: Option<bool>,
     pub autolink: Option<bool>,
@@ -225,7 +232,6 @@ impl<'a> Decoder<'a> for ExExtensionOptions {
     }
 }
 
-#[allow(deprecated)]
 impl ExExtensionOptions {
     pub fn apply(mut self, extension: &mut Extension<'static>) {
         self.apply_common_options(extension);
@@ -235,7 +241,6 @@ impl ExExtensionOptions {
 
     fn apply_common_options(&mut self, extension: &mut Extension<'static>) {
         overwrite(&mut extension.strikethrough, self.strikethrough);
-        overwrite(&mut extension.tagfilter, self.tagfilter);
         overwrite(&mut extension.table, self.table);
         overwrite(&mut extension.autolink, self.autolink);
         overwrite(&mut extension.tasklist, self.tasklist);
@@ -499,6 +504,13 @@ impl<'a> Decoder<'a> for ExOptions {
 }
 
 impl ExOptions {
+    pub fn tagfilter(&self) -> bool {
+        self.extension
+            .as_ref()
+            .and_then(|extension| extension.tagfilter)
+            .unwrap_or(false)
+    }
+
     pub fn comrak_options(&self) -> Options<'static> {
         let mut options = Options::default();
         if let Some(extension) = self.extension.clone() {
@@ -544,6 +556,8 @@ pub struct ExLumisOptions {
     // Lumis moved this off the formatter in 0.8; it arrives alongside it.
     #[cfg(feature = "lumis")]
     pub rainbow_brackets: bool,
+    #[cfg(feature = "lumis")]
+    pub budget: ExBudget,
 }
 
 #[derive(Debug, Default)]
@@ -576,8 +590,8 @@ pub enum ExSyntaxHighlightEngineOptions {
 
 /// Every option `Lumis.highlight/2` takes is accepted, decoded by the same
 /// code as the `:lumis` NIF, deprecated ones included. A code fence decides its
-/// own language and has nothing to annotate or budget, so `:language`,
-/// `:annotations` and `:budget` are read and left unused.
+/// own language and has nothing to annotate, so `:language` and
+/// `:annotations` are read and left unused. Budgets apply to each fence.
 ///
 /// `context` names where the options sat in the caller's own call, so an error
 /// reads `invalid value for :syntax_highlight option: ...`.
@@ -590,6 +604,7 @@ impl ExLumisOptions {
         Ok(Self {
             formatter: options.formatter,
             rainbow_brackets: options.rainbow_brackets,
+            budget: ExBudget::new(options.time_limit, options.match_limit),
         })
     }
 }

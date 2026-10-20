@@ -6,13 +6,55 @@ defmodule MDExNativeE2E.LumisRegressionTest do
                    themes: [light: "catppuccin_latte", dark: "catppuccin_mocha"],
                    default_theme: "light-dark()"}
 
+    test "a time budget returns the whole fence escaped and marks every HTML formatter" do
+      line = "let value = a < b && c > d;"
+      source = "fn main() {\n" <> String.duplicate(line <> "\n", 4_000) <> "}"
+
+      for formatter <- [
+            :html_linked,
+            {:html_inline, theme: "onedark"},
+            {:html_multi_themes, themes: [dark: "onedark"], default_theme: "dark"}
+          ] do
+        html = render("```rust\n#{source}\n```", formatter: formatter, budget: [time_limit: 1])
+
+        assert html =~ ~s(data-lumis-budget="time")
+        assert length(Regex.scan(~r/let value = a &lt; b &amp;&amp; c &gt; d;/, html)) == 4_000
+        assert length(Regex.scan(~r/<span\b/, html)) == 4_002
+        refute html =~ "a < b"
+      end
+    end
+
+    test "a match budget preserves highlighting and reports dropped matches" do
+      source = "fn main() { let value = (1 + (2 * (3 - 4))); }"
+
+      html =
+        render("```rust\n#{source}\n```",
+          formatter: :html_linked,
+          budget: [time_limit: 0, match_limit: 1]
+        )
+
+      assert html =~ ~s(data-lumis-budget="matches")
+      assert length(Regex.scan(~r/<span\b/, html)) > 1
+      assert html |> String.replace(~r/<[^>]*>/, "") |> String.trim() == source
+    end
+
+    test "omitted and nil limits use defaults, and zero disables the time limit" do
+      for budget <- [[], [time_limit: nil, match_limit: nil], [time_limit: 0]] do
+        html = render("```rust\nfn main() {}\n```", formatter: :html_linked, budget: budget)
+
+        refute html =~ "data-lumis-budget"
+        assert html =~ ~s(class="l-keyword-function")
+      end
+    end
+
     test "multi-theme options reach the pre attributes (issue #32)" do
       html = render("```elixir\nIO.puts(:hello)\n```", formatter: @multi_themes)
 
       assert html =~
                "style=\"color: light-dark(#4c4f69, #cdd6f4); background-color: light-dark(#eff1f5, #1e1e2e);\""
 
-      assert Enum.sort(pre_classes(html)) == Enum.sort(["lumis", "lumis-themes", "light", "dark"])
+      assert Enum.sort(pre_classes(html)) ==
+               Enum.sort(["lumis", "lumis-themes", "catppuccin_latte", "catppuccin_mocha"])
     end
 
     test "a declared parser highlights, an undeclared one renders plain" do
@@ -37,7 +79,7 @@ defmodule MDExNativeE2E.LumisRegressionTest do
       # Deprecated, but it still themes the fence, as it did through Lumis.
       assert render("```elixir\n:ok\n```", theme: "dracula") =~ "background-color: #282a36"
 
-      # A fence decides its own language and has nothing to annotate or budget.
+      # A fence decides its own language and has nothing to annotate.
       assert render("```elixir\n:ok\n```",
                language: "rust",
                annotations: [],
