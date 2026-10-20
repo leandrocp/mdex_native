@@ -51,4 +51,4 @@ syntect = ["comrak/syntect", "dep:two-face"]
 # crates.io keeps one lumis-core for this crate and for lumis-wasm-runtime.
 # Remove it and require "4.1.0" at release.
 [patch.crates-io]
-lumis-core = { git = "https://github.com/leandrocp/lumis", rev = "264aa63d69d6fd9ffba0d1ab578ee950d7dcf86f" }
+lumis-core = { git = "https://github.com/leandrocp/lumis", rev = "ba053b20c14ba9869b26910e19fd6cc868ce9965" }
