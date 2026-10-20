@@ -372,9 +372,6 @@ defmodule MDExNative.Comrak do
 
   defp legacy_formatter_option({:theme, {:theme, theme}}), do: {:theme, theme}
 
-  defp legacy_formatter_option({key, attrs}) when key in [:pre_attrs, :code_attrs],
-    do: {key, Enum.map(attrs, fn {name, value} -> {legacy_key(name), value} end)}
-
   defp legacy_formatter_option({:themes, %{} = themes}),
     do: {:themes, Enum.map(themes, fn {id, theme} -> {legacy_key(id), theme} end)}
 

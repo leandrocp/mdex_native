@@ -75,6 +75,34 @@ defmodule MDExNativeE2E.LumisRegressionTest do
       assert MDExNativeE2E.CompileTimeRender.from_keyword() =~ "<span style=\"color: #"
     end
 
+    test "legacy formatter attributes do not require existing atoms" do
+      name = "data-custom-#{System.unique_integer([:positive])}"
+      assert_raise ArgumentError, fn -> String.to_existing_atom(name) end
+
+      wire = %{
+        formatter:
+          {:html_inline,
+           %{
+             theme: {:string, "onedark"},
+             pre_attrs: [{name, "pre-value"}],
+             code_attrs: [{name, "code-value"}]
+           }}
+      }
+
+      for syntax_highlight <- [[engine: :lumis, opts: wire], %{engine: :lumis, opts: wire}] do
+        html =
+          MDExNative.Comrak.markdown_to_html("```elixir\n:ok\n```",
+            render: [unsafe: true],
+            syntax_highlight: syntax_highlight
+          )
+
+        assert html =~ ~r/<pre\b[^>]*#{name}="pre-value"/
+        assert html =~ ~r/<code\b[^>]*#{name}="code-value"/
+      end
+
+      assert_raise ArgumentError, fn -> String.to_existing_atom(name) end
+    end
+
     test "every option Lumis.highlight/2 takes is accepted" do
       # Deprecated, but it still themes the fence, as it did through Lumis.
       assert render("```elixir\n:ok\n```", theme: "dracula") =~ "background-color: #282a36"

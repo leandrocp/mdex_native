@@ -839,7 +839,7 @@ defmodule MDExNative.ComrakTest do
                MDExNative.Comrak.legacy_syntax_highlight(wire)
 
       assert opts[:theme] == "dracula"
-      assert opts[:pre_attrs] == [id: "x"]
+      assert opts[:pre_attrs] == [{"id", "x"}]
       assert opts[:highlight_lines] == %{lines: [1, 3..9//2], style: "color: red", class: nil}
       assert opts[:header] == %{open_tag: "<div>", close_tag: "</div>"}
 
@@ -892,7 +892,7 @@ defmodule MDExNative.ComrakTest do
 
       options = MDExNative.Comrak.legacy_syntax_highlight(%{engine: :lumis, opts: wire})
       assert %{opts: %{formatter: {:html_inline, opts}}} = options
-      assert Enum.sort(opts) == [pre_attrs: [id: "x"], theme: "dracula"]
+      assert Enum.sort(opts) == [pre_attrs: [{"id", "x"}], theme: "dracula"]
     end
 
     test "leaves options in the shape a caller writes alone" do
