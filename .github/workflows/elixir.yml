@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      MDEX_NATIVE_E2E_MDEX_REFS: main latest
+      MDEX_NATIVE_E2E_MDEX_REFS: lp-drop-lumis-dependency latest
 
     steps:
       - uses: actions/checkout@v7
