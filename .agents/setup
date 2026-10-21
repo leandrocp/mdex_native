@@ -13,7 +13,7 @@ TIMEFORMAT='Completed in %R seconds'
 
 echo '==> Checking system packages'
 packages=()
-for package in build-essential ca-certificates curl unzip libssl-dev libncurses6; do
+for package in build-essential cmake ca-certificates curl unzip libssl-dev libncurses6; do
   if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -qx 'install ok installed'; then
     packages+=("$package")
   fi
