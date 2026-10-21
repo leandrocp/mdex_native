@@ -34,7 +34,9 @@ A fence goes through [`lumis_adapter.rs`][lumis_adapter], which implements comra
 
 An application that also highlights with `:lumis` runs two Lumis runtimes, one in `lumis_nif` and one here.
 
-They share files: the parser packages and the compiled-module cache under the Lumis data directory. A parser compiled by one is not compiled again by the other.
+They share files: the parser packages and the compiled-module cache under the Lumis data directory. Reusing a compiled parser requires the same Wasmtime version, parser bytes, target, and compatible engine settings. Different Wasmtime patch versions use separate cache entries.
+
+The [cache-alignment workflow](.github/workflows/wasmtime-cache.yml) compares our lockfile with the standalone NIF lockfile at an immutable Lumis release commit. It runs on dependency changes and gates publishing. To target a new Lumis release, update `LUMIS_REF` in that workflow and align our lockfile with it, without tightening public dependency requirements. The check guarantees version alignment for that pair, not cache hits for arbitrary package combinations; users can still mix versions and use separate compilation caches.
 
 They don't share memory. Each NIF has its own [wasmtime] engine and Tree-sitter [`WasmStore`][wasmstore], so a language used by both is loaded twice, and each store has its own `store_full` limit. With lumis 0.10.0 and mdex_native 0.2.10 on macOS arm64, the first language costs about 15 MB and 120 ms per NIF, and each additional language about 2.7 MB and 13 ms.
 

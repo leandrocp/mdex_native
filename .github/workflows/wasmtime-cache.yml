@@ -1,0 +1,46 @@
+name: Wasmtime cache alignment
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "native/**"
+      - ".github/scripts/**"
+      - ".github/workflows/wasmtime-cache.yml"
+      - ".github/workflows/publish.yml"
+  pull_request:
+    paths:
+      - "native/**"
+      - ".github/scripts/**"
+      - ".github/workflows/wasmtime-cache.yml"
+      - ".github/workflows/publish.yml"
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      # hex-lumis/v0.10.3; update this reference and our lockfile together.
+      LUMIS_REF: b895f4cd0d8c6f19f2cf8172e3d9042ecf1853b1
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Test the version comparison
+        run: python3 -m unittest discover -s .github/scripts -v
+
+      - name: Validate the NIF lockfile with Lumis enabled
+        run: cargo metadata --manifest-path native/mdex_native_nif/Cargo.toml --features lumis --locked --format-version 1 > /dev/null
+
+      - name: Compare against the targeted Lumis release
+        run: |
+          curl --fail --silent --show-error --location --retry 3 \
+            "https://raw.githubusercontent.com/leandrocp/lumis/$LUMIS_REF/packages/elixir/lumis/native/lumis_nif/Cargo.lock" \
+            --output "$RUNNER_TEMP/lumis-Cargo.lock"
+          python3 .github/scripts/check-wasmtime-cache.py \
+            native/mdex_native_nif/Cargo.lock "$RUNNER_TEMP/lumis-Cargo.lock"
