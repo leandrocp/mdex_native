@@ -16,8 +16,9 @@ jobs:
 
   release-nifs:
     needs: wasmtime-cache
-    uses: leandrocp/github-actions/.github/workflows/nif-release.yml@main
+    uses: leandrocp/github-actions/.github/workflows/nif-release.yml@a7a8f258b545ba8292a446aa5009c59f90db9e32
     with:
+      locked: true
       project-name: mdex_native_nif
       project-dir: native/mdex_native_nif
       feature-variants: '[{"features":"lumis","variant":"lumis"},{"features":"syntect","variant":"syntect"},{"features":"","variant":""}]'
