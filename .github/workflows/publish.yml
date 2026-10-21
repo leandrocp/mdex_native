@@ -11,7 +11,11 @@ permissions:
   id-token: write
 
 jobs:
+  wasmtime-cache:
+    uses: ./.github/workflows/wasmtime-cache.yml
+
   release-nifs:
+    needs: wasmtime-cache
     uses: leandrocp/github-actions/.github/workflows/nif-release.yml@main
     with:
       project-name: mdex_native_nif
