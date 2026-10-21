@@ -16,6 +16,12 @@ Most applications should use `MDEx` directly to benefit from plugins, Document A
 
 But this project offers direct access to underlying Rust crates when you don't need all those features, or need a bit more performance, or less dependencies.
 
+HTML rendering reserves the exact destination `mdex:incomplete-link` for MDEx's
+incomplete Markdown fragments. Links and wikilinks with that destination render
+without `href`; images render as escaped plain alt text, without an `<img>` or
+figure. This happens before URL rewriting and sanitization, including in unsafe
+mode. Parsing, CommonMark and XML output retain the destination unchanged.
+
 ## Installation
 
 Add `:mdex_native` to your dependencies:

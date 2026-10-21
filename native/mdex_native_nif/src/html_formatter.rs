@@ -5,6 +5,8 @@
 //! the field. This formatter delegates every node to `format_node_default`
 //! except `Link` and `Image`, where it writes the same markup comrak would,
 //! plus the attributes.
+//! MDEx's reserved `mdex:incomplete-link` destination renders as an anchor
+//! without href (including wikilinks), or plain alt text for images.
 //! The optional compatibility entry point also retains deprecated tag filtering
 //! for raw HTML nodes.
 //!
@@ -40,12 +42,28 @@ use std::fmt::{self, Write};
 
 mod tagfilter;
 
+// Shared contract with MDEx.FragmentParser; this exact destination is reserved.
+const INCOMPLETE_LINK_URL: &str = "mdex:incomplete-link";
+
 create_formatter!(MdexFormatter, {
     NodeValue::Image(ref nl) => |context, node, entering| {
         return render_image(context, node, entering, nl);
     },
     NodeValue::Link(ref nl) => |context, node, entering| {
         return render_link(context, node, entering, nl);
+    },
+    NodeValue::WikiLink(ref nl) => |context, node, entering| {
+        if nl.url != INCOMPLETE_LINK_URL {
+            return html::format_node_default(context, node, entering);
+        }
+        if entering {
+            context.write_str("<a")?;
+            html::render_sourcepos(context, node)?;
+            context.write_str(" data-wikilink=\"true\">")?;
+        } else {
+            context.write_str("</a>")?;
+        }
+        return Ok(ChildRendering::HTML);
     },
 });
 
@@ -108,7 +126,8 @@ fn render_link<T>(
     entering: bool,
     nl: &NodeLink,
 ) -> Result<ChildRendering, fmt::Error> {
-    if !writes_attrs(context, node) {
+    let incomplete = nl.url == INCOMPLETE_LINK_URL;
+    if !incomplete && !writes_attrs(context, node) {
         return html::format_node_default(context, node, entering);
     }
 
@@ -123,20 +142,24 @@ fn render_link<T>(
     if entering {
         context.write_str("<a")?;
         html::render_sourcepos(context, node)?;
-        context.write_str(" href=\"")?;
-        if context.options.render.r#unsafe || !html::dangerous_url(&nl.url) {
-            match &context.options.extension.link_url_rewriter {
-                Some(rewriter) => context.escape_href(&rewriter.to_html(&nl.url))?,
-                None => context.escape_href(&nl.url)?,
+        if !incomplete {
+            context.write_str(" href=\"")?;
+            if context.options.render.r#unsafe || !html::dangerous_url(&nl.url) {
+                match &context.options.extension.link_url_rewriter {
+                    Some(rewriter) => context.escape_href(&rewriter.to_html(&nl.url))?,
+                    None => context.escape_href(&nl.url)?,
+                }
             }
+            context.write_str("\"")?;
         }
-        context.write_str("\"")?;
         if !nl.title.is_empty() {
             context.write_str(" title=\"")?;
             context.escape(&nl.title)?;
             context.write_str("\"")?;
         }
-        write_attrs(context, node)?;
+        if writes_attrs(context, node) {
+            write_attrs(context, node)?;
+        }
         context.write_str(">")?;
     } else {
         context.write_str("</a>")?;
@@ -159,6 +182,9 @@ fn render_image<T>(
     entering: bool,
     nl: &NodeLink,
 ) -> Result<ChildRendering, fmt::Error> {
+    if nl.url == INCOMPLETE_LINK_URL {
+        return Ok(ChildRendering::Plain);
+    }
     if !writes_attrs(context, node) {
         return html::format_node_default(context, node, entering);
     }
@@ -232,6 +258,11 @@ fn write_attrs<T>(context: &mut Context<T>, node: Node<'_>) -> fmt::Result {
 
     for (key, value) in &attrs.pairs {
         if !is_attribute_name(key) {
+            continue;
+        }
+        if key.eq_ignore_ascii_case("href")
+            && matches!(&ast.value, NodeValue::Link(nl) if nl.url == INCOMPLETE_LINK_URL)
+        {
             continue;
         }
         context.write_str(" ")?;
@@ -356,6 +387,70 @@ mod tests {
                 .map(|(k, v)| (k.to_string(), v.to_string()))
                 .collect(),
         }
+    }
+
+    #[test]
+    fn incomplete_destinations_render_without_urls() {
+        for unsafe_ in [false, true] {
+            let mut options = attr_options();
+            options.render.r#unsafe = unsafe_;
+            options.render.figure_with_caption = true;
+            options.extension.wikilinks_title_after_pipe = true;
+            options.extension.link_url_rewriter =
+                Some(std::sync::Arc::new(|url: &str| format!("/link/{url}")));
+            options.extension.image_url_rewriter =
+                Some(std::sync::Arc::new(|url: &str| format!("/image/{url}")));
+
+            for (markdown, expected) in [
+                (
+                    "[**docs**](mdex:incomplete-link)",
+                    "<a><strong>docs</strong></a>",
+                ),
+                (
+                    "[[mdex:incomplete-link|wiki]]",
+                    "<a data-wikilink=\"true\">wiki</a>",
+                ),
+                (
+                    "![a *b* & <c> `d`](mdex:incomplete-link \"caption\")",
+                    "a b &amp; &lt;c&gt; d",
+                ),
+                ("![](mdex:incomplete-link)", ""),
+                (
+                    "[![badge](mdex:incomplete-link)](mdex:incomplete-link)",
+                    "<a>badge</a>",
+                ),
+                (
+                    "![a [link](https://example.test) ![inner](image.png)](mdex:incomplete-link)",
+                    "a link inner",
+                ),
+            ] {
+                assert_eq!(render(markdown, &options), format!("<p>{expected}</p>\n"));
+            }
+
+            // Only the exact reserved destination changes, not the whole scheme.
+            let completed = "[docs](mdex:other) ![chart](chart.png)";
+            assert_eq!(
+                render(completed, &options),
+                comrak_html(completed, &options)
+            );
+        }
+    }
+
+    #[test]
+    fn attributes_cannot_restore_an_incomplete_href() {
+        assert_eq!(
+            render_with_attrs(
+                "[docs](mdex:incomplete-link \"title\")",
+                &unsafe_options(),
+                |value| matches!(value, NodeValue::Link(..)),
+                attributes(
+                    Some("docs"),
+                    &["pending"],
+                    &[("href", "/bad"), ("HREF", "/also-bad"), ("data-ok", "kept")]
+                ),
+            ),
+            "<p><a title=\"title\" id=\"docs\" class=\"pending\" data-ok=\"kept\">docs</a></p>\n"
+        );
     }
 
     #[test]
