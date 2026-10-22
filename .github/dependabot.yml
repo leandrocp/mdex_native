@@ -6,6 +6,11 @@ updates:
     schedule:
       interval: "weekly"
 
+  - package-ecosystem: "mix"
+    directory: "/integration_test/fixtures/dummy_app"
+    schedule:
+      interval: "weekly"
+
   - package-ecosystem: "cargo"
     directory: "/native/mdex_native_nif"
     schedule:
