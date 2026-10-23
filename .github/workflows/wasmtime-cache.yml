@@ -24,8 +24,8 @@ jobs:
   check:
     runs-on: ubuntu-latest
     env:
-      # Same Lumis revision as the temporary Cargo patches; replace at release.
-      LUMIS_REF: 3f983fb2e611c8c0c4c8ed474b557ed24df465c5
+      # cargo-lumis-wasm-runtime/v0.5.2; update this reference and our lockfile together.
+      LUMIS_REF: 898b9ef824e186dc431dbcf711a83787c54e65ed
     steps:
       - uses: actions/checkout@v7
 

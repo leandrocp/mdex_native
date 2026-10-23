@@ -660,7 +660,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1171,8 +1171,9 @@ dependencies = [
 
 [[package]]
 name = "lumis-core"
-version = "4.0.2"
-source = "git+https://github.com/leandrocp/lumis?rev=3f983fb2e611c8c0c4c8ed474b557ed24df465c5#3f983fb2e611c8c0c4c8ed474b557ed24df465c5"
+version = "4.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "280f08e459afb86720148b2d5f0525aee9efecff13dc0de2ecfe9a29bab0ec9c"
 dependencies = [
  "derive_builder",
  "glob",
@@ -1189,8 +1190,9 @@ dependencies = [
 
 [[package]]
 name = "lumis-wasm-runtime"
-version = "0.5.1"
-source = "git+https://github.com/leandrocp/lumis?rev=3f983fb2e611c8c0c4c8ed474b557ed24df465c5#3f983fb2e611c8c0c4c8ed474b557ed24df465c5"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af7d7f39144507a5e53f8e5d74480deaa5105d1f75af76d4a08d32e064f63592"
 dependencies = [
  "etcetera",
  "lumis-core",
@@ -1715,7 +1717,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2069,7 +2071,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2726,7 +2728,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
