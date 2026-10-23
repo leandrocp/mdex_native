@@ -37,7 +37,6 @@ defmodule MDExNative.Integration.E2ETest do
 
       clone = ["clone", "--depth", "1", "--branch", ref, mdex_repo(), mdex_path]
       run!("git", clone, native_path(), [], label: build_path)
-      apply_release_expectations!(mdex_path, ref)
 
       env = e2e_env("lumis", native_checkout_path, build_path: build_path)
       run_mix!(mdex_path, ["deps.get"], env, label: build_path)
@@ -45,22 +44,6 @@ defmodule MDExNative.Integration.E2ETest do
       run_mix!(mdex_path, ["test"], env, label: build_path)
     end
   end
-
-  defp apply_release_expectations!(path, "v0.14.2") do
-    commit = run!("git", ["rev-parse", "HEAD"], path, [], label: "mdex/v0.14.2") |> String.trim()
-    assert commit == "7aba3ae57b235a986d419de3918cd5c1fd5b4edc"
-
-    patch = Path.join(integration_path(), "fixtures/mdex-v0.14.2-expectations.patch")
-
-    IO.puts(
-      "e2e[mdex/v0.14.2]: apply documented upstream expectation corrections to #{commit}; run the full suite"
-    )
-
-    run!("git", ["apply", "--check", patch], path, [], label: "mdex/v0.14.2")
-    run!("git", ["apply", patch], path, [], label: "mdex/v0.14.2")
-  end
-
-  defp apply_release_expectations!(_path, _ref), do: :ok
 
   @tag :cloudflare
   test "precompiled artifact loads from Cloudflare" do
