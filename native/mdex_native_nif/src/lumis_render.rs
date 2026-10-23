@@ -11,17 +11,19 @@ use lumis_core::events::HighlightEvent;
 use lumis_core::languages::Language;
 use lumis_wasm_runtime::RuntimeError;
 
-use crate::types::elixir_types::{
-    ExAppearance, ExAttrValue, ExFormatterOption, ExHtmlInlineHighlightLines,
-    ExHtmlInlineHighlightLinesStyle, ExHtmlLinkedHighlightLines, ExLineSpec, ThemeOrString,
-};
 use crate::types::options::ExBudget;
+use lumis_core::elixir::{
+    ExAppearance, ExAttrValue, ExFormatterOption, ExHtmlInlineHighlightLines,
+    ExHtmlInlineHighlightLinesStyle, ExHtmlLinkedHighlightLines, ExHtmlStructure, ExLineSpec,
+    ThemeOrString,
+};
 
 pub fn render_code_fence(
     source: &str,
     language: Option<&str>,
     formatter: Option<ExFormatterOption>,
     rainbow_brackets: bool,
+    word_diff: bool,
     budget: ExBudget,
     attributes: &HashMap<String, String>,
 ) -> Result<String, String> {
@@ -45,7 +47,13 @@ pub fn render_code_fence(
         (plain(), None)
     } else {
         let executor = crate::lumis_runtime::executor().map_err(|reason| format!("{reason:#}"))?;
-        match executor.highlight(source, language.id_name(), rainbow_brackets, budget) {
+        match executor.highlight(
+            source,
+            language.id_name(),
+            rainbow_brackets,
+            word_diff,
+            budget,
+        ) {
             Ok(output) => (flatten_events(source, output.events), output.budget),
             // A parser this project never installed, or one the runtime cannot
             // reach. That costs the fence it names, not the document around it:
@@ -80,7 +88,9 @@ pub fn render_code_fence(
 ///
 /// A decorator wins over the option, an unset option falls back to what MDEx
 /// has always rendered, and `header` is dropped because Comrak writes the
-/// closing tags and an outer header could never be closed.
+/// closing tags and an outer header could never be closed. A code fence is a
+/// block, so `structure` is always `:block`: inline output has no `</pre>` for
+/// Comrak's closing tags to match.
 fn with_mdex_attributes(
     formatter: ExFormatterOption,
     attributes: &HashMap<String, String>,
@@ -89,6 +99,7 @@ fn with_mdex_attributes(
 
     match formatter {
         F::HtmlInline {
+            structure: _,
             theme,
             pre_class,
             pre_attrs,
@@ -112,6 +123,7 @@ fn with_mdex_attributes(
             attributes,
         ),
         F::HtmlLinked {
+            structure: _,
             pre_class,
             pre_attrs,
             code_attrs,
@@ -119,6 +131,7 @@ fn with_mdex_attributes(
             line_numbers,
             header: _,
         } => F::HtmlLinked {
+            structure: ExHtmlStructure::Block,
             pre_class: mdex_attribute(attributes, "pre_class").or(pre_class),
             pre_attrs,
             code_attrs,
@@ -127,6 +140,7 @@ fn with_mdex_attributes(
             header: None,
         },
         F::HtmlMultiThemes {
+            structure: _,
             themes,
             default_theme,
             css_variable_prefix,
@@ -139,6 +153,7 @@ fn with_mdex_attributes(
             line_numbers,
             header: _,
         } => F::HtmlMultiThemes {
+            structure: ExHtmlStructure::Block,
             themes,
             default_theme,
             css_variable_prefix,
@@ -169,6 +184,7 @@ fn with_mdex_attributes(
         // formatter cannot take. A fence's `highlight_lines` attribute is read
         // back from the decorator instead.
         F::BbcodeScoped { .. } => F::HtmlInline {
+            structure: ExHtmlStructure::Block,
             theme: None,
             pre_class: mdex_attribute(attributes, "pre_class"),
             pre_attrs: Vec::new(),
@@ -209,6 +225,7 @@ fn html_inline_with_attributes(
         .or_else(|| Some(ThemeOrString::String("onedark".to_string())));
 
     ExFormatterOption::HtmlInline {
+        structure: ExHtmlStructure::Block,
         pre_class: mdex_attribute(attributes, "pre_class").or(formatter.pre_class),
         pre_attrs: formatter.pre_attrs,
         code_attrs: formatter.code_attrs,
@@ -403,6 +420,7 @@ mod tests {
             language,
             formatter,
             rainbow_brackets,
+            false,
             ExBudget::default(),
             &attributes,
         )
@@ -559,6 +577,7 @@ mod tests {
     #[test]
     fn a_linked_formatter_defaults_the_highlighted_line_class() {
         let formatter = ExFormatterOption::HtmlLinked {
+            structure: ExHtmlStructure::Block,
             pre_class: None,
             pre_attrs: Vec::new(),
             code_attrs: Vec::new(),

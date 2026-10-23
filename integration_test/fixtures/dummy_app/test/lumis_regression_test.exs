@@ -2,6 +2,10 @@ defmodule MDExNativeE2E.LumisRegressionTest do
   use ExUnit.Case
 
   if Application.compile_env(:mdex_native, :syntax_highlighter) == :lumis do
+    @multi_themes {:html_multi_themes,
+                   themes: [light: "catppuccin_latte", dark: "catppuccin_mocha"],
+                   default_theme: "light-dark()"}
+
     test "a time budget returns the whole fence escaped and marks every HTML formatter" do
       line = "let value = a < b && c > d;"
       source = "fn main() {\n" <> String.duplicate(line <> "\n", 4_000) <> "}"
@@ -11,13 +15,7 @@ defmodule MDExNativeE2E.LumisRegressionTest do
             {:html_inline, theme: "onedark"},
             {:html_multi_themes, themes: [dark: "onedark"], default_theme: "dark"}
           ] do
-        html =
-          MDExNative.Comrak.markdown_to_html("```rust\n#{source}\n```",
-            syntax_highlight: [
-              engine: :lumis,
-              opts: [formatter: formatter, budget: [time_limit: 1]]
-            ]
-          )
+        html = render("```rust\n#{source}\n```", formatter: formatter, budget: [time_limit: 1])
 
         assert html =~ ~s(data-lumis-budget="time")
         assert length(Regex.scan(~r/let value = a &lt; b &amp;&amp; c &gt; d;/, html)) == 4_000
@@ -30,11 +28,9 @@ defmodule MDExNativeE2E.LumisRegressionTest do
       source = "fn main() { let value = (1 + (2 * (3 - 4))); }"
 
       html =
-        MDExNative.Comrak.markdown_to_html("```rust\n#{source}\n```",
-          syntax_highlight: [
-            engine: :lumis,
-            opts: [formatter: :html_linked, budget: [time_limit: 0, match_limit: 1]]
-          ]
+        render("```rust\n#{source}\n```",
+          formatter: :html_linked,
+          budget: [time_limit: 0, match_limit: 1]
         )
 
       assert html =~ ~s(data-lumis-budget="matches")
@@ -43,83 +39,39 @@ defmodule MDExNativeE2E.LumisRegressionTest do
     end
 
     test "omitted and nil limits use defaults, and zero disables the time limit" do
-      markdown = "```rust\nfn main() {}\n```"
-
       for budget <- [[], [time_limit: nil, match_limit: nil], [time_limit: 0]] do
-        html =
-          MDExNative.Comrak.markdown_to_html(markdown,
-            syntax_highlight: [
-              engine: :lumis,
-              opts: [formatter: :html_linked, budget: budget]
-            ]
-          )
+        html = render("```rust\nfn main() {}\n```", formatter: :html_linked, budget: budget)
 
         refute html =~ "data-lumis-budget"
         assert html =~ ~s(class="l-keyword-function")
       end
     end
 
-    test "native markdown_to_html_with_options includes Lumis multi-theme pre attributes (issue #32)" do
-      markdown = "```elixir\nIO.puts(:hello)\n```"
-
-      formatter =
-        {:html_multi_themes,
-         themes: [light: "catppuccin_latte", dark: "catppuccin_mocha"],
-         default_theme: "light-dark()"}
-
-      lumis_opts = [formatter: formatter] |> Lumis.validate_options!() |> Lumis.rust_options!()
-
-      html =
-        MDExNative.Native.markdown_to_html_with_options(markdown, %{
-          render: %{unsafe: true},
-          syntax_highlight: %{
-            engine: :lumis,
-            opts: lumis_opts
-          }
-        })
+    test "multi-theme options reach the pre attributes (issue #32)" do
+      html = render("```elixir\nIO.puts(:hello)\n```", formatter: @multi_themes)
 
       assert html =~
                "style=\"color: light-dark(#4c4f69, #cdd6f4); background-color: light-dark(#eff1f5, #1e1e2e);\""
 
-      pre_classes = pre_classes(html)
-
-      assert Enum.sort(pre_classes) == Enum.sort(["lumis", "lumis-themes", "light", "dark"])
+      assert Enum.sort(pre_classes(html)) ==
+               Enum.sort(["lumis", "lumis-themes", "catppuccin_latte", "catppuccin_mocha"])
     end
 
-    # MDEx publishes flat spans where Lumis nests them, so a fence and
-    # Lumis.highlight/2 agree on colour but not on element structure. These are
-    # the languages whose scopes never nest, where the two must match exactly.
-    @parity_samples [
-      {"html", "<div class=\"a\"><script>let x = 1;</script></div>"},
-      {"rust", "fn main() {\n    let v: Vec<String> = vec![];\n}"},
-      {"json", "{\"a\": [1, 2, {\"b\": null}]}"}
-    ]
+    test "word_diff marks changed words only when enabled" do
+      source = "@@ -1 +1 @@\n-x = foo(1)\n+x = foo(2)"
+      markdown = "```diff\n#{source}\n```"
+      plain = render(markdown, formatter: :html_linked)
+      decorated = render(markdown, formatter: :html_linked, word_diff: true)
 
-    test "a fence renders exactly what Lumis.highlight would" do
-      formatter = {:html_inline, theme: "onedark"}
-      opts = [formatter: formatter] |> Lumis.validate_options!() |> Lumis.rust_options!()
-
-      for {language, source} <- @parity_samples do
-        {name, formatter_opts} = formatter
-
-        direct =
-          Lumis.highlight!(source, formatter: {name, [language: language] ++ formatter_opts})
-
-        rendered =
-          "```#{language}\n#{source}\n```"
-          |> MDExNative.Comrak.markdown_to_html(syntax_highlight: [engine: :lumis, opts: opts])
-          |> String.trim_trailing("\n")
-
-        assert direct == rendered, "#{language} diverged from Lumis.highlight/2"
-      end
+      refute plain =~ "l-diff-minus-word"
+      refute plain =~ "l-diff-plus-word"
+      assert decorated =~ ~s(class="l-diff-minus-word")
+      assert decorated =~ ~s(class="l-diff-plus-word")
+      assert decorated |> String.replace(~r/<[^>]*>/, "") |> String.trim() == source
+      assert render(markdown, formatter: :html_linked, word_diff: false) == plain
     end
 
     test "a declared parser highlights, an undeclared one renders plain" do
-      # Both halves come from the store this NIF was pointed at, which is the
-      # `lumis_wasm_*` dependencies Lumis itself resolves — a parser is
-      # installed once for the VM rather than once per NIF.
-      assert Lumis.Packages.installed_dirs() != []
-
       declared = highlight("```elixir\nIO.puts(:hello)\n```")
       assert declared =~ "language-elixir"
       # Scoped per token, so the source is split across spans rather than literal.
@@ -135,18 +87,193 @@ defmodule MDExNativeE2E.LumisRegressionTest do
 
     test "a fence rendered at compile time is highlighted" do
       assert MDExNativeE2E.CompileTimeRender.from_keyword() =~ "<span style=\"color: #"
-      assert MDExNativeE2E.CompileTimeRender.from_map() =~ "<span style=\"color: #"
     end
 
-    test "an invalid Lumis option reports what Lumis said" do
-      error =
-        assert_raise NimbleOptions.ValidationError, fn ->
+    test "legacy formatter attributes do not require existing atoms" do
+      name = "data-custom-#{System.unique_integer([:positive])}"
+      assert_raise ArgumentError, fn -> String.to_existing_atom(name) end
+
+      wire = %{
+        formatter:
+          {:html_inline,
+           %{
+             theme: {:string, "onedark"},
+             pre_attrs: [{name, "pre-value"}],
+             code_attrs: [{name, "code-value"}]
+           }}
+      }
+
+      for syntax_highlight <- [[engine: :lumis, opts: wire], %{engine: :lumis, opts: wire}] do
+        html =
           MDExNative.Comrak.markdown_to_html("```elixir\n:ok\n```",
-            syntax_highlight: [engine: :lumis, opts: [formatter: {:html_inline, nope: true}]]
+            render: [unsafe: true],
+            syntax_highlight: syntax_highlight
           )
+
+        assert html =~ ~r/<pre\b[^>]*#{name}="pre-value"/
+        assert html =~ ~r/<code\b[^>]*#{name}="code-value"/
+      end
+
+      assert_raise ArgumentError, fn -> String.to_existing_atom(name) end
+    end
+
+    test "every option Lumis.highlight/2 takes is accepted" do
+      # Deprecated, but it still themes the fence, as it did through Lumis.
+      assert render("```elixir\n:ok\n```", theme: "dracula") =~ "background-color: #282a36"
+
+      # A fence decides its own language and has nothing to annotate.
+      assert render("```elixir\n:ok\n```",
+               language: "rust",
+               annotations: [],
+               budget: [time_limit: 1000],
+               rainbow_brackets: true
+             ) =~ "language-elixir"
+    end
+
+    test "an invalid Lumis option raises ArgumentError naming it" do
+      error =
+        assert_raise ArgumentError, fn ->
+          render("```elixir\n:ok\n```", formatter: {:html_inline, them: "dracula"})
         end
 
-      assert Exception.message(error) =~ "nope"
+      # Where the option sat is this library's; the rest is lumis-core's, and
+      # its list of valid options grows with Lumis.
+      assert error.message =~
+               ~r/^invalid value for :syntax_highlight option: invalid value for :opts option: /
+
+      assert error.message =~ "unknown option :them (did you mean :theme?)"
+    end
+
+    test "compiled parsers go where :lumis keeps its own, or in this application without it" do
+      expected =
+        case :code.priv_dir(:lumis) do
+          {:error, :bad_name} -> :code.priv_dir(:mdex_native)
+          priv -> priv
+        end
+
+      assert MDExNative.Application.data_dir() == Path.join(List.to_string(expected), "lumis")
+    end
+
+    if System.fetch_env!("MDEX_NATIVE_E2E_CASE") == "lumis" do
+      # MDEx 0.14.1 and projects that copied it convert options with Lumis
+      # 0.10's `Lumis.rust_options!/1` before calling mdex_native.
+      test "legacy wire options and caller options render identically through both HTML APIs" do
+        markdown = "```elixir\n" <> Enum.map_join(1..7, "\n", &"IO.puts(#{&1})") <> "\n```"
+        document = MDExNative.Comrak.parse_document(markdown)
+
+        cases = [
+          {[
+             formatter:
+               {:html_inline,
+                theme: "dracula",
+                pre_attrs: ["data-legacy": "pre"],
+                code_attrs: ["data-legacy": "code"],
+                header: %{open_tag: "<section data-legacy=\"header\">", close_tag: "</section>"},
+                highlight_lines: %{
+                  lines: [1, 3..7//2],
+                  style: "background-color: #123456;",
+                  class: "selected"
+                }}
+           ],
+           [
+             "#282a36",
+             "data-legacy=\"pre\"",
+             "data-legacy=\"code\"",
+             "background-color: #123456;"
+           ], [1, 3, 5, 7]},
+          {[
+             formatter:
+               {:html_inline,
+                theme: Lumis.Theme.get("dracula"),
+                highlight_lines: %{lines: [2], style: :theme, class: "selected"}}
+           ], ["#282a36", "background-color: #44475a;"], [2]},
+          {[
+             formatter: {:html_linked, highlight_lines: %{lines: [2..6//2], class: "selected"}}
+           ], ["l-punctuation"], [2, 4, 6]},
+          {[formatter: @multi_themes],
+           ["light-dark(#4c4f69, #cdd6f4)", "catppuccin_latte", "catppuccin_mocha"], []},
+          # Non-HTML formatters retain the existing HTML fallback for a fence.
+          {[formatter: {:terminal, theme: "dracula", background: "#abcdef", width: 80}],
+           ["<pre", "#282a36"], []},
+          {[formatter: {:terminal, theme: "dracula", background: :theme}], ["<pre", "#282a36"],
+           []},
+          {[formatter: {:bbcode_scoped, highlight_lines: %{lines: [2]}}], ["<pre", "<code"], []}
+        ]
+
+        for {opts, fragments, selected_lines} <- cases do
+          wire = opts |> Lumis.validate_options!() |> Lumis.rust_options!()
+          expected = render(markdown, opts)
+
+          for fragment <- fragments, do: assert(expected =~ fragment)
+
+          # Comrak owns the closing tags; headers are accepted but omitted.
+          refute expected =~ "<section"
+          refute expected =~ "</section>"
+
+          for line <- 1..7 do
+            selected? =
+              Regex.match?(
+                ~r/<span\b(?=[^>]*class="[^"]*\bselected\b)(?=[^>]*data-line="#{line}")[^>]*>/,
+                expected
+              )
+
+            assert selected? == line in selected_lines
+          end
+
+          for syntax_highlight <- [
+                [engine: :lumis, opts: opts],
+                %{engine: :lumis, opts: opts},
+                %{engine: :lumis, opts: Map.new(opts)},
+                [opts: opts],
+                opts,
+                Map.new(opts),
+                [engine: :lumis, opts: wire],
+                %{engine: :lumis, opts: wire},
+                [opts: wire],
+                wire
+              ] do
+            options = [render: [unsafe: true], syntax_highlight: syntax_highlight]
+
+            assert MDExNative.Comrak.markdown_to_html(markdown, options) == expected,
+                   "markdown_to_html/2 diverged for #{inspect(syntax_highlight)}"
+
+            assert MDExNative.Comrak.document_to_html(document, options) == expected,
+                   "document_to_html/2 diverged for #{inspect(syntax_highlight)}"
+          end
+        end
+
+        assert MDExNativeE2E.CompileTimeRender.from_map() ==
+                 MDExNativeE2E.CompileTimeRender.from_keyword()
+      end
+
+      # MDEx publishes flat spans where Lumis nests them, so a fence and
+      # Lumis.highlight/2 agree on colour but not on element structure. These are
+      # the languages whose scopes never nest, where the two must match exactly.
+      @parity_samples [
+        {"html", "<div class=\"a\"><script>let x = 1;</script></div>"},
+        {"rust", "fn main() {\n    let v: Vec<String> = vec![];\n}"},
+        {"json", "{\"a\": [1, 2, {\"b\": null}]}"}
+      ]
+
+      test "a fence renders exactly what Lumis.highlight would" do
+        {name, formatter_opts} = formatter = {:html_inline, theme: "onedark"}
+
+        for {language, source} <- @parity_samples do
+          direct =
+            Lumis.highlight!(source, formatter: {name, [language: language] ++ formatter_opts})
+
+          rendered =
+            "```#{language}\n#{source}\n```"
+            |> render(formatter: formatter)
+            |> String.trim_trailing("\n")
+
+          assert direct == rendered, "#{language} diverged from Lumis.highlight/2"
+        end
+      end
+
+      test "the parsers mdex_native reads are the ones Lumis resolves" do
+        assert Lumis.Packages.installed_dirs() != []
+      end
     end
 
     # Compiled modules go under the Lumis data directory, where `:lumis` keeps
@@ -202,6 +329,13 @@ defmodule MDExNativeE2E.LumisRegressionTest do
 
     defp highlight(markdown) do
       MDExNative.Comrak.markdown_to_html(markdown, syntax_highlight: [engine: :lumis])
+    end
+
+    defp render(markdown, opts) do
+      MDExNative.Comrak.markdown_to_html(markdown,
+        render: [unsafe: true],
+        syntax_highlight: [engine: :lumis, opts: opts]
+      )
     end
   end
 

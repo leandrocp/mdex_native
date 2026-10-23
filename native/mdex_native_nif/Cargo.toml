@@ -22,10 +22,10 @@ comrak = { version = "0.56", default-features = false, features = [
   "shortcodes",
   "phoenix_heex",
 ] }
-# The same two crates `lumis_nif` links. The two NIFs share parser files and
-# the compile cache on disk, not the runtime; see ARCHITECTURE.md.
-lumis-core = { version = "4.0.0", default-features = false, features = ["all-languages"], optional = true }
-lumis-wasm-runtime = { version = "0.5.0", optional = true }
+# The same two crates `lumis_nif` links, with `rustler` for the option
+# decoders the two NIFs share. They share no runtime; see ARCHITECTURE.md.
+lumis-core = { version = "4.1.0", default-features = false, features = ["all-languages", "rustler"], optional = true }
+lumis-wasm-runtime = { version = "0.5.2", optional = true }
 lol_html = "3.0"
 parking_lot = "0.12"
 phf = { version = "0.14", features = ["macros"] }
@@ -44,4 +44,3 @@ default = ["nif_version_2_15"]
 lumis = ["dep:lumis-core", "dep:lumis-wasm-runtime"]
 nif_version_2_15 = ["rustler/nif_version_2_15"]
 syntect = ["comrak/syntect", "dep:two-face"]
-

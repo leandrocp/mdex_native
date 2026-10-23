@@ -24,6 +24,10 @@ erl_crash.dump
 comrak-*.tar
 
 /priv/native/
+# Compiled parsers. `_build/*/lib/mdex_native/priv` symlinks here when
+# mdex_native is a path dependency, so a project testing against a checkout
+# caches them in it.
+/priv/lumis/
 /target/
 /.e2e/
 .expert/

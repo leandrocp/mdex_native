@@ -24,8 +24,8 @@ jobs:
   check:
     runs-on: ubuntu-latest
     env:
-      # hex-lumis/v0.10.3; update this reference and our lockfile together.
-      LUMIS_REF: b895f4cd0d8c6f19f2cf8172e3d9042ecf1853b1
+      # cargo-lumis-wasm-runtime/v0.5.2; update this reference and our lockfile together.
+      LUMIS_REF: 898b9ef824e186dc431dbcf711a83787c54e65ed
     steps:
       - uses: actions/checkout@v7
 

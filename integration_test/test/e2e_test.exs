@@ -12,7 +12,7 @@ defmodule MDExNative.Integration.E2ETest do
   end
 
   test "syntax highlighter compile-time options" do
-    for e2e_case <- ~w(default lumis syntect) do
+    for e2e_case <- ~w(default lumis lumis_standalone syntect) do
       native_checkout_path = prepare_native_checkout!("native/#{e2e_case}")
       dummy_app_path = prepare_dummy_app!(e2e_case, native_checkout_path)
       env = e2e_env(e2e_case, native_checkout_path, build_path: "dummy_app/#{e2e_case}")
