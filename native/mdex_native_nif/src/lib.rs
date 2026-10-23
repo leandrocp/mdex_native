@@ -26,6 +26,8 @@ use lol_html::{rewrite_str, text, RewriteStrSettings};
 use lumis_adapter::LumisAdapter;
 use rustler::types::list::ListIterator;
 use rustler::{Encoder, Env, NifResult, Term};
+#[cfg(feature = "syntect")]
+use std::sync::Arc;
 use types::{document::*, options::*};
 
 // Standalone Rust tests have no BEAM host to resolve NIF symbols.
@@ -402,14 +404,38 @@ fn syntax_highlighter(
         ExSyntaxHighlightEngineOptions::Syntect(opts) => {
             #[cfg(feature = "syntect")]
             {
+                use once_cell::sync::Lazy;
+                use parking_lot::Mutex;
+                use std::collections::HashMap;
+
+                static ADAPTERS: Lazy<Mutex<HashMap<Option<String>, Arc<SyntectAdapter>>>> =
+                    Lazy::new(|| Mutex::new(HashMap::new()));
+
+                // Serialize initialization, not rendering, so concurrent first use
+                // builds only one syntax/theme set for each cached adapter.
+                let mut adapters = ADAPTERS.lock();
+                if let Some(adapter) = adapters.get(&opts.theme) {
+                    return Ok(CodeFenceSyntaxHighlighter::Syntect(Arc::clone(adapter)));
+                }
+
                 let builder = SyntectAdapterBuilder::new()
                     .syntax_set(two_face::syntax::extra_newlines())
                     .theme_set(two_face::theme::extra().into());
 
-                let adapter = match opts.theme.as_deref() {
+                let adapter = Arc::new(match opts.theme.as_deref() {
                     Some(theme) => builder.theme(theme).build(),
                     None => builder.build(),
-                };
+                });
+
+                // Bound the cache to bundled themes plus CSS-class mode. Unknown
+                // names retain Comrak's behavior without becoming permanent keys.
+                if opts.theme.as_deref().is_none_or(|name| {
+                    two_face::theme::EmbeddedLazyThemeSet::theme_names()
+                        .iter()
+                        .any(|theme| theme.as_name() == name)
+                }) {
+                    adapters.insert(opts.theme, Arc::clone(&adapter));
+                }
 
                 Ok(CodeFenceSyntaxHighlighter::Syntect(adapter))
             }
@@ -458,7 +484,7 @@ enum CodeFenceSyntaxHighlighter {
     #[cfg(feature = "lumis")]
     Lumis(Box<LumisAdapter>),
     #[cfg(feature = "syntect")]
-    Syntect(SyntectAdapter),
+    Syntect(Arc<SyntectAdapter>),
 }
 
 #[cfg(any(feature = "lumis", feature = "syntect"))]

@@ -11,9 +11,14 @@ permissions:
   id-token: write
 
 jobs:
+  wasmtime-cache:
+    uses: ./.github/workflows/wasmtime-cache.yml
+
   release-nifs:
-    uses: leandrocp/github-actions/.github/workflows/nif-release.yml@main
+    needs: wasmtime-cache
+    uses: leandrocp/github-actions/.github/workflows/nif-release.yml@84f29a1e6b71de81fe806e553eb72b5e8aebe729
     with:
+      locked: true
       project-name: mdex_native_nif
       project-dir: native/mdex_native_nif
       feature-variants: '[{"features":"lumis","variant":"lumis"},{"features":"syntect","variant":"syntect"},{"features":"","variant":""}]'

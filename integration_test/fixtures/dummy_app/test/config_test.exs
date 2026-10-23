@@ -70,6 +70,41 @@ defmodule MDExNativeE2E.ConfigTest do
     end
   end
 
+  if Application.compile_env(:mdex_native, :syntax_highlighter) == :syntect do
+    test "concurrent renders keep CSS classes and named themes independent" do
+      [nil, "InspiredGitHub", "Dracula"]
+      |> List.duplicate(10)
+      |> List.flatten()
+      |> Task.async_stream(
+        fn theme ->
+          options = [syntax_highlight: [engine: :syntect, opts: [theme: theme]]]
+          html = MDExNative.Comrak.markdown_to_html(@rust, options)
+          document = MDExNative.Comrak.parse_document(@rust)
+
+          assert MDExNative.Comrak.document_to_html(document, options) == html
+          assert html =~ ~s(class="language-rust")
+
+          case theme do
+            nil ->
+              assert html =~ ~s(<span class="source rust">)
+              refute html =~ "style="
+
+            "InspiredGitHub" ->
+              assert html =~ "background-color:#ffffff;"
+              assert html =~ ~s(<span style="color:)
+
+            "Dracula" ->
+              assert html =~ "background-color:#282a36;"
+              assert html =~ ~s(<span style="color:)
+          end
+        end,
+        max_concurrency: 8,
+        ordered: false
+      )
+      |> Enum.each(fn result -> assert {:ok, _} = result end)
+    end
+  end
+
   defp lumis_html(markdown) do
     MDExNative.Comrak.markdown_to_html(markdown,
       syntax_highlight: [
