@@ -45,6 +45,7 @@ struct Job {
     source: String,
     language: String,
     rainbow_brackets: bool,
+    word_diff: bool,
     budget: ExBudget,
     reply: mpsc::SyncSender<Result<HighlightOutput, RuntimeError>>,
 }
@@ -96,7 +97,8 @@ impl Executor {
                     let highlighted = runtime.highlight_with(
                         &job.source,
                         &job.language,
-                        &job.budget.highlight_options(job.rainbow_brackets),
+                        &job.budget
+                            .highlight_options(job.rainbow_brackets, job.word_diff),
                     );
                     let _ = job.reply.send(highlighted);
                 })
@@ -111,6 +113,7 @@ impl Executor {
         source: &str,
         language: &str,
         rainbow_brackets: bool,
+        word_diff: bool,
         budget: ExBudget,
     ) -> Result<HighlightOutput, RuntimeError> {
         let (reply, answer) = mpsc::sync_channel(1);
@@ -120,6 +123,7 @@ impl Executor {
                 source: source.to_string(),
                 language: language.to_string(),
                 rainbow_brackets,
+                word_diff,
                 budget,
                 reply,
             })

@@ -16,9 +16,10 @@ impl ExBudget {
         }
     }
 
-    pub fn highlight_options(self, rainbow_brackets: bool) -> HighlightOptions {
+    pub fn highlight_options(self, rainbow_brackets: bool, word_diff: bool) -> HighlightOptions {
         HighlightOptions {
             rainbow_brackets,
+            word_diff,
             time_limit_ms: match self.time_limit {
                 Some(0) => None,
                 Some(ms) => Some(ms),
@@ -36,7 +37,7 @@ mod tests {
 
     #[test]
     fn defaults_keep_lumis_time_and_match_limits() {
-        let options = ExBudget::default().highlight_options(false);
+        let options = ExBudget::default().highlight_options(false, false);
         assert_eq!(options.time_limit_ms, Some(5_000));
         assert_eq!(options.match_limit, 8192);
     }
@@ -47,7 +48,7 @@ mod tests {
             time_limit: Some(0),
             match_limit: Some(4096),
         }
-        .highlight_options(true);
+        .highlight_options(true, false);
         assert_eq!(options.time_limit_ms, None);
         assert_eq!(options.match_limit, 4096);
         assert!(options.rainbow_brackets);

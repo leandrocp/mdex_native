@@ -57,6 +57,20 @@ defmodule MDExNativeE2E.LumisRegressionTest do
                Enum.sort(["lumis", "lumis-themes", "catppuccin_latte", "catppuccin_mocha"])
     end
 
+    test "word_diff marks changed words only when enabled" do
+      source = "@@ -1 +1 @@\n-x = foo(1)\n+x = foo(2)"
+      markdown = "```diff\n#{source}\n```"
+      plain = render(markdown, formatter: :html_linked)
+      decorated = render(markdown, formatter: :html_linked, word_diff: true)
+
+      refute plain =~ "l-diff-minus-word"
+      refute plain =~ "l-diff-plus-word"
+      assert decorated =~ ~s(class="l-diff-minus-word")
+      assert decorated =~ ~s(class="l-diff-plus-word")
+      assert decorated |> String.replace(~r/<[^>]*>/, "") |> String.trim() == source
+      assert render(markdown, formatter: :html_linked, word_diff: false) == plain
+    end
+
     test "a declared parser highlights, an undeclared one renders plain" do
       declared = highlight("```elixir\nIO.puts(:hello)\n```")
       assert declared =~ "language-elixir"

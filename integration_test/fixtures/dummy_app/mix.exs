@@ -37,6 +37,7 @@ defmodule MDExNativeE2E.MixProject do
         {:lumis_wasm_html, "~> 0.26"},
         {:lumis_wasm_json, "~> 0.26"},
         {:lumis_wasm_css, "~> 0.26"},
+        {:lumis_wasm_diff, "~> 0.26"},
         {:lumis_wasm_javascript, "~> 0.26"}
       ]
   end

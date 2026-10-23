@@ -557,6 +557,8 @@ pub struct ExLumisOptions {
     #[cfg(feature = "lumis")]
     pub rainbow_brackets: bool,
     #[cfg(feature = "lumis")]
+    pub word_diff: bool,
+    #[cfg(feature = "lumis")]
     pub budget: ExBudget,
 }
 
@@ -604,6 +606,7 @@ impl ExLumisOptions {
         Ok(Self {
             formatter: options.formatter,
             rainbow_brackets: options.rainbow_brackets,
+            word_diff: options.word_diff,
             budget: ExBudget::new(options.time_limit, options.match_limit),
         })
     }

@@ -23,6 +23,7 @@ pub fn render_code_fence(
     language: Option<&str>,
     formatter: Option<ExFormatterOption>,
     rainbow_brackets: bool,
+    word_diff: bool,
     budget: ExBudget,
     attributes: &HashMap<String, String>,
 ) -> Result<String, String> {
@@ -46,7 +47,13 @@ pub fn render_code_fence(
         (plain(), None)
     } else {
         let executor = crate::lumis_runtime::executor().map_err(|reason| format!("{reason:#}"))?;
-        match executor.highlight(source, language.id_name(), rainbow_brackets, budget) {
+        match executor.highlight(
+            source,
+            language.id_name(),
+            rainbow_brackets,
+            word_diff,
+            budget,
+        ) {
             Ok(output) => (flatten_events(source, output.events), output.budget),
             // A parser this project never installed, or one the runtime cannot
             // reach. That costs the fence it names, not the document around it:
@@ -413,6 +420,7 @@ mod tests {
             language,
             formatter,
             rainbow_brackets,
+            false,
             ExBudget::default(),
             &attributes,
         )

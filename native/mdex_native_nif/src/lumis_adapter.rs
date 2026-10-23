@@ -65,6 +65,7 @@ fn parse_custom_attributes(info_string: &str) -> Option<HashMap<String, String>>
 pub struct LumisAdapter {
     formatter: ExFormatterOption,
     rainbow_brackets: bool,
+    word_diff: bool,
     budget: ExBudget,
     fence: Mutex<FenceState>,
     /// Comrak's adapter trait can only answer `fmt::Error`, which says nothing
@@ -74,10 +75,16 @@ pub struct LumisAdapter {
 }
 
 impl LumisAdapter {
-    pub fn new(formatter: ExFormatterOption, rainbow_brackets: bool, budget: ExBudget) -> Self {
+    pub fn new(
+        formatter: ExFormatterOption,
+        rainbow_brackets: bool,
+        word_diff: bool,
+        budget: ExBudget,
+    ) -> Self {
         Self {
             formatter,
             rainbow_brackets,
+            word_diff,
             budget,
             fence: Mutex::new(FenceState::default()),
             failure: Mutex::new(None),
@@ -138,6 +145,7 @@ impl SyntaxHighlighterAdapter for LumisAdapter {
             language,
             Some(self.formatter.clone()),
             self.rainbow_brackets,
+            self.word_diff,
             self.budget,
             &fence.attributes,
         )

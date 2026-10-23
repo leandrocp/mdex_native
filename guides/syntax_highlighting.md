@@ -48,9 +48,12 @@ html = MDExNative.Comrak.markdown_to_html(markdown,
 ````
 
 Lumis formatters and options are documented in [`Lumis`](https://lumis.hexdocs.pm/Lumis.html#t:formatter/0).
-MDExNative reads `:formatter` and `:rainbow_brackets`, and decodes them with the
+MDExNative reads `:formatter`, `:rainbow_brackets`, and `:word_diff` with the
 same Rust code as the `:lumis` package, so the `:lumis` package itself is not
 needed. Install it only to build a custom `%Lumis.Theme{}`.
+
+Set `word_diff: true` in the engine options to mark changed words in `diff`
+fences. This requires the `:lumis_wasm_diff` parser package.
 
 ### Highlighting budgets
 

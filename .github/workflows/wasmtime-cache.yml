@@ -24,8 +24,8 @@ jobs:
   check:
     runs-on: ubuntu-latest
     env:
-      # hex-lumis/v0.10.3; update this reference and our lockfile together.
-      LUMIS_REF: b895f4cd0d8c6f19f2cf8172e3d9042ecf1853b1
+      # Same Lumis revision as the temporary Cargo patches; replace at release.
+      LUMIS_REF: 3f983fb2e611c8c0c4c8ed474b557ed24df465c5
     steps:
       - uses: actions/checkout@v7
 
