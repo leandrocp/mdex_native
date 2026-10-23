@@ -14,7 +14,7 @@ defmodule MDExNativeE2E.CompileTimeRender do
     def from_keyword, do: @from_keyword
 
     # The map MDEx 0.14.1 sends, with options in Lumis 0.10's wire format.
-    if Code.ensure_loaded?(Lumis) do
+    if System.fetch_env!("MDEX_NATIVE_E2E_CASE") == "lumis" do
       @from_map MDExNative.Comrak.markdown_to_html(@markdown,
                   syntax_highlight: %{
                     engine: :lumis,

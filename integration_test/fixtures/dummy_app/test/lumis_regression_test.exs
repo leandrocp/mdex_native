@@ -154,22 +154,96 @@ defmodule MDExNativeE2E.LumisRegressionTest do
       assert MDExNative.Application.data_dir() == Path.join(List.to_string(expected), "lumis")
     end
 
-    if Code.ensure_loaded?(Lumis) do
+    if System.fetch_env!("MDEX_NATIVE_E2E_CASE") == "lumis" do
       # MDEx 0.14.1 and projects that copied it convert options with Lumis
       # 0.10's `Lumis.rust_options!/1` before calling mdex_native.
-      test "options converted by Lumis.rust_options!/1 still render" do
-        wire = [formatter: @multi_themes] |> Lumis.validate_options!() |> Lumis.rust_options!()
+      test "legacy wire options and caller options render identically through both HTML APIs" do
+        markdown = "```elixir\n" <> Enum.map_join(1..7, "\n", &"IO.puts(#{&1})") <> "\n```"
+        document = MDExNative.Comrak.parse_document(markdown)
 
-        for syntax_highlight <- [[engine: :lumis, opts: wire], %{engine: :lumis, opts: wire}] do
-          html =
-            MDExNative.Comrak.markdown_to_html("```elixir\nIO.puts(:hello)\n```",
-              syntax_highlight: syntax_highlight
-            )
+        cases = [
+          {[
+             formatter:
+               {:html_inline,
+                theme: "dracula",
+                pre_attrs: ["data-legacy": "pre"],
+                code_attrs: ["data-legacy": "code"],
+                header: %{open_tag: "<section data-legacy=\"header\">", close_tag: "</section>"},
+                highlight_lines: %{
+                  lines: [1, 3..7//2],
+                  style: "background-color: #123456;",
+                  class: "selected"
+                }}
+           ],
+           [
+             "#282a36",
+             "data-legacy=\"pre\"",
+             "data-legacy=\"code\"",
+             "background-color: #123456;"
+           ], [1, 3, 5, 7]},
+          {[
+             formatter:
+               {:html_inline,
+                theme: Lumis.Theme.get("dracula"),
+                highlight_lines: %{lines: [2], style: :theme, class: "selected"}}
+           ], ["#282a36", "background-color: #44475a;"], [2]},
+          {[
+             formatter: {:html_linked, highlight_lines: %{lines: [2..6//2], class: "selected"}}
+           ], ["l-punctuation"], [2, 4, 6]},
+          {[formatter: @multi_themes],
+           ["light-dark(#4c4f69, #cdd6f4)", "catppuccin_latte", "catppuccin_mocha"], []},
+          # Non-HTML formatters retain the existing HTML fallback for a fence.
+          {[formatter: {:terminal, theme: "dracula", background: "#abcdef", width: 80}],
+           ["<pre", "#282a36"], []},
+          {[formatter: {:terminal, theme: "dracula", background: :theme}], ["<pre", "#282a36"],
+           []},
+          {[formatter: {:bbcode_scoped, highlight_lines: %{lines: [2]}}], ["<pre", "<code"], []}
+        ]
 
-          assert html =~ "light-dark(#4c4f69, #cdd6f4)"
+        for {opts, fragments, selected_lines} <- cases do
+          wire = opts |> Lumis.validate_options!() |> Lumis.rust_options!()
+          expected = render(markdown, opts)
+
+          for fragment <- fragments, do: assert(expected =~ fragment)
+
+          # Comrak owns the closing tags; headers are accepted but omitted.
+          refute expected =~ "<section"
+          refute expected =~ "</section>"
+
+          for line <- 1..7 do
+            selected? =
+              Regex.match?(
+                ~r/<span\b(?=[^>]*class="[^"]*\bselected\b)(?=[^>]*data-line="#{line}")[^>]*>/,
+                expected
+              )
+
+            assert selected? == line in selected_lines
+          end
+
+          for syntax_highlight <- [
+                [engine: :lumis, opts: opts],
+                %{engine: :lumis, opts: opts},
+                %{engine: :lumis, opts: Map.new(opts)},
+                [opts: opts],
+                opts,
+                Map.new(opts),
+                [engine: :lumis, opts: wire],
+                %{engine: :lumis, opts: wire},
+                [opts: wire],
+                wire
+              ] do
+            options = [render: [unsafe: true], syntax_highlight: syntax_highlight]
+
+            assert MDExNative.Comrak.markdown_to_html(markdown, options) == expected,
+                   "markdown_to_html/2 diverged for #{inspect(syntax_highlight)}"
+
+            assert MDExNative.Comrak.document_to_html(document, options) == expected,
+                   "document_to_html/2 diverged for #{inspect(syntax_highlight)}"
+          end
         end
 
-        assert MDExNativeE2E.CompileTimeRender.from_map() =~ "<span style=\"color: #"
+        assert MDExNativeE2E.CompileTimeRender.from_map() ==
+                 MDExNativeE2E.CompileTimeRender.from_keyword()
       end
 
       # MDEx publishes flat spans where Lumis nests them, so a fence and
