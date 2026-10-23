@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.13](https://github.com/leandrocp/mdex_native/compare/v0.2.12...v0.2.13) (2026-10-23)
+
+### Features
+
+- Highlight with Lumis without the :lumis package in [\#88](https://github.com/leandrocp/mdex_native/pull/88)
+
+### Bug Fixes
+
+- Cache Syntect adapters by theme across renders (#102)
+
+### Other Changes
+
+- Configure Dependabot weekly updates for all ecosystems in [\#109](https://github.com/leandrocp/mdex_native/pull/109)
+
 ## [0.2.12](https://github.com/leandrocp/mdex_native/compare/v0.2.11...v0.2.12) (2026-10-19)
 
 ### Bug Fixes
