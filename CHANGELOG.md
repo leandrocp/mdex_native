@@ -4,7 +4,7 @@
 
 ### Features
 
-- Highlight with Lumis without the :lumis package in [\#88](https://github.com/leandrocp/mdex_native/pull/88)
+- Lumis highlight doesn't require the :lumis package in [\#88](https://github.com/leandrocp/mdex_native/pull/88)
 
 ### Bug Fixes
 
