@@ -9,7 +9,6 @@ use std::collections::HashMap;
 
 use lumis_core::events::HighlightEvent;
 use lumis_core::languages::Language;
-use lumis_wasm_runtime::RuntimeError;
 
 use crate::types::options::ExBudget;
 use lumis_core::elixir::{
@@ -46,29 +45,23 @@ pub fn render_code_fence(
     let (events, exhausted) = if language == Language::PlainText {
         (plain(), None)
     } else {
-        let executor = crate::lumis_runtime::executor().map_err(|reason| format!("{reason:#}"))?;
-        match executor.highlight(
-            source,
-            language.id_name(),
-            rainbow_brackets,
-            word_diff,
-            budget,
-        ) {
-            Ok(output) => (flatten_events(source, output.events), output.budget),
-            // A parser this project never installed, or one the runtime cannot
-            // reach. That costs the fence it names, not the document around it:
-            // a thousand-line post still renders when one block asks for a
-            // language nothing depends on.
-            Err(
-                RuntimeError::Store { .. }
-                | RuntimeError::LanguageNotLoaded(_)
-                | RuntimeError::LanguageNotCached(_)
-                | RuntimeError::UnknownLanguage(_)
-                | RuntimeError::LanguageStoreUnavailable,
-            ) => (plain(), None),
-            // Anything else is a parser or a runtime at fault rather than an
-            // absent dependency, and is worth surfacing.
-            Err(runtime_error) => return Err(runtime_error.to_string()),
+        let highlighted = crate::lumis_runtime::executor().ok().and_then(|executor| {
+            executor
+                .highlight(
+                    source,
+                    language.id_name(),
+                    rainbow_brackets,
+                    word_diff,
+                    budget,
+                )
+                .ok()
+        });
+        match highlighted {
+            Some(output) => (flatten_events(source, output.events), output.budget),
+            // Missing parsers, broken queries, and runtime failures cost only
+            // this fence's highlighting, not the surrounding document. Keep
+            // the formatter so it still escapes and styles the plain source.
+            None => (plain(), None),
         }
     };
 

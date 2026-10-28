@@ -85,6 +85,59 @@ defmodule MDExNativeE2E.LumisRegressionTest do
       refute undeclared =~ "<span style=\"color: #"
     end
 
+    @tag :tmp_dir
+    test "a broken highlight query falls back per fence through both HTML APIs", %{
+      tmp_dir: tmp_dir
+    } do
+      # Use an installed grammar with an invalid query, rather than depending
+      # on a particular upstream parser bug remaining unfixed (issue #113).
+      parsers = Path.join(tmp_dir, "parsers")
+      File.cp_r!(Application.app_dir(:lumis_wasm_rust, "priv/parsers"), parsers)
+      manifest = Path.join(parsers, "rust.lumis.json")
+
+      package =
+        manifest
+        |> File.read!()
+        |> Jason.decode!()
+        |> put_in(["languages", "rust", "highlights"], "(mdex_invalid_node) @keyword")
+
+      File.write!(manifest, Jason.encode!(package))
+
+      # A fresh VM isolates the broken parser from the suite's runtime/cache.
+      run_before_start("""
+      import ExUnit.Assertions
+      {:ok, _} = Application.ensure_all_started(:mdex_native)
+      assert MDExNative.Native.configure_lumis_store(
+        #{inspect(Path.join(tmp_dir, "data"))},
+        [#{inspect(parsers)}, Application.app_dir(:lumis_wasm_elixir, "priv/parsers")]
+      )
+
+      markdown = "Before\\n\\n```rust\\nlet x = a < b && c > d;\\n```\\n\\n```elixir\\nIO.puts(:ok)\\n```\\n\\nAfter"
+      document = MDExNative.Comrak.parse_document(markdown)
+
+      for formatter <- [
+            :html_linked,
+            {:html_inline, theme: "onedark"},
+            {:html_multi_themes, themes: [dark: "onedark"], default_theme: "dark"}
+          ] do
+        options = [syntax_highlight: [engine: :lumis, opts: [formatter: formatter]]]
+        html = MDExNative.Comrak.markdown_to_html(markdown, options)
+        assert MDExNative.Comrak.document_to_html(document, options) == html
+        assert html =~ "<p>Before</p>"
+        assert html =~ "<p>After</p>"
+        assert html =~ "let x = a &lt; b &amp;&amp; c &gt; d;"
+        refute html =~ "a < b"
+        refute html =~ "data-lumis-budget"
+        assert length(Regex.scan(~r/<pre\\b/, html)) == 2
+        assert length(Regex.scan(~r/<\\/code><\\/pre>/, html)) == 2
+
+        # A later, healthy fence must still receive syntax highlighting.
+        assert html =~ "language-elixir"
+        refute html =~ "IO.puts(:ok)"
+      end
+      """)
+    end
+
     test "a fence rendered at compile time is highlighted" do
       assert MDExNativeE2E.CompileTimeRender.from_keyword() =~ "<span style=\"color: #"
     end
