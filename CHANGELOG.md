@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.14](https://github.com/leandrocp/mdex_native/compare/v0.2.13...v0.2.14) (2026-10-28)
+
+### Bug Fixes
+
+- Fall back to plain text when Lumis highlighting fails in [\#114](https://github.com/leandrocp/mdex_native/pull/114)
+
+### Dependencies
+
+- Update Lumis core to 6.0 in [\#118](https://github.com/leandrocp/mdex_native/pull/118)
+
 ## [0.2.13](https://github.com/leandrocp/mdex_native/compare/v0.2.12...v0.2.13) (2026-10-23)
 
 ### Features
