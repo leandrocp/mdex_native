@@ -15,6 +15,25 @@ defmodule MDExNative.Comrak do
   The `:tagfilter` extension is deprecated but retains its existing behavior
   for compatibility. Use `:sanitize` to clean rendered HTML instead.
 
+  ## Obsidian Flavored Markdown
+
+  These extensions are disabled by default:
+
+  - `extension: [ofm_comments: true]` parses `%%inline comments%%` and multiline
+    comments starting with `%%` at the beginning of a line. Comments remain in
+    the AST, CommonMark, and XML, but are omitted from HTML.
+  - `extension: [ofm_callouts: true]` parses callouts such as
+    `> [!warning|metadata]- **Title**`. Callouts support arbitrary types,
+    metadata, Markdown titles, and fold markers (`+` expanded, `-` collapsed).
+    They take precedence over `:alerts` when both are enabled; syntax rejected
+    by callouts can still be parsed as an alert. HTML exposes fold state as
+    data attributes, not interactive folding behavior.
+  - Either `:wikilinks_title_after_pipe` or `:wikilinks_title_before_pipe`
+    enables wiki links and `![[url]]` embeds. Embeds set `WikiLink.embed` to
+    `true`, preserve `!` in CommonMark, and render as ordinary links in HTML.
+    Set `extension: [wikilinks_title_after_pipe: true, wikilinks_ignore_embeds: true]`
+    to leave `![[url]]` as literal text while still parsing `[[url]]`.
+
   ## Examples
 
       iex> MDExNative.Comrak.markdown_to_html("# Hello")
@@ -25,6 +44,9 @@ defmodule MDExNative.Comrak do
 
       iex> MDExNative.Comrak.anchorize("Hello World")
       "hello-world"
+
+      iex> MDExNative.Comrak.markdown_to_html("Visible %%hidden%% text", extension: [ofm_comments: true])
+      "<p>Visible  text</p>\n"
   """
 
   @typedoc "Markdown source text."

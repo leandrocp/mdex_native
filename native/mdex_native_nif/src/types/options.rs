@@ -59,6 +59,8 @@ mod atoms {
         math_dollars,
         math_latex,
         multiline_block_quotes,
+        ofm_callouts,
+        ofm_comments,
         ol_width,
         opts,
         parse,
@@ -88,6 +90,7 @@ mod atoms {
         underline,
         unsafe_ = "unsafe",
         width,
+        wikilinks_ignore_embeds,
         wikilinks_title_after_pipe,
         wikilinks_title_before_pipe
     }
@@ -162,10 +165,13 @@ pub struct ExExtensionOptions {
     pub front_matter_delimiter: Option<String>,
     pub multiline_block_quotes: Option<bool>,
     pub alerts: Option<bool>,
+    pub ofm_callouts: Option<bool>,
+    pub ofm_comments: Option<bool>,
     pub math_dollars: Option<bool>,
     pub math_latex: Option<bool>,
     pub math_code: Option<bool>,
     pub shortcodes: Option<bool>,
+    pub wikilinks_ignore_embeds: Option<bool>,
     pub wikilinks_title_after_pipe: Option<bool>,
     pub wikilinks_title_before_pipe: Option<bool>,
     pub underline: Option<bool>,
@@ -203,10 +209,13 @@ impl<'a> Decoder<'a> for ExExtensionOptions {
             front_matter_delimiter: optional_field(term, atoms::front_matter_delimiter())?,
             multiline_block_quotes: optional_field(term, atoms::multiline_block_quotes())?,
             alerts: optional_field(term, atoms::alerts())?,
+            ofm_callouts: optional_field(term, atoms::ofm_callouts())?,
+            ofm_comments: optional_field(term, atoms::ofm_comments())?,
             math_dollars: optional_field(term, atoms::math_dollars())?,
             math_latex: optional_field(term, atoms::math_latex())?,
             math_code: optional_field(term, atoms::math_code())?,
             shortcodes: optional_field(term, atoms::shortcodes())?,
+            wikilinks_ignore_embeds: optional_field(term, atoms::wikilinks_ignore_embeds())?,
             wikilinks_title_after_pipe: optional_field(term, atoms::wikilinks_title_after_pipe())?,
             wikilinks_title_before_pipe: optional_field(
                 term,
@@ -268,10 +277,16 @@ impl ExExtensionOptions {
             self.multiline_block_quotes,
         );
         overwrite(&mut extension.alerts, self.alerts);
+        overwrite(&mut extension.ofm_callouts, self.ofm_callouts);
+        overwrite(&mut extension.ofm_comments, self.ofm_comments);
         overwrite(&mut extension.math_dollars, self.math_dollars);
         overwrite(&mut extension.math_latex, self.math_latex);
         overwrite(&mut extension.math_code, self.math_code);
         overwrite(&mut extension.shortcodes, self.shortcodes);
+        overwrite(
+            &mut extension.wikilinks_ignore_embeds,
+            self.wikilinks_ignore_embeds,
+        );
         overwrite(
             &mut extension.wikilinks_title_after_pipe,
             self.wikilinks_title_after_pipe,

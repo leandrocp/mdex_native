@@ -123,6 +123,10 @@ pub enum NewNode {
     Subtext(ExSubtext),
     EscapedTag(ExEscapedTag),
     Alert(ExAlert),
+    Callout(ExCallout),
+    CalloutTitle(ExCalloutTitle),
+    CommentInline(ExCommentInline),
+    MultilineComment(ExMultilineComment),
     HeexBlock(ExHeexBlock),
     HeexInline(ExHeexInline),
     BlockDirective(ExBlockDirective),
@@ -176,6 +180,10 @@ impl NewNode {
             | Self::Subtext(ExSubtext { sourcepos, .. })
             | Self::EscapedTag(ExEscapedTag { sourcepos, .. })
             | Self::Alert(ExAlert { sourcepos, .. })
+            | Self::Callout(ExCallout { sourcepos, .. })
+            | Self::CalloutTitle(ExCalloutTitle { sourcepos, .. })
+            | Self::CommentInline(ExCommentInline { sourcepos, .. })
+            | Self::MultilineComment(ExMultilineComment { sourcepos, .. })
             | Self::HeexBlock(ExHeexBlock { sourcepos, .. })
             | Self::HeexInline(ExHeexInline { sourcepos, .. })
             | Self::BlockDirective(ExBlockDirective { sourcepos, .. }) => *sourcepos,
@@ -220,6 +228,8 @@ impl NewNode {
             | Self::SpoileredText(ExSpoileredText { nodes, .. })
             | Self::Subtext(ExSubtext { nodes, .. })
             | Self::Alert(ExAlert { nodes, .. })
+            | Self::Callout(ExCallout { nodes, .. })
+            | Self::CalloutTitle(ExCalloutTitle { nodes, .. })
             | Self::HeexBlock(ExHeexBlock { nodes, .. })
             | Self::BlockDirective(ExBlockDirective { nodes, .. }) => Some(std::mem::take(nodes)),
             _ => None,
@@ -286,6 +296,10 @@ impl From<NewNode> for NodeValue {
             NewNode::Subtext(n) => n.into(),
             NewNode::EscapedTag(n) => n.into(),
             NewNode::Alert(n) => n.into(),
+            NewNode::Callout(n) => n.into(),
+            NewNode::CalloutTitle(n) => n.into(),
+            NewNode::CommentInline(n) => n.into(),
+            NewNode::MultilineComment(n) => n.into(),
             NewNode::HeexBlock(n) => n.into(),
             NewNode::HeexInline(n) => n.into(),
             NewNode::BlockDirective(n) => n.into(),
@@ -999,6 +1013,7 @@ impl From<ExEscaped> for NodeValue {
 pub struct ExWikiLink {
     pub nodes: Vec<NewNode>,
     pub url: String,
+    pub embed: bool,
     pub sourcepos: ExSourcepos,
 }
 
@@ -1006,6 +1021,7 @@ impl From<ExWikiLink> for NodeValue {
     fn from(node: ExWikiLink) -> Self {
         NodeValue::WikiLink(comrak::nodes::NodeWikiLink {
             url: node.url.to_string(),
+            embed: node.embed,
         })
     }
 }
@@ -1128,6 +1144,82 @@ impl From<ExAlert> for NodeValue {
             fence_length: node.fence_length,
             fence_offset: node.fence_offset,
         }))
+    }
+}
+
+#[derive(Clone, Debug, NifStruct, PartialEq)]
+#[module = "MDExNative.Comrak.CommentInline"]
+pub struct ExCommentInline {
+    pub literal: String,
+    pub sourcepos: ExSourcepos,
+}
+
+impl From<ExCommentInline> for NodeValue {
+    fn from(node: ExCommentInline) -> Self {
+        NodeValue::CommentInline(comrak::nodes::NodeComment {
+            literal: node.literal,
+        })
+    }
+}
+
+#[derive(Clone, Debug, NifStruct, PartialEq)]
+#[module = "MDExNative.Comrak.MultilineComment"]
+pub struct ExMultilineComment {
+    pub literal: String,
+    pub closed: bool,
+    pub sourcepos: ExSourcepos,
+}
+
+impl From<ExMultilineComment> for NodeValue {
+    fn from(node: ExMultilineComment) -> Self {
+        NodeValue::MultilineComment(comrak::nodes::NodeCommentBlock {
+            literal: node.literal,
+            closed: node.closed,
+        })
+    }
+}
+
+#[derive(Clone, Debug, NifUnitEnum, PartialEq)]
+pub enum ExCalloutFold {
+    None,
+    Expanded,
+    Collapsed,
+}
+
+#[derive(Clone, Debug, NifStruct, PartialEq)]
+#[module = "MDExNative.Comrak.Callout"]
+pub struct ExCallout {
+    pub nodes: Vec<NewNode>,
+    pub callout_type: String,
+    pub metadata: Option<String>,
+    pub fold: ExCalloutFold,
+    pub sourcepos: ExSourcepos,
+}
+
+impl From<ExCallout> for NodeValue {
+    fn from(node: ExCallout) -> Self {
+        NodeValue::Callout(Box::new(comrak::nodes::NodeCallout {
+            callout_type: node.callout_type,
+            metadata: node.metadata,
+            fold: match node.fold {
+                ExCalloutFold::None => comrak::nodes::CalloutFold::None,
+                ExCalloutFold::Expanded => comrak::nodes::CalloutFold::Expanded,
+                ExCalloutFold::Collapsed => comrak::nodes::CalloutFold::Collapsed,
+            },
+        }))
+    }
+}
+
+#[derive(Clone, Debug, NifStruct, PartialEq)]
+#[module = "MDExNative.Comrak.CalloutTitle"]
+pub struct ExCalloutTitle {
+    pub nodes: Vec<NewNode>,
+    pub sourcepos: ExSourcepos,
+}
+
+impl From<ExCalloutTitle> for NodeValue {
+    fn from(_node: ExCalloutTitle) -> Self {
+        NodeValue::CalloutTitle
     }
 }
 
@@ -1455,6 +1547,7 @@ fn comrak_ast_to_ex_document_with_children<'a>(
         NodeValue::WikiLink(ref attrs) => NewNode::WikiLink(ExWikiLink {
             nodes: children,
             url: attrs.url.to_string(),
+            embed: attrs.embed,
             sourcepos,
         }),
 
@@ -1497,6 +1590,34 @@ fn comrak_ast_to_ex_document_with_children<'a>(
             multiline: attrs.multiline,
             fence_length: attrs.fence_length,
             fence_offset: attrs.fence_offset,
+            sourcepos,
+        }),
+
+        NodeValue::Callout(ref attrs) => NewNode::Callout(ExCallout {
+            nodes: children,
+            callout_type: attrs.callout_type.clone(),
+            metadata: attrs.metadata.clone(),
+            fold: match attrs.fold {
+                comrak::nodes::CalloutFold::None => ExCalloutFold::None,
+                comrak::nodes::CalloutFold::Expanded => ExCalloutFold::Expanded,
+                comrak::nodes::CalloutFold::Collapsed => ExCalloutFold::Collapsed,
+            },
+            sourcepos,
+        }),
+
+        NodeValue::CalloutTitle => NewNode::CalloutTitle(ExCalloutTitle {
+            nodes: children,
+            sourcepos,
+        }),
+
+        NodeValue::CommentInline(ref attrs) => NewNode::CommentInline(ExCommentInline {
+            literal: attrs.literal.clone(),
+            sourcepos,
+        }),
+
+        NodeValue::MultilineComment(ref attrs) => NewNode::MultilineComment(ExMultilineComment {
+            literal: attrs.literal.clone(),
+            closed: attrs.closed,
             sourcepos,
         }),
 

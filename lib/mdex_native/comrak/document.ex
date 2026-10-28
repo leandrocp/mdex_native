@@ -602,11 +602,18 @@ end
 
 defmodule MDExNative.Comrak.WikiLink do
   @moduledoc """
-  A link in the form of a wiki link.
+  A wiki link (`[[url]]`) or embed (`![[url]]`).
+
+  `embed` distinguishes embeds in the AST and CommonMark/XML output. HTML
+  renders both as links, without fetching or embedding the target content.
   """
 
-  @type t :: %__MODULE__{nodes: [MDExNative.Comrak.ast_node()], url: String.t()}
-  defstruct nodes: [], url: "", sourcepos: %MDExNative.Comrak.Sourcepos{}
+  @type t :: %__MODULE__{
+          nodes: [MDExNative.Comrak.ast_node()],
+          url: String.t(),
+          embed: boolean()
+        }
+  defstruct nodes: [], url: "", embed: false, sourcepos: %MDExNative.Comrak.Sourcepos{}
 end
 
 defmodule MDExNative.Comrak.Underline do
@@ -679,6 +686,68 @@ defmodule MDExNative.Comrak.Alert do
             fence_length: 0,
             fence_offset: 0,
             sourcepos: %MDExNative.Comrak.Sourcepos{}
+end
+
+defmodule MDExNative.Comrak.CommentInline do
+  @moduledoc """
+  An Obsidian `%%comment%%` span, enabled with `extension: [ofm_comments: true]`.
+
+  The literal excludes the delimiters. Comments are omitted from HTML but
+  preserved in the AST, CommonMark, and XML; they are not a way to store secrets.
+  """
+
+  @type t :: %__MODULE__{literal: String.t()}
+  defstruct literal: "", sourcepos: %MDExNative.Comrak.Sourcepos{}
+end
+
+defmodule MDExNative.Comrak.MultilineComment do
+  @moduledoc """
+  An Obsidian block comment, enabled with `extension: [ofm_comments: true]`.
+
+  The literal excludes the `%%` delimiters. `closed` records whether a closing
+  delimiter was present. HTML omits the comment; CommonMark and XML preserve it.
+  """
+
+  @type t :: %__MODULE__{literal: String.t(), closed: boolean()}
+  defstruct literal: "", closed: false, sourcepos: %MDExNative.Comrak.Sourcepos{}
+end
+
+defmodule MDExNative.Comrak.Callout do
+  @moduledoc """
+  An Obsidian callout, enabled with `extension: [ofm_callouts: true]`.
+
+  `callout_type` is normalized (for example, `My Type` becomes `my-type`).
+  `metadata` preserves text after `|` in the marker. `fold` is `:none`,
+  `:expanded` (`+`), or `:collapsed` (`-`). A custom Markdown title is the
+  first child, a `MDExNative.Comrak.CalloutTitle`; remaining children are the body.
+
+  HTML uses `callout`, `callout-title`, and `callout-content` classes and
+  `data-callout`, `data-callout-metadata`, and `data-callout-fold` attributes.
+  Folding requires the consuming application's CSS/JavaScript.
+  """
+
+  @type t :: %__MODULE__{
+          nodes: [MDExNative.Comrak.ast_node()],
+          callout_type: String.t(),
+          metadata: String.t() | nil,
+          fold: :none | :expanded | :collapsed
+        }
+  defstruct nodes: [],
+            callout_type: "note",
+            metadata: nil,
+            fold: :none,
+            sourcepos: %MDExNative.Comrak.Sourcepos{}
+end
+
+defmodule MDExNative.Comrak.CalloutTitle do
+  @moduledoc """
+  The custom title of an Obsidian callout, as Markdown block children.
+
+  This node must be the first child of a `MDExNative.Comrak.Callout`.
+  """
+
+  @type t :: %__MODULE__{nodes: [MDExNative.Comrak.ast_node()]}
+  defstruct nodes: [], sourcepos: %MDExNative.Comrak.Sourcepos{}
 end
 
 defmodule MDExNative.Comrak.BlockDirective do

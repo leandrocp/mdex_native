@@ -27,7 +27,7 @@
 //! - [`render_link`](https://github.com/kivikakk/comrak/blob/6fbe87fafde3953a9f3bc582804318593d703805/src/html.rs#L818-L852)
 //! - [`render_image`](https://github.com/kivikakk/comrak/blob/6fbe87fafde3953a9f3bc582804318593d703805/src/html.rs#L743-L783)
 //!
-//! Both remain unchanged in comrak 0.56.0. When comrak is upgraded,
+//! Both remain unchanged in comrak 0.59.0. When comrak is upgraded,
 //! re-read those two functions and mirror
 //! any change here. `mirrors_comrak_for_empty_attrs` is what catches drift: it
 //! renders links and images carrying empty attributes, so this code runs and

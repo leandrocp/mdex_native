@@ -2,16 +2,21 @@ defmodule MDExNative.ComrakTest do
   use ExUnit.Case
 
   alias MDExNative.Comrak.Attributes
+  alias MDExNative.Comrak.Callout
+  alias MDExNative.Comrak.CalloutTitle
   alias MDExNative.Comrak.Code
   alias MDExNative.Comrak.CodeBlock
+  alias MDExNative.Comrak.CommentInline
   alias MDExNative.Comrak.Document
   alias MDExNative.Comrak.Escaped
   alias MDExNative.Comrak.EscapedTag
   alias MDExNative.Comrak.Heading
   alias MDExNative.Comrak.Image
   alias MDExNative.Comrak.Link
+  alias MDExNative.Comrak.MultilineComment
   alias MDExNative.Comrak.Paragraph
   alias MDExNative.Comrak.Text
+  alias MDExNative.Comrak.WikiLink
 
   @code_block_markdown """
   ```elixir
@@ -44,6 +49,209 @@ defmodule MDExNative.ComrakTest do
     html = MDExNative.Comrak.markdown_to_html("- [x] done", extension: [tasklist: true])
 
     assert html =~ ~s(<input type="checkbox" checked="" disabled="" /> done)
+  end
+
+  describe "Obsidian comments" do
+    @options [extension: [ofm_comments: true]]
+
+    test "preserves inline and block comments across AST conversion but omits them from HTML" do
+      markdown = "a %%inline <secret>%% b\n\n%%\nblock **secret**\n%%\n"
+      document = MDExNative.Comrak.parse_document(markdown, @options)
+
+      assert %Document{
+               nodes: [
+                 %Paragraph{
+                   nodes: [
+                     %Text{literal: "a "},
+                     %CommentInline{literal: "inline <secret>", sourcepos: sourcepos},
+                     %Text{literal: " b"}
+                   ]
+                 },
+                 %MultilineComment{literal: "\nblock **secret**\n", closed: true}
+               ]
+             } = document
+
+      assert sourcepos.start == {1, 3}
+      assert sourcepos.end == {1, 21}
+      assert MDExNative.Comrak.markdown_to_html(markdown, @options) == "<p>a  b</p>\n"
+      assert MDExNative.Comrak.document_to_html(document, @options) == "<p>a  b</p>\n"
+      assert MDExNative.Comrak.document_to_commonmark(document, @options) == markdown
+
+      xml = MDExNative.Comrak.markdown_to_xml(markdown, @options)
+      assert xml =~ ~s(<comment xml:space="preserve">inline &lt;secret&gt;</comment>)
+      assert xml =~ "block **secret**"
+      assert MDExNative.Comrak.document_to_xml(document, @options) == xml
+    end
+
+    test "preserves unclosed block comments without adding a closing delimiter" do
+      markdown = "%%\nunfinished"
+      document = MDExNative.Comrak.parse_document(markdown, @options)
+
+      assert %Document{nodes: [%MultilineComment{closed: false, literal: "\nunfinished"}]} =
+               document
+
+      assert MDExNative.Comrak.document_to_commonmark(document, @options) == markdown <> "\n"
+      assert MDExNative.Comrak.document_to_html(document, @options) == ""
+    end
+
+    test "is opt-in and leaves comment syntax in code alone" do
+      assert MDExNative.Comrak.markdown_to_html("a %%hidden%% b") == "<p>a %%hidden%% b</p>\n"
+
+      assert MDExNative.Comrak.markdown_to_html("a %%hidden%% b",
+               extension: [ofm_comments: false]
+             ) ==
+               "<p>a %%hidden%% b</p>\n"
+
+      assert MDExNative.Comrak.markdown_to_html("`%%inline%%`\n\n```\n%%block%%\n```", @options) ==
+               "<p><code>%%inline%%</code></p>\n<pre><code>%%block%%\n</code></pre>\n"
+    end
+  end
+
+  describe "Obsidian callouts" do
+    @options [extension: [ofm_callouts: true]]
+
+    test "round-trips metadata, Markdown titles, nested body nodes, and all fold states" do
+      for {marker, fold} <- [{"", :none}, {"+", :expanded}, {"-", :collapsed}] do
+        markdown = "> [!My Type|a&b]#{marker} **Title**\n> Body\n>\n> - item\n"
+        document = MDExNative.Comrak.parse_document(markdown, @options)
+
+        assert %Document{
+                 nodes: [
+                   %Callout{
+                     callout_type: "my-type",
+                     metadata: "a&b",
+                     fold: ^fold,
+                     nodes: [
+                       %CalloutTitle{
+                         nodes: [
+                           %Paragraph{
+                             nodes: [%MDExNative.Comrak.Strong{nodes: [%Text{literal: "Title"}]}]
+                           }
+                         ]
+                       },
+                       %Paragraph{nodes: [%Text{literal: "Body"}]},
+                       %MDExNative.Comrak.List{}
+                     ],
+                     sourcepos: %{start: {1, 1}, end: {4, 8}}
+                   }
+                 ]
+               } = document
+
+        html =
+          ~s(<div class="callout" data-callout="my-type" data-callout-metadata="a&amp;b" data-callout-fold="#{fold}">\n) <>
+            "<div class=\"callout-title\">\n<strong>Title</strong>\n</div>\n" <>
+            "<div class=\"callout-content\">\n<p>Body</p>\n<ul>\n<li>item</li>\n</ul>\n</div>\n</div>\n"
+
+        assert MDExNative.Comrak.markdown_to_html(markdown, @options) == html
+        assert MDExNative.Comrak.document_to_html(document, @options) == html
+
+        xml = MDExNative.Comrak.markdown_to_xml(markdown, @options)
+        assert xml =~ ~s(<callout type="my-type" metadata="a&amp;b" fold="#{fold}">)
+        assert xml =~ "<callout_title>"
+        assert MDExNative.Comrak.document_to_xml(document, @options) == xml
+
+        commonmark = MDExNative.Comrak.document_to_commonmark(document, @options)
+        assert commonmark =~ "> [!my-type|a&b]#{marker} **Title**"
+        assert MDExNative.Comrak.markdown_to_html(commonmark, @options) == html
+      end
+    end
+
+    test "defaults, opt-in behavior, and precedence over alerts" do
+      markdown = "> [!note]\n> Body"
+
+      assert %Document{nodes: [%MDExNative.Comrak.BlockQuote{}]} =
+               MDExNative.Comrak.parse_document(markdown)
+
+      assert %Document{nodes: [%Callout{metadata: nil, fold: :none, nodes: [%Paragraph{}]}]} =
+               MDExNative.Comrak.parse_document(markdown, @options)
+
+      html = MDExNative.Comrak.markdown_to_html(markdown, @options)
+      assert html =~ ~s(<div class="callout-title">Note</div>)
+
+      both = [extension: [ofm_callouts: true, alerts: true]]
+      assert MDExNative.Comrak.markdown_to_html(markdown, both) == html
+
+      assert %Document{nodes: [%MDExNative.Comrak.Alert{title: "Title"}]} =
+               MDExNative.Comrak.parse_document("> [!note]Title\n> Body", both)
+    end
+  end
+
+  describe "wikilink embeds" do
+    test "preserves embed flags and both title conventions through all renderers" do
+      for {option, target} <- [
+            wikilinks_title_after_pipe: "page|Label",
+            wikilinks_title_before_pipe: "Label|page"
+          ] do
+        options = [extension: [{option, true}]]
+        markdown = "![[#{target}]] [[#{target}]]"
+        document = MDExNative.Comrak.parse_document(markdown, options)
+
+        assert %Document{
+                 nodes: [
+                   %Paragraph{
+                     nodes: [
+                       %WikiLink{url: "page", embed: true, nodes: [%Text{literal: "Label"}]},
+                       %Text{literal: " "},
+                       %WikiLink{url: "page", embed: false}
+                     ]
+                   }
+                 ]
+               } = document
+
+        html =
+          ~s(<p><a href="page" data-wikilink="true">Label</a> <a href="page" data-wikilink="true">Label</a></p>\n)
+
+        assert MDExNative.Comrak.markdown_to_html(markdown, options) == html
+        assert MDExNative.Comrak.document_to_html(document, options) == html
+        assert MDExNative.Comrak.document_to_commonmark(document, options) == markdown <> "\n"
+
+        xml = MDExNative.Comrak.markdown_to_xml(markdown, options)
+        assert xml =~ ~s(<wikilink destination="page" embed="true">)
+        assert xml =~ ~s(<wikilink destination="page" embed="false">)
+        assert MDExNative.Comrak.document_to_xml(document, options) == xml
+
+        ignore = [extension: [{option, true}, {:wikilinks_ignore_embeds, true}]]
+
+        assert MDExNative.Comrak.markdown_to_html(markdown, ignore) ==
+                 ~s(<p>![[#{target}]] <a href="page" data-wikilink="true">Label</a></p>\n)
+      end
+    end
+  end
+
+  test "renders wide tables with correct alignment across rows and separate tables" do
+    # Exercise Comrak's table-cell index cache through our custom HTML formatter.
+    # Different alignments and table widths catch a stale index between rows/tables.
+    columns = 1024
+    header = Enum.map_join(1..columns, "|", &"h#{&1}")
+
+    separators =
+      Enum.map_join(1..columns, "|", fn i -> if rem(i, 2) == 1, do: ":--", else: "--:" end)
+
+    row = Enum.map_join(1..columns, "|", &"v#{&1}")
+    markdown = "#{header}\n#{separators}\n#{row}\n#{row}\n\ncenter\n:--:\nlast\n"
+    options = [extension: [table: true]]
+
+    headers =
+      Enum.map_join(1..columns, fn i ->
+        alignment = if rem(i, 2) == 1, do: "left", else: "right"
+        ~s(<th align="#{alignment}">h#{i}</th>\n)
+      end)
+
+    cells =
+      Enum.map_join(1..columns, fn i ->
+        alignment = if rem(i, 2) == 1, do: "left", else: "right"
+        ~s(<td align="#{alignment}">v#{i}</td>\n)
+      end)
+
+    expected =
+      "<table>\n<thead>\n<tr>\n#{headers}</tr>\n</thead>\n<tbody>\n" <>
+        "<tr>\n#{cells}</tr>\n<tr>\n#{cells}</tr>\n</tbody>\n</table>\n" <>
+        "<table>\n<thead>\n<tr>\n<th align=\"center\">center</th>\n</tr>\n</thead>\n" <>
+        "<tbody>\n<tr>\n<td align=\"center\">last</td>\n</tr>\n</tbody>\n</table>\n"
+
+    assert MDExNative.Comrak.markdown_to_html(markdown, options) == expected
+    document = MDExNative.Comrak.parse_document(markdown, options)
+    assert MDExNative.Comrak.document_to_html(document, options) == expected
   end
 
   test "renders heading anchors using Comrak 0.54 markup" do
