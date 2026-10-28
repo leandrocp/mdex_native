@@ -12,8 +12,8 @@ The tests create isolated temporary projects under `tmp/` so feature variants li
 
 The downstream job runs the full MDEx suite against this native checkout.
 `MDEX_NATIVE_E2E_MDEX_REF` selects a branch or tag; without it, the repository's
-default branch is used. CI currently selects the coordinated MDEx #449 branch,
-`lp-drop-lumis-dependency`. Remove that override after #449 lands.
+default branch is used. CI currently selects the companion Comrak 0.59 branch,
+`lp-comrak-059`. Return it to `main` after the MDEx AST/options update lands.
 
 The selected revision's tests run unchanged. This checks the pair being released,
 not compatibility between a new native implementation and every older MDEx release.

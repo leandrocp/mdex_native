@@ -15,6 +15,38 @@ defmodule MDExNative.Comrak do
   The `:tagfilter` extension is deprecated but retains its existing behavior
   for compatibility. Use `:sanitize` to clean rendered HTML instead.
 
+  ## Obsidian Flavored Markdown
+
+  These extensions are disabled by default:
+
+  - `extension: [ofm_comments: true]` parses `%%inline comments%%` and multiline
+    comments starting with `%%` at the beginning of a line. Comments remain in
+    the AST, CommonMark, and XML, but are omitted from HTML.
+  - `extension: [ofm_callouts: true]` parses callouts such as
+    `> [!warning|metadata]- **Title**`. Callouts support arbitrary types,
+    metadata, Markdown titles, and fold markers (`+` expanded, `-` collapsed).
+    They take precedence over `:alerts` when both are enabled; syntax rejected
+    by callouts can still be parsed as an alert. HTML exposes fold state as
+    data attributes, not interactive folding behavior.
+  - Either `:wikilinks_title_after_pipe` or `:wikilinks_title_before_pipe`
+    enables wiki links and `![[url]]` embeds. Embeds set `WikiLink.embed` to
+    `true`, preserve `!` in CommonMark, and render as ordinary links in HTML.
+    Set `extension: [wikilinks_title_after_pipe: true, wikilinks_ignore_embeds: true]`
+    to leave `![[url]]` as literal text while still parsing `[[url]]`.
+
+  ## Parsing timeout
+
+  `parse: [timeout: milliseconds]` enables cooperative parser cancellation for
+  `parse_document/2`, `markdown_to_html/2`, and `markdown_to_xml/2`. The timeout
+  is a non-negative integer in milliseconds; omitted or `nil` means unlimited.
+  `0` cancels at the first parser checkpoint. Expiration raises `RuntimeError`
+  with `"Markdown parsing timed out"`; no partial document or output is returned.
+
+  Comrak checks at parser checkpoints (every 256 lines, inlines, or nodes),
+  so this is not a hard wall-clock bound. It covers only parsing, not AST
+  conversion, rendering, highlighting, or sanitization. The `document_to_*`
+  functions do not parse Markdown and therefore ignore this option.
+
   ## Examples
 
       iex> MDExNative.Comrak.markdown_to_html("# Hello")
@@ -25,6 +57,9 @@ defmodule MDExNative.Comrak do
 
       iex> MDExNative.Comrak.anchorize("Hello World")
       "hello-world"
+
+      iex> MDExNative.Comrak.markdown_to_html("Visible %%hidden%% text", extension: [ofm_comments: true])
+      "<p>Visible  text</p>\n"
   """
 
   @typedoc "Markdown source text."
@@ -49,7 +84,7 @@ defmodule MDExNative.Comrak do
   @typedoc "Comrak [`Extension`](https://docs.rs/comrak/latest/comrak/options/struct.Extension.html) options."
   @type extension_options :: keyword()
 
-  @typedoc "Comrak [`Parse`](https://docs.rs/comrak/latest/comrak/options/struct.Parse.html) options."
+  @typedoc "Comrak [`Parse`](https://docs.rs/comrak/latest/comrak/options/struct.Parse.html) options, plus the MDExNative `:timeout` in milliseconds."
   @type parse_options :: keyword()
 
   @typedoc "Comrak [`Render`](https://docs.rs/comrak/latest/comrak/options/struct.Render.html) options."
@@ -409,6 +444,10 @@ defmodule MDExNative.Comrak do
   end
 
   defp syntax_highlight_option(option), do: option
+
+  defp check_native_output({:error, :parse_timeout}) do
+    raise "Markdown parsing timed out"
+  end
 
   defp check_native_output({:error, {:lumis_error, reason}}) do
     raise """

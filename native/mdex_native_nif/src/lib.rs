@@ -28,6 +28,7 @@ use rustler::types::list::ListIterator;
 use rustler::{Encoder, Env, NifResult, Term};
 #[cfg(feature = "syntect")]
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use types::{document::*, options::*};
 
 // Standalone Rust tests have no BEAM host to resolve NIF symbols.
@@ -37,7 +38,8 @@ rustler::init!("Elixir.MDExNative.Native");
 mod atoms {
     rustler::atoms! {
         nodes,
-        lumis_error
+        lumis_error,
+        parse_timeout
     }
 }
 
@@ -188,8 +190,26 @@ fn comrak_ast_to_document_term<'a, 'b>(env: Env<'a>, root: &'b AstNode<'b>) -> N
 fn parse_document<'a>(env: Env<'a>, md: &str, options: ExOptions) -> NifResult<Term<'a>> {
     let comrak_options = options.comrak_options();
     let arena = Arena::new();
-    let root = comrak::parse_document(&arena, md, &comrak_options);
+    let timeout = options.parse.as_ref().and_then(|parse| parse.timeout);
+    let root = parse_markdown(&arena, md, &comrak_options, timeout)?;
     comrak_ast_to_document_term(env, root)
+}
+
+fn parse_markdown<'a>(
+    arena: &'a Arena<'a>,
+    md: &str,
+    options: &Options,
+    timeout: Option<u64>,
+) -> NifResult<&'a AstNode<'a>> {
+    match timeout {
+        None => Ok(comrak::parse_document(arena, md, options)),
+        Some(milliseconds) => {
+            let start = Instant::now();
+            let limit = Duration::from_millis(milliseconds);
+            comrak::try_parse_document(arena, md, options, &|| start.elapsed() >= limit)
+                .map_err(|_| rustler::Error::Term(Box::new(atoms::parse_timeout())))
+        }
+    }
 }
 
 #[cfg_attr(not(test), rustler::nif(schedule = "DirtyCpu"))]
@@ -199,10 +219,11 @@ fn markdown_to_html_with_options<'a>(
     options: ExOptions,
 ) -> NifResult<Term<'a>> {
     let tagfilter = options.tagfilter();
+    let timeout = options.parse.as_ref().and_then(|parse| parse.timeout);
     let (comrak_options, lumis_adapter, sanitize) = render_parts(options)?;
     let escape_curly_braces_in_code = comrak_options.extension.phoenix_heex;
     let arena = Arena::new();
-    let root = comrak::parse_document(&arena, md, &comrak_options);
+    let root = parse_markdown(&arena, md, &comrak_options, timeout)?;
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
 
@@ -219,9 +240,10 @@ fn markdown_to_xml_with_options<'a>(
     md: &str,
     options: ExOptions,
 ) -> NifResult<Term<'a>> {
+    let timeout = options.parse.as_ref().and_then(|parse| parse.timeout);
     let (comrak_options, lumis_adapter, _sanitize) = render_parts(options)?;
     let arena = Arena::new();
-    let root = comrak::parse_document(&arena, md, &comrak_options);
+    let root = parse_markdown(&arena, md, &comrak_options, timeout)?;
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
 
