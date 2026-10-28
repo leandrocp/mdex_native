@@ -88,6 +88,11 @@ A parser is a WebAssembly module published as a
 Nothing is compiled in and nothing is fetched at runtime: name a language you
 haven't installed and that fence comes out as plain text.
 
+If a parser's queries fail to compile or the highlighting runtime fails, that
+fence also falls back to escaped plain text. Its HTML formatter and options
+still apply, and the rest of the document renders normally. Invalid options
+and formatter errors still raise.
+
 Loading happens on first use, which costs a Wasmtime compile the first time.
 Compiled parsers are cached where `:lumis` keeps its own, `config :lumis,
 :data_dir` or `LUMIS_DATA_DIR` or the `:lumis` application's `priv`, so later
