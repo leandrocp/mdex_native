@@ -24,8 +24,8 @@ comrak = { version = "0.56", default-features = false, features = [
 ] }
 # The same two crates `lumis_nif` links, with `rustler` for the option
 # decoders the two NIFs share. They share no runtime; see ARCHITECTURE.md.
-lumis-core = { version = "5.0.0", default-features = false, features = ["all-languages", "rustler"], optional = true }
-lumis-wasm-runtime = { version = "0.5.3", optional = true }
+lumis-core = { version = "6.0.0", default-features = false, features = ["all-languages", "rustler"], optional = true }
+lumis-wasm-runtime = { version = "0.6.0", optional = true }
 lol_html = "3.0"
 parking_lot = "0.12"
 phf = { version = "0.14", features = ["macros"] }
