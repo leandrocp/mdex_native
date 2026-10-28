@@ -8,7 +8,6 @@
 
 ### Dependencies
 
-- Update Lumis release pair in [\#116](https://github.com/leandrocp/mdex_native/pull/116)
 - Update Lumis core to 6.0 in [\#118](https://github.com/leandrocp/mdex_native/pull/118)
 
 ## [0.2.13](https://github.com/leandrocp/mdex_native/compare/v0.2.12...v0.2.13) (2026-10-23)
