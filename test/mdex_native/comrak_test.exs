@@ -218,36 +218,6 @@ defmodule MDExNative.ComrakTest do
     end
   end
 
-  test "parser timeouts raise without returning partial results on every Markdown entry point" do
-    large_markdown = String.duplicate("# Heading with *emphasis*\n\n", 20_000)
-
-    for function <- [:parse_document, :markdown_to_html, :markdown_to_xml] do
-      assert_raise RuntimeError, "Markdown parsing timed out", fn ->
-        apply(MDExNative.Comrak, function, ["# Hello", [parse: [timeout: 0]]])
-      end
-
-      assert_raise RuntimeError, "Markdown parsing timed out", fn ->
-        apply(MDExNative.Comrak, function, [large_markdown, [parse: [timeout: 1]]])
-      end
-
-      expected = apply(MDExNative.Comrak, function, ["# Hello"])
-
-      for timeout <- [nil, 60_000] do
-        assert apply(MDExNative.Comrak, function, ["# Hello", [parse: [timeout: timeout]]]) ==
-                 expected
-      end
-
-      for timeout <- [-1, "100", 1.5] do
-        assert_raise ArgumentError, fn ->
-          apply(MDExNative.Comrak, function, ["# Hello", [parse: [timeout: timeout]]])
-        end
-      end
-    end
-
-    document = MDExNative.Comrak.parse_document("# Hello")
-    assert MDExNative.Comrak.document_to_html(document, parse: [timeout: 0]) == "<h1>Hello</h1>\n"
-  end
-
   test "renders wide tables with correct alignment across rows and separate tables" do
     # Exercise Comrak's table-cell index cache through our custom HTML formatter.
     # Different alignments and table widths catch a stale index between rows/tables.

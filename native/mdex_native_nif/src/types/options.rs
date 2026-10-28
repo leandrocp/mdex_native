@@ -87,7 +87,6 @@ mod atoms {
         tasklist_classes,
         tasklist_in_table,
         theme,
-        timeout,
         underline,
         unsafe_ = "unsafe",
         width,
@@ -344,8 +343,6 @@ pub struct ExParseOptions {
     pub leave_footnote_definitions: Option<bool>,
     pub escaped_char_spans: Option<bool>,
     pub sourcepos_chars: Option<bool>,
-    // MDExNative deadline for Comrak's cancellation callback, in milliseconds.
-    pub timeout: Option<u64>,
 }
 
 impl<'a> Decoder<'a> for ExParseOptions {
@@ -360,7 +357,6 @@ impl<'a> Decoder<'a> for ExParseOptions {
             leave_footnote_definitions: optional_field(term, atoms::leave_footnote_definitions())?,
             escaped_char_spans: optional_field(term, atoms::escaped_char_spans())?,
             sourcepos_chars: optional_field(term, atoms::sourcepos_chars())?,
-            timeout: optional_field(term, atoms::timeout())?,
         })
     }
 }

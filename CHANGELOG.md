@@ -7,7 +7,6 @@
 - Add `extension: [ofm_comments: true]` and the `CommentInline` / `MultilineComment` AST nodes. Comments are omitted from HTML but preserved in CommonMark and XML ([Comrak #876](https://github.com/kivikakk/comrak/pull/876)).
 - Add `extension: [ofm_callouts: true]` and the `Callout` / `CalloutTitle` AST nodes, including metadata, Markdown titles, and fold state ([Comrak #878](https://github.com/kivikakk/comrak/pull/878)).
 - Preserve wikilink embeds (`![[url]]`) in `WikiLink.embed` and CommonMark/XML output. HTML renders embeds as links. Set `extension: [wikilinks_ignore_embeds: true]` to leave embeds as literal text ([Comrak #874](https://github.com/kivikakk/comrak/pull/874), [#887](https://github.com/kivikakk/comrak/pull/887)).
-- Add optional `parse: [timeout: milliseconds]` for Markdown parsing and Markdown-to-HTML/XML conversion, using Comrak's cooperative cancellation API. Expiration raises `RuntimeError`; rendering and AST conversion are outside the timeout ([Comrak #883](https://github.com/kivikakk/comrak/pull/883)).
 
 ### Security
 
