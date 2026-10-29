@@ -10,7 +10,7 @@ defmodule MDExNative.Comrak do
 
   Options follow Rust [`comrak::Options`](https://docs.rs/comrak/latest/comrak/struct.Options.html)
   and use keyword lists. MDExNative also accepts `:sanitize`,
-  `:syntax_highlight`, and `:limits`.
+  `:syntax_highlight`, and `:budget`.
 
   ## Return values
 
@@ -85,7 +85,7 @@ defmodule MDExNative.Comrak do
   @typedoc "Comrak [`Render`](https://docs.rs/comrak/latest/comrak/options/struct.Render.html) options."
   @type render_options :: keyword()
 
-  @typedoc "Comrak [`Options`](https://docs.rs/comrak/latest/comrak/options/struct.Options.html), plus `:syntax_highlight`, `:sanitize`, and `:limits`."
+  @typedoc "Comrak [`Options`](https://docs.rs/comrak/latest/comrak/options/struct.Options.html), plus `:syntax_highlight`, `:sanitize`, and `:budget`."
   @type options :: keyword()
 
   @doc ~S"""
@@ -165,7 +165,7 @@ defmodule MDExNative.Comrak do
 
     See the [Sanitization](sanitization.md) guide for more info.
 
-  - `:limits` - bounds parsing, as `[parse_time: milliseconds]`. Omitted, or
+  - `:budget` - bounds parsing, as `[parse_time: milliseconds]`. Omitted, or
     `parse_time` set to `nil` or `0`, means no limit, which is the default.
 
     Applies to the Comrak parse in `parse_document/2`, `markdown_to_html/2`, and
@@ -174,9 +174,10 @@ defmodule MDExNative.Comrak do
     the limit cooperatively, so a parse can run somewhat past it. Running out
     returns `{:error, %MDExNative.ParseTimeExceededError{}}`, never partial output;
     the bang variants raise it.
-    Lumis highlighting has its own per-block `:budget` option; Syntect has none.
+    This is separate from the per-block `:budget` in Lumis's `:syntax_highlight`
+    options; Syntect has none.
 
-        {:ok, html} = MDExNative.Comrak.markdown_to_html(markdown, limits: [parse_time: 1_000])
+        {:ok, html} = MDExNative.Comrak.markdown_to_html(markdown, budget: [parse_time: 1_000])
 
   ## Examples
 
@@ -385,7 +386,7 @@ defmodule MDExNative.Comrak do
     MDExNative.Application.configure_lumis_store()
 
     Map.new(options, fn
-      {key, value} when key in [:extension, :parse, :render, :limits] and is_list(value) ->
+      {key, value} when key in [:extension, :parse, :render, :budget] and is_list(value) ->
         {key, Map.new(value)}
 
       {:syntax_highlight, value} when is_list(value) ->

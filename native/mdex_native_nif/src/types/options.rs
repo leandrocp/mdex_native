@@ -21,6 +21,7 @@ mod atoms {
         alerts,
         autolink,
         block_directive,
+        budget,
         cjk_friendly_emphasis,
         compact_html,
         default_info_string,
@@ -52,7 +53,6 @@ mod atoms {
         insert,
         leave_footnote_definitions,
         link_attributes,
-        limits,
         link_url_rewriter,
         list_style,
         math_code,
@@ -505,7 +505,7 @@ pub struct ExOptions {
     pub render: Option<ExRenderOptions>,
     pub syntax_highlight: Option<ExSyntaxHighlightOptions>,
     pub sanitize: Option<ExSanitizeOption>,
-    pub limits: Option<ExLimits>,
+    pub budget: Option<ExParseBudget>,
 }
 
 impl<'a> Decoder<'a> for ExOptions {
@@ -516,23 +516,23 @@ impl<'a> Decoder<'a> for ExOptions {
             render: optional_field(term, atoms::render())?,
             syntax_highlight: syntax_highlight_field(term)?,
             sanitize: optional_field(term, atoms::sanitize())?,
-            limits: optional_field(term, atoms::limits())?,
+            budget: optional_field(term, atoms::budget())?,
         })
     }
 }
 
-/// The top-level `:limits`, which bound Comrak's parse. They are not Comrak
-/// options, so they stay out of `:parse` where a future Comrak field could
-/// collide with them.
+/// The top-level `:budget`, which bounds Comrak's parse. It is not a Comrak
+/// option, so it stays out of `:parse` where a future Comrak field could
+/// collide with it. It is separate from Lumis's per-block highlighting budget.
 #[derive(Debug, Default)]
-pub struct ExLimits {
+pub struct ExParseBudget {
     pub parse_time: Option<u64>,
 }
 
-impl<'a> Decoder<'a> for ExLimits {
+impl<'a> Decoder<'a> for ExParseBudget {
     fn decode(term: Term<'a>) -> NifResult<Self> {
         // `optional_field` reads a non-map as a missing key, which would turn
-        // `limits: 1000` into no limit at all.
+        // `budget: 1000` into no limit at all.
         if !term.is_map() {
             return Err(rustler::Error::BadArg);
         }
@@ -546,9 +546,9 @@ impl ExOptions {
     /// Milliseconds the parse may take, or `None` for no limit. Like Lumis's
     /// `time_limit` in MDExNative, an explicit zero means no limit.
     pub fn parse_time_limit(&self) -> Option<u64> {
-        self.limits
+        self.budget
             .as_ref()
-            .and_then(|limits| limits.parse_time)
+            .and_then(|budget| budget.parse_time)
             .filter(|&ms| ms > 0)
     }
 

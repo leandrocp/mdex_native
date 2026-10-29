@@ -1,6 +1,6 @@
 defmodule MDExNative.ParseTimeExceededError do
   @moduledoc """
-  Markdown parsing ran past the `limits: [parse_time: milliseconds]` option.
+  Markdown parsing ran past the `budget: [parse_time: milliseconds]` option.
 
   `:parse_time` is the limit that was exceeded, in milliseconds.
   """

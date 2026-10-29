@@ -184,12 +184,12 @@ defmodule MDExNative.ComrakTest do
     test "a parse past its time limit returns an error without partial output" do
       for function <- [:parse_document, :markdown_to_html, :markdown_to_xml] do
         assert {:error, %MDExNative.ParseTimeExceededError{parse_time: 1} = error} =
-                 apply(MDExNative.Comrak, function, [@slow_markdown, [limits: [parse_time: 1]]])
+                 apply(MDExNative.Comrak, function, [@slow_markdown, [budget: [parse_time: 1]]])
 
         assert Exception.message(error) == "Markdown parsing exceeded its 1 ms time limit"
 
         assert_raise MDExNative.ParseTimeExceededError, fn ->
-          apply(MDExNative.Comrak, :"#{function}!", [@slow_markdown, [limits: [parse_time: 1]]])
+          apply(MDExNative.Comrak, :"#{function}!", [@slow_markdown, [budget: [parse_time: 1]]])
         end
       end
     end
@@ -197,29 +197,29 @@ defmodule MDExNative.ComrakTest do
     test "zero, nil, and a generous limit leave the output unchanged" do
       {:ok, html} = MDExNative.Comrak.markdown_to_html(@slow_markdown)
 
-      for limits <- [
+      for budget <- [
             [parse_time: 0],
             [parse_time: 60_000],
             %{parse_time: 60_000},
             [parse_time: nil],
             nil
           ] do
-        assert MDExNative.Comrak.markdown_to_html(@slow_markdown, limits: limits) == {:ok, html}
+        assert MDExNative.Comrak.markdown_to_html(@slow_markdown, budget: budget) == {:ok, html}
       end
     end
 
     test "rejects a parse time that is not a non-negative integer" do
       for parse_time <- [-1, 1.5, "1000"] do
         assert_raise ArgumentError, fn ->
-          MDExNative.Comrak.markdown_to_html("# Hi", limits: [parse_time: parse_time])
+          MDExNative.Comrak.markdown_to_html("# Hi", budget: [parse_time: parse_time])
         end
       end
     end
 
-    test "rejects limits that are not a keyword list or map" do
-      for limits <- [1_000, "1000", :fast] do
+    test "rejects a budget that is not a keyword list or map" do
+      for budget <- [1_000, "1000", :fast] do
         assert_raise ArgumentError, fn ->
-          MDExNative.Comrak.markdown_to_html("# Hi", limits: limits)
+          MDExNative.Comrak.markdown_to_html("# Hi", budget: budget)
         end
       end
     end
