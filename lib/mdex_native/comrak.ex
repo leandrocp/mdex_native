@@ -174,7 +174,7 @@ defmodule MDExNative.Comrak do
     the limit cooperatively, so a parse can run somewhat past it. Running out
     returns `{:error, %MDExNative.BudgetExhaustedError{}}`, never partial output;
     the bang variants raise it.
-    Syntax highlighting has its own per-block budget in the Lumis options.
+    Lumis highlighting has its own per-block `:budget` option; Syntect has none.
 
         {:ok, html} = MDExNative.Comrak.markdown_to_html(markdown, budget: [time_limit: 1_000])
 
