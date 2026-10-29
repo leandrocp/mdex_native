@@ -4,16 +4,14 @@
 
 ### Breaking Changes
 
-- `MDExNative.Comrak.parse_document/2`, `markdown_to_html/2`, `markdown_to_xml/2`, `document_to_html/2`, `document_to_xml/2`, and `document_to_commonmark/2` now return `{:ok, result}` or `{:error, exception}`. To keep the old behavior, call the new bang variants.
+- `MDExNative.Comrak.parse_document/2`, `markdown_to_html/2`, `markdown_to_xml/2`, `document_to_html/2`, `document_to_xml/2`, and `document_to_commonmark/2` now return `{:ok, result}` or `{:error, exception}`. To keep the old behavior, call the new bang variants. In [\#123](https://github.com/leandrocp/mdex_native/pull/123)
 
 ### Features
 
 - Add `extension: [ofm_comments: true]` and the `CommentInline` / `MultilineComment` AST nodes. Comments are omitted from HTML but preserved in CommonMark and XML.
 - Add `extension: [ofm_callouts: true]` and the `Callout` / `CalloutTitle` AST nodes, including metadata, Markdown titles, and fold state.
 - Preserve wikilink embeds (`![[url]]`) in `WikiLink.embed` and CommonMark/XML output. HTML renders embeds as links. Set `extension: [wikilinks_ignore_embeds: true]` to leave embeds as literal text.
-- Add a top-level `budget: [parse_time: milliseconds]` option that bounds Comrak's parse in `parse_document/2`, `markdown_to_html/2`, and `markdown_to_xml/2`. Running out returns `{:error, %MDExNative.ParseTimeExceededError{}}` without partial output; the bang variants raise it. Omitting `budget`, or setting `parse_time` to `nil` or `0`, means no limit, the default ([\#120](https://github.com/leandrocp/mdex_native/issues/120)).
-- **Breaking:** Return ok/error tuples from MDExNative.Comrak in [\#123](https://github.com/leandrocp/mdex_native/pull/123)
-- Add a parse time limit in [\#122](https://github.com/leandrocp/mdex_native/pull/122)
+- Add a top-level `budget: [parse_time: milliseconds]` option that bounds Comrak's parse in `parse_document/2`, `markdown_to_html/2`, and `markdown_to_xml/2`. Running out returns `{:error, %MDExNative.ParseTimeExceededError{}}` without partial output; the bang variants raise it. Omitting `budget`, or setting `parse_time` to `nil` or `0`, means no limit, the default ([\#120](https://github.com/leandrocp/mdex_native/issues/120)). In [\#122](https://github.com/leandrocp/mdex_native/pull/122)
 
 ### Security
 
