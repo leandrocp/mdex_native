@@ -165,19 +165,7 @@ defmodule MDExNative.Comrak do
 
     See the [Sanitization](sanitization.md) guide for more info.
 
-  - `:budget` - bounds parsing, as `[parse_time: milliseconds]`. Omitted, or
-    `parse_time` set to `nil` or `0`, means no limit, which is the default.
-
-    Applies to the Comrak parse in `parse_document/2`, `markdown_to_html/2`, and
-    `markdown_to_xml/2`; rendering, syntax highlighting, and sanitization are
-    not counted, and the `document_to_*` functions do not parse. Comrak checks
-    the limit cooperatively, so a parse can run somewhat past it. Running out
-    returns `{:error, %MDExNative.ParseTimeExceededError{}}`, never partial output;
-    the bang variants raise it.
-    This is separate from the per-block `:budget` in Lumis's `:syntax_highlight`
-    options; Syntect has none.
-
-        {:ok, html} = MDExNative.Comrak.markdown_to_html(markdown, budget: [parse_time: 1_000])
+  - `:budget` - bounds parsing, as `[parse_time: milliseconds]`. `0` or `nil` means no limit.
 
   ## Examples
 

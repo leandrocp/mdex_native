@@ -200,7 +200,6 @@ defmodule MDExNative.ComrakTest do
       for budget <- [
             [parse_time: 0],
             [parse_time: 60_000],
-            %{parse_time: 60_000},
             [parse_time: nil],
             nil
           ] do
@@ -216,7 +215,7 @@ defmodule MDExNative.ComrakTest do
       end
     end
 
-    test "rejects a budget that is not a keyword list or map" do
+    test "rejects a budget that is not a keyword list" do
       for budget <- [1_000, "1000", :fast] do
         assert_raise ArgumentError, fn ->
           MDExNative.Comrak.markdown_to_html("# Hi", budget: budget)
