@@ -28,6 +28,7 @@ use rustler::types::list::ListIterator;
 use rustler::{Encoder, Env, NifResult, Term};
 #[cfg(feature = "syntect")]
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use types::{document::*, options::*};
 
 // Standalone Rust tests have no BEAM host to resolve NIF symbols.
@@ -37,7 +38,8 @@ rustler::init!("Elixir.MDExNative.Native");
 mod atoms {
     rustler::atoms! {
         nodes,
-        lumis_error
+        lumis_error,
+        parse_budget_exhausted
     }
 }
 
@@ -184,11 +186,43 @@ fn comrak_ast_to_document_term<'a, 'b>(env: Env<'a>, root: &'b AstNode<'b>) -> N
     }
 }
 
+/// Parses `md`, giving up once `time_limit` milliseconds have passed.
+///
+/// Comrak checks the deadline cooperatively, every 256 lines, inlines or nodes,
+/// so a parse can run somewhat past it. A cancelled parse returns no tree, so
+/// the caller gets `{:error, {:parse_budget_exhausted, time_limit}}` rather than
+/// partial output.
+fn parse<'a>(
+    arena: &'a Arena<'a>,
+    md: &str,
+    options: &Options,
+    time_limit: Option<u64>,
+) -> NifResult<&'a AstNode<'a>> {
+    // A limit too far out for `Instant` to represent is no limit at all.
+    let deadline = time_limit.and_then(|ms| Instant::now().checked_add(Duration::from_millis(ms)));
+    let Some(deadline) = deadline else {
+        return Ok(comrak::parse_document(arena, md, options));
+    };
+
+    let past_deadline = || Instant::now() >= deadline;
+    let exhausted =
+        || rustler::Error::Term(Box::new((atoms::parse_budget_exhausted(), time_limit)));
+
+    let root =
+        comrak::try_parse_document(arena, md, options, &past_deadline).map_err(|_| exhausted())?;
+    // Comrak only asks at its checkpoints, so a parse can pass the last one in
+    // time and still finish late. Check once more so a late parse fails too.
+    if past_deadline() {
+        return Err(exhausted());
+    }
+    Ok(root)
+}
+
 #[cfg_attr(not(test), rustler::nif(schedule = "DirtyCpu"))]
 fn parse_document<'a>(env: Env<'a>, md: &str, options: ExOptions) -> NifResult<Term<'a>> {
     let comrak_options = options.comrak_options();
     let arena = Arena::new();
-    let root = comrak::parse_document(&arena, md, &comrak_options);
+    let root = parse(&arena, md, &comrak_options, options.parse_time_limit())?;
     comrak_ast_to_document_term(env, root)
 }
 
@@ -199,10 +233,11 @@ fn markdown_to_html_with_options<'a>(
     options: ExOptions,
 ) -> NifResult<Term<'a>> {
     let tagfilter = options.tagfilter();
+    let time_limit = options.parse_time_limit();
     let (comrak_options, lumis_adapter, sanitize) = render_parts(options)?;
     let escape_curly_braces_in_code = comrak_options.extension.phoenix_heex;
     let arena = Arena::new();
-    let root = comrak::parse_document(&arena, md, &comrak_options);
+    let root = parse(&arena, md, &comrak_options, time_limit)?;
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
 
@@ -219,9 +254,10 @@ fn markdown_to_xml_with_options<'a>(
     md: &str,
     options: ExOptions,
 ) -> NifResult<Term<'a>> {
+    let time_limit = options.parse_time_limit();
     let (comrak_options, lumis_adapter, _sanitize) = render_parts(options)?;
     let arena = Arena::new();
-    let root = comrak::parse_document(&arena, md, &comrak_options);
+    let root = parse(&arena, md, &comrak_options, time_limit)?;
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
 

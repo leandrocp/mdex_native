@@ -36,8 +36,8 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # Companion test update (stacked on lp-comrak-059); return to main after it merges.
-      MDEX_NATIVE_E2E_MDEX_REF: lp-native-ok-error
+      # Companion budget option (stacked on lp-native-ok-error); return to main after it merges.
+      MDEX_NATIVE_E2E_MDEX_REF: lp-parse-budget
 
     steps:
       - uses: actions/checkout@v7

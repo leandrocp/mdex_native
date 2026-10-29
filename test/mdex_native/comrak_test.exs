@@ -176,6 +176,55 @@ defmodule MDExNative.ComrakTest do
     end
   end
 
+  describe "parse budget" do
+    # Takes well over a millisecond to parse even in a release build, and every
+    # Comrak cancellation checkpoint after the deadline stops it.
+    @slow_markdown String.duplicate("a *b* [c](d) ", 50_000)
+
+    test "a parse past its time limit returns an error without partial output" do
+      for function <- [:parse_document, :markdown_to_html, :markdown_to_xml] do
+        assert {:error, %MDExNative.BudgetExhaustedError{time_limit: 1} = error} =
+                 apply(MDExNative.Comrak, function, [@slow_markdown, [budget: [time_limit: 1]]])
+
+        assert Exception.message(error) == "Markdown parsing exceeded its 1 ms time limit"
+
+        assert_raise MDExNative.BudgetExhaustedError, fn ->
+          apply(MDExNative.Comrak, :"#{function}!", [@slow_markdown, [budget: [time_limit: 1]]])
+        end
+      end
+    end
+
+    test "zero, nil, and a generous limit leave the output unchanged" do
+      {:ok, html} = MDExNative.Comrak.markdown_to_html(@slow_markdown)
+
+      for budget <- [
+            [time_limit: 0],
+            [time_limit: 60_000],
+            %{time_limit: 60_000},
+            [time_limit: nil],
+            nil
+          ] do
+        assert MDExNative.Comrak.markdown_to_html(@slow_markdown, budget: budget) == {:ok, html}
+      end
+    end
+
+    test "rejects a time limit that is not a non-negative integer" do
+      for time_limit <- [-1, 1.5, "1000"] do
+        assert_raise ArgumentError, fn ->
+          MDExNative.Comrak.markdown_to_html("# Hi", budget: [time_limit: time_limit])
+        end
+      end
+    end
+
+    test "rejects a budget that is not a keyword list or map" do
+      for budget <- [1_000, "1000", :fast] do
+        assert_raise ArgumentError, fn ->
+          MDExNative.Comrak.markdown_to_html("# Hi", budget: budget)
+        end
+      end
+    end
+  end
+
   describe "wikilink embeds" do
     test "preserves embed flags and both title conventions through all renderers" do
       for {option, target} <- [

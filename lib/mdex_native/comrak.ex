@@ -9,8 +9,8 @@ defmodule MDExNative.Comrak do
   Elixir bindings for Comrak's parser and renderers.
 
   Options follow Rust [`comrak::Options`](https://docs.rs/comrak/latest/comrak/struct.Options.html)
-  and use keyword lists. MDExNative also accepts `:sanitize` and
-  `:syntax_highlight`.
+  and use keyword lists. MDExNative also accepts `:sanitize`,
+  `:syntax_highlight`, and `:budget`.
 
   ## Return values
 
@@ -85,7 +85,7 @@ defmodule MDExNative.Comrak do
   @typedoc "Comrak [`Render`](https://docs.rs/comrak/latest/comrak/options/struct.Render.html) options."
   @type render_options :: keyword()
 
-  @typedoc "Comrak [`Options`](https://docs.rs/comrak/latest/comrak/options/struct.Options.html), plus `:syntax_highlight` and `:sanitize`."
+  @typedoc "Comrak [`Options`](https://docs.rs/comrak/latest/comrak/options/struct.Options.html), plus `:syntax_highlight`, `:sanitize`, and `:budget`."
   @type options :: keyword()
 
   @doc ~S"""
@@ -164,6 +164,19 @@ defmodule MDExNative.Comrak do
   - `:sanitize` - cleans rendered HTML. Defaults to `nil`.
 
     See the [Sanitization](sanitization.md) guide for more info.
+
+  - `:budget` - bounds parsing, as `[time_limit: milliseconds]`. Omitted, `nil`,
+    or `0` means no limit, which is the default.
+
+    Applies to the Comrak parse in `parse_document/2`, `markdown_to_html/2`, and
+    `markdown_to_xml/2`; rendering, syntax highlighting, and sanitization are
+    not counted, and the `document_to_*` functions do not parse. Comrak checks
+    the limit cooperatively, so a parse can run somewhat past it. Running out
+    returns `{:error, %MDExNative.BudgetExhaustedError{}}`, never partial output;
+    the bang variants raise it.
+    Syntax highlighting has its own per-block budget in the Lumis options.
+
+        {:ok, html} = MDExNative.Comrak.markdown_to_html(markdown, budget: [time_limit: 1_000])
 
   ## Examples
 
@@ -372,7 +385,7 @@ defmodule MDExNative.Comrak do
     MDExNative.Application.configure_lumis_store()
 
     Map.new(options, fn
-      {key, value} when key in [:extension, :parse, :render] and is_list(value) ->
+      {key, value} when key in [:extension, :parse, :render, :budget] and is_list(value) ->
         {key, Map.new(value)}
 
       {:syntax_highlight, value} when is_list(value) ->
@@ -503,6 +516,9 @@ defmodule MDExNative.Comrak do
 
     """)
   end
+
+  defp native_result({:error, {:parse_budget_exhausted, time_limit}}),
+    do: {:error, %MDExNative.BudgetExhaustedError{time_limit: time_limit}}
 
   defp native_result(:lumis_not_enabled), do: highlight_error(lumis_not_enabled_message())
 
