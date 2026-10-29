@@ -1,7 +1,5 @@
 # Changelog
 
-## Unreleased
-
 ## [0.3.0](https://github.com/leandrocp/mdex_native/compare/v0.2.14...v0.3.0) (2026-10-29)
 
 ### Breaking Changes
