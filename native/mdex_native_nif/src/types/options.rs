@@ -64,6 +64,7 @@ mod atoms {
         ol_width,
         opts,
         parse,
+        parse_time,
         phoenix_heex,
         prefer_fenced,
         rainbow_brackets,
@@ -504,6 +505,7 @@ pub struct ExOptions {
     pub render: Option<ExRenderOptions>,
     pub syntax_highlight: Option<ExSyntaxHighlightOptions>,
     pub sanitize: Option<ExSanitizeOption>,
+    pub budget: Option<ExParseBudget>,
 }
 
 impl<'a> Decoder<'a> for ExOptions {
@@ -514,11 +516,42 @@ impl<'a> Decoder<'a> for ExOptions {
             render: optional_field(term, atoms::render())?,
             syntax_highlight: syntax_highlight_field(term)?,
             sanitize: optional_field(term, atoms::sanitize())?,
+            budget: optional_field(term, atoms::budget())?,
+        })
+    }
+}
+
+/// The top-level `:budget`, which bounds Comrak's parse. It is not a Comrak
+/// option, so it stays out of `:parse` where a future Comrak field could
+/// collide with it. It is separate from Lumis's per-block highlighting budget.
+#[derive(Debug, Default)]
+pub struct ExParseBudget {
+    pub parse_time: Option<u64>,
+}
+
+impl<'a> Decoder<'a> for ExParseBudget {
+    fn decode(term: Term<'a>) -> NifResult<Self> {
+        // `optional_field` reads a non-map as a missing key, which would turn
+        // `budget: 1000` into no limit at all.
+        if !term.is_map() {
+            return Err(rustler::Error::BadArg);
+        }
+        Ok(Self {
+            parse_time: optional_field(term, atoms::parse_time())?,
         })
     }
 }
 
 impl ExOptions {
+    /// Milliseconds the parse may take, or `None` for no limit. Like Lumis's
+    /// `time_limit` in MDExNative, an explicit zero means no limit.
+    pub fn parse_time_limit(&self) -> Option<u64> {
+        self.budget
+            .as_ref()
+            .and_then(|budget| budget.parse_time)
+            .filter(|&ms| ms > 0)
+    }
+
     pub fn tagfilter(&self) -> bool {
         self.extension
             .as_ref()

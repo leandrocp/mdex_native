@@ -9,8 +9,8 @@ defmodule MDExNative.Comrak do
   Elixir bindings for Comrak's parser and renderers.
 
   Options follow Rust [`comrak::Options`](https://docs.rs/comrak/latest/comrak/struct.Options.html)
-  and use keyword lists. MDExNative also accepts `:sanitize` and
-  `:syntax_highlight`.
+  and use keyword lists. MDExNative also accepts `:sanitize`,
+  `:syntax_highlight`, and `:budget`.
 
   ## Return values
 
@@ -85,7 +85,7 @@ defmodule MDExNative.Comrak do
   @typedoc "Comrak [`Render`](https://docs.rs/comrak/latest/comrak/options/struct.Render.html) options."
   @type render_options :: keyword()
 
-  @typedoc "Comrak [`Options`](https://docs.rs/comrak/latest/comrak/options/struct.Options.html), plus `:syntax_highlight` and `:sanitize`."
+  @typedoc "Comrak [`Options`](https://docs.rs/comrak/latest/comrak/options/struct.Options.html), plus `:syntax_highlight`, `:sanitize`, and `:budget`."
   @type options :: keyword()
 
   @doc ~S"""
@@ -164,6 +164,8 @@ defmodule MDExNative.Comrak do
   - `:sanitize` - cleans rendered HTML. Defaults to `nil`.
 
     See the [Sanitization](sanitization.md) guide for more info.
+
+  - `:budget` - bounds parsing, as `[parse_time: milliseconds]`. `0` or `nil` means no limit.
 
   ## Examples
 
@@ -372,7 +374,7 @@ defmodule MDExNative.Comrak do
     MDExNative.Application.configure_lumis_store()
 
     Map.new(options, fn
-      {key, value} when key in [:extension, :parse, :render] and is_list(value) ->
+      {key, value} when key in [:extension, :parse, :render, :budget] and is_list(value) ->
         {key, Map.new(value)}
 
       {:syntax_highlight, value} when is_list(value) ->
@@ -503,6 +505,9 @@ defmodule MDExNative.Comrak do
 
     """)
   end
+
+  defp native_result({:error, {:parse_time_exceeded, parse_time}}),
+    do: {:error, %MDExNative.ParseTimeExceededError{parse_time: parse_time}}
 
   defp native_result(:lumis_not_enabled), do: highlight_error(lumis_not_enabled_message())
 
