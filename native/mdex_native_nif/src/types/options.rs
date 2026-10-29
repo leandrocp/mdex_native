@@ -21,7 +21,6 @@ mod atoms {
         alerts,
         autolink,
         block_directive,
-        budget,
         cjk_friendly_emphasis,
         compact_html,
         default_info_string,
@@ -53,6 +52,7 @@ mod atoms {
         insert,
         leave_footnote_definitions,
         link_attributes,
+        limits,
         link_url_rewriter,
         list_style,
         math_code,
@@ -64,6 +64,7 @@ mod atoms {
         ol_width,
         opts,
         parse,
+        parse_time,
         phoenix_heex,
         prefer_fenced,
         rainbow_brackets,
@@ -87,7 +88,6 @@ mod atoms {
         tasklist_classes,
         tasklist_in_table,
         theme,
-        time_limit,
         underline,
         unsafe_ = "unsafe",
         width,
@@ -505,7 +505,7 @@ pub struct ExOptions {
     pub render: Option<ExRenderOptions>,
     pub syntax_highlight: Option<ExSyntaxHighlightOptions>,
     pub sanitize: Option<ExSanitizeOption>,
-    pub budget: Option<ExParseBudget>,
+    pub limits: Option<ExLimits>,
 }
 
 impl<'a> Decoder<'a> for ExOptions {
@@ -516,29 +516,28 @@ impl<'a> Decoder<'a> for ExOptions {
             render: optional_field(term, atoms::render())?,
             syntax_highlight: syntax_highlight_field(term)?,
             sanitize: optional_field(term, atoms::sanitize())?,
-            budget: optional_field(term, atoms::budget())?,
+            limits: optional_field(term, atoms::limits())?,
         })
     }
 }
 
-/// The top-level `:budget`, which bounds Comrak's parse. It is not a Comrak
-/// option, so it stays out of `:parse` where a future Comrak field could
-/// collide with it. Shaped like Lumis's `:budget`, though Comrak has no match
-/// limit to offer.
+/// The top-level `:limits`, which bound Comrak's parse. They are not Comrak
+/// options, so they stay out of `:parse` where a future Comrak field could
+/// collide with them.
 #[derive(Debug, Default)]
-pub struct ExParseBudget {
-    pub time_limit: Option<u64>,
+pub struct ExLimits {
+    pub parse_time: Option<u64>,
 }
 
-impl<'a> Decoder<'a> for ExParseBudget {
+impl<'a> Decoder<'a> for ExLimits {
     fn decode(term: Term<'a>) -> NifResult<Self> {
         // `optional_field` reads a non-map as a missing key, which would turn
-        // `budget: 1000` into no limit at all.
+        // `limits: 1000` into no limit at all.
         if !term.is_map() {
             return Err(rustler::Error::BadArg);
         }
         Ok(Self {
-            time_limit: optional_field(term, atoms::time_limit())?,
+            parse_time: optional_field(term, atoms::parse_time())?,
         })
     }
 }
@@ -547,9 +546,9 @@ impl ExOptions {
     /// Milliseconds the parse may take, or `None` for no limit. Like Lumis's
     /// `time_limit` in MDExNative, an explicit zero means no limit.
     pub fn parse_time_limit(&self) -> Option<u64> {
-        self.budget
+        self.limits
             .as_ref()
-            .and_then(|budget| budget.time_limit)
+            .and_then(|limits| limits.parse_time)
             .filter(|&ms| ms > 0)
     }
 

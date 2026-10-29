@@ -1,6 +1,6 @@
 defmodule MDExNative.BudgetExhaustedError do
   @moduledoc """
-  Markdown parsing ran past the `budget: [time_limit: milliseconds]` option.
+  Markdown parsing ran past the `limits: [parse_time: milliseconds]` option.
 
   `:time_limit` is the limit that was exceeded, in milliseconds.
   """

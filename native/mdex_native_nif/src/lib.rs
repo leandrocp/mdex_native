@@ -39,7 +39,7 @@ mod atoms {
     rustler::atoms! {
         nodes,
         lumis_error,
-        parse_budget_exhausted
+        parse_time_exceeded
     }
 }
 
@@ -186,27 +186,26 @@ fn comrak_ast_to_document_term<'a, 'b>(env: Env<'a>, root: &'b AstNode<'b>) -> N
     }
 }
 
-/// Parses `md`, giving up once `time_limit` milliseconds have passed.
+/// Parses `md`, giving up once `parse_time` milliseconds have passed.
 ///
 /// Comrak checks the deadline cooperatively, every 256 lines, inlines or nodes,
 /// so a parse can run somewhat past it. A cancelled parse returns no tree, so
-/// the caller gets `{:error, {:parse_budget_exhausted, time_limit}}` rather than
+/// the caller gets `{:error, {:parse_time_exceeded, parse_time}}` rather than
 /// partial output.
 fn parse<'a>(
     arena: &'a Arena<'a>,
     md: &str,
     options: &Options,
-    time_limit: Option<u64>,
+    parse_time: Option<u64>,
 ) -> NifResult<&'a AstNode<'a>> {
     // A limit too far out for `Instant` to represent is no limit at all.
-    let deadline = time_limit.and_then(|ms| Instant::now().checked_add(Duration::from_millis(ms)));
+    let deadline = parse_time.and_then(|ms| Instant::now().checked_add(Duration::from_millis(ms)));
     let Some(deadline) = deadline else {
         return Ok(comrak::parse_document(arena, md, options));
     };
 
     let past_deadline = || Instant::now() >= deadline;
-    let exhausted =
-        || rustler::Error::Term(Box::new((atoms::parse_budget_exhausted(), time_limit)));
+    let exhausted = || rustler::Error::Term(Box::new((atoms::parse_time_exceeded(), parse_time)));
 
     let root =
         comrak::try_parse_document(arena, md, options, &past_deadline).map_err(|_| exhausted())?;
