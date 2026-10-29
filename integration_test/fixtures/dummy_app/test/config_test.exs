@@ -5,11 +5,11 @@ defmodule MDExNativeE2E.ConfigTest do
   test "compile-time syntax highlighter config is used" do
     case System.fetch_env!("MDEX_NATIVE_E2E_CASE") do
       e2e_case when e2e_case in ["default", "cloudflare"] ->
-        assert MDExNative.Comrak.markdown_to_html(@rust, syntax_highlight: nil) ==
+        assert MDExNative.Comrak.markdown_to_html!(@rust, syntax_highlight: nil) ==
                  "<pre><code class=\"language-rust\">fn main() {}\n</code></pre>\n"
 
         lumis_error =
-          assert_raise RuntimeError, fn ->
+          assert_raise MDExNative.SyntaxHighlightError, fn ->
             lumis_html(@rust)
           end
 
@@ -17,7 +17,7 @@ defmodule MDExNativeE2E.ConfigTest do
                  "Lumis is not enabled.\n\nComrak tried to syntax highlight a code block with Lumis, but this NIF was not compiled with Lumis support.\n\nEnable it in your config:\n\n    config :mdex_native, syntax_highlighter: :lumis\n\nAnd add a parser package to your deps for every language you highlight:\n\n    {:lumis_wasm_elixir, \"~> 0.26\"}\n\n"
 
         syntect_error =
-          assert_raise RuntimeError, fn ->
+          assert_raise MDExNative.SyntaxHighlightError, fn ->
             syntect_html(@rust)
           end
 
@@ -34,7 +34,7 @@ defmodule MDExNativeE2E.ConfigTest do
         # `:opts` without an explicit engine: the default has to reach the NIF,
         # or it reads the legacy shape and drops these options.
         implicit =
-          MDExNative.Comrak.markdown_to_html(@rust,
+          MDExNative.Comrak.markdown_to_html!(@rust,
             syntax_highlight: [opts: [formatter: {:html_inline, theme: "dracula"}]]
           )
 
@@ -42,15 +42,15 @@ defmodule MDExNativeE2E.ConfigTest do
 
         # Legacy `[formatter: ...]`, which carries no engine key at all.
         legacy =
-          MDExNative.Comrak.markdown_to_html(@rust,
+          MDExNative.Comrak.markdown_to_html!(@rust,
             syntax_highlight: [formatter: {:html_inline, theme: "dracula"}]
           )
 
         assert legacy =~ "background-color: #282a36"
 
         error =
-          assert_raise RuntimeError, fn ->
-            MDExNative.Comrak.markdown_to_html(@rust, syntax_highlight: [engine: :syntect])
+          assert_raise MDExNative.SyntaxHighlightError, fn ->
+            MDExNative.Comrak.markdown_to_html!(@rust, syntax_highlight: [engine: :syntect])
           end
 
         assert error.message ==
@@ -61,8 +61,8 @@ defmodule MDExNativeE2E.ConfigTest do
                  "<pre class=\"syntax-highlighting\"><code class=\"language-rust\"><span class=\"source rust\"><span class=\"meta function rust\"><span class=\"meta function rust\"><span class=\"storage type function rust\">fn</span> </span><span class=\"entity name function rust\">main</span></span><span class=\"meta function rust\"><span class=\"meta function parameters rust\"><span class=\"punctuation section parameters begin rust\">(</span></span><span class=\"meta function rust\"><span class=\"meta function parameters rust\"><span class=\"punctuation section parameters end rust\">)</span></span></span></span><span class=\"meta function rust\"> </span><span class=\"meta function rust\"><span class=\"meta block rust\"><span class=\"punctuation section block begin rust\">{</span></span><span class=\"meta block rust\"><span class=\"punctuation section block end rust\">}</span></span></span>\n</span></code></pre>\n"
 
         error =
-          assert_raise RuntimeError, fn ->
-            MDExNative.Comrak.markdown_to_html(@rust, syntax_highlight: [engine: :lumis])
+          assert_raise MDExNative.SyntaxHighlightError, fn ->
+            MDExNative.Comrak.markdown_to_html!(@rust, syntax_highlight: [engine: :lumis])
           end
 
         assert error.message ==
@@ -78,10 +78,10 @@ defmodule MDExNativeE2E.ConfigTest do
       |> Task.async_stream(
         fn theme ->
           options = [syntax_highlight: [engine: :syntect, opts: [theme: theme]]]
-          html = MDExNative.Comrak.markdown_to_html(@rust, options)
-          document = MDExNative.Comrak.parse_document(@rust)
+          html = MDExNative.Comrak.markdown_to_html!(@rust, options)
+          document = MDExNative.Comrak.parse_document!(@rust)
 
-          assert MDExNative.Comrak.document_to_html(document, options) == html
+          assert MDExNative.Comrak.document_to_html!(document, options) == html
           assert html =~ ~s(class="language-rust")
 
           case theme do
@@ -106,7 +106,7 @@ defmodule MDExNativeE2E.ConfigTest do
   end
 
   defp lumis_html(markdown) do
-    MDExNative.Comrak.markdown_to_html(markdown,
+    MDExNative.Comrak.markdown_to_html!(markdown,
       syntax_highlight: [
         engine: :lumis,
         opts: [formatter: {:html_inline, theme: "catppuccin_macchiato"}]
@@ -115,6 +115,6 @@ defmodule MDExNativeE2E.ConfigTest do
   end
 
   defp syntect_html(markdown) do
-    MDExNative.Comrak.markdown_to_html(markdown, syntax_highlight: [engine: :syntect])
+    MDExNative.Comrak.markdown_to_html!(markdown, syntax_highlight: [engine: :syntect])
   end
 end

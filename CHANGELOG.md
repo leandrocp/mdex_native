@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Breaking Changes
+
+- `MDExNative.Comrak.parse_document/2`, `markdown_to_html/2`, `markdown_to_xml/2`, `document_to_html/2`, `document_to_xml/2`, and `document_to_commonmark/2` now return `{:ok, result}` or `{:error, exception}` instead of a bare result. Syntax highlighting failures, including an engine that is not compiled in, are returned as `MDExNative.SyntaxHighlightError` instead of raising `RuntimeError`. To keep the old behavior, call the new bang variants (`markdown_to_html!/2` and so on), which return the result or raise.
+
 ### Features
 
 - Add `extension: [ofm_comments: true]` and the `CommentInline` / `MultilineComment` AST nodes. Comments are omitted from HTML but preserved in CommonMark and XML ([Comrak #876](https://github.com/kivikakk/comrak/pull/876)).

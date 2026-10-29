@@ -46,7 +46,7 @@ defmodule MDExNative.ComrakTest do
   end
 
   test "renders markdown with Comrak options" do
-    html = MDExNative.Comrak.markdown_to_html("- [x] done", extension: [tasklist: true])
+    html = MDExNative.Comrak.markdown_to_html!("- [x] done", extension: [tasklist: true])
 
     assert html =~ ~s(<input type="checkbox" checked="" disabled="" /> done)
   end
@@ -56,7 +56,7 @@ defmodule MDExNative.ComrakTest do
 
     test "preserves inline and block comments across AST conversion but omits them from HTML" do
       markdown = "a %%inline <secret>%% b\n\n%%\nblock **secret**\n%%\n"
-      document = MDExNative.Comrak.parse_document(markdown, @options)
+      document = MDExNative.Comrak.parse_document!(markdown, @options)
 
       assert %Document{
                nodes: [
@@ -73,36 +73,36 @@ defmodule MDExNative.ComrakTest do
 
       assert sourcepos.start == {1, 3}
       assert sourcepos.end == {1, 21}
-      assert MDExNative.Comrak.markdown_to_html(markdown, @options) == "<p>a  b</p>\n"
-      assert MDExNative.Comrak.document_to_html(document, @options) == "<p>a  b</p>\n"
-      assert MDExNative.Comrak.document_to_commonmark(document, @options) == markdown
+      assert MDExNative.Comrak.markdown_to_html!(markdown, @options) == "<p>a  b</p>\n"
+      assert MDExNative.Comrak.document_to_html!(document, @options) == "<p>a  b</p>\n"
+      assert MDExNative.Comrak.document_to_commonmark!(document, @options) == markdown
 
-      xml = MDExNative.Comrak.markdown_to_xml(markdown, @options)
+      xml = MDExNative.Comrak.markdown_to_xml!(markdown, @options)
       assert xml =~ ~s(<comment xml:space="preserve">inline &lt;secret&gt;</comment>)
       assert xml =~ "block **secret**"
-      assert MDExNative.Comrak.document_to_xml(document, @options) == xml
+      assert MDExNative.Comrak.document_to_xml!(document, @options) == xml
     end
 
     test "preserves unclosed block comments without adding a closing delimiter" do
       markdown = "%%\nunfinished"
-      document = MDExNative.Comrak.parse_document(markdown, @options)
+      document = MDExNative.Comrak.parse_document!(markdown, @options)
 
       assert %Document{nodes: [%MultilineComment{closed: false, literal: "\nunfinished"}]} =
                document
 
-      assert MDExNative.Comrak.document_to_commonmark(document, @options) == markdown <> "\n"
-      assert MDExNative.Comrak.document_to_html(document, @options) == ""
+      assert MDExNative.Comrak.document_to_commonmark!(document, @options) == markdown <> "\n"
+      assert MDExNative.Comrak.document_to_html!(document, @options) == ""
     end
 
     test "is opt-in and leaves comment syntax in code alone" do
-      assert MDExNative.Comrak.markdown_to_html("a %%hidden%% b") == "<p>a %%hidden%% b</p>\n"
+      assert MDExNative.Comrak.markdown_to_html!("a %%hidden%% b") == "<p>a %%hidden%% b</p>\n"
 
-      assert MDExNative.Comrak.markdown_to_html("a %%hidden%% b",
+      assert MDExNative.Comrak.markdown_to_html!("a %%hidden%% b",
                extension: [ofm_comments: false]
              ) ==
                "<p>a %%hidden%% b</p>\n"
 
-      assert MDExNative.Comrak.markdown_to_html("`%%inline%%`\n\n```\n%%block%%\n```", @options) ==
+      assert MDExNative.Comrak.markdown_to_html!("`%%inline%%`\n\n```\n%%block%%\n```", @options) ==
                "<p><code>%%inline%%</code></p>\n<pre><code>%%block%%\n</code></pre>\n"
     end
   end
@@ -113,7 +113,7 @@ defmodule MDExNative.ComrakTest do
     test "round-trips metadata, Markdown titles, nested body nodes, and all fold states" do
       for {marker, fold} <- [{"", :none}, {"+", :expanded}, {"-", :collapsed}] do
         markdown = "> [!My Type|a&b]#{marker} **Title**\n> Body\n>\n> - item\n"
-        document = MDExNative.Comrak.parse_document(markdown, @options)
+        document = MDExNative.Comrak.parse_document!(markdown, @options)
 
         assert %Document{
                  nodes: [
@@ -142,17 +142,17 @@ defmodule MDExNative.ComrakTest do
             "<div class=\"callout-title\">\n<strong>Title</strong>\n</div>\n" <>
             "<div class=\"callout-content\">\n<p>Body</p>\n<ul>\n<li>item</li>\n</ul>\n</div>\n</div>\n"
 
-        assert MDExNative.Comrak.markdown_to_html(markdown, @options) == html
-        assert MDExNative.Comrak.document_to_html(document, @options) == html
+        assert MDExNative.Comrak.markdown_to_html!(markdown, @options) == html
+        assert MDExNative.Comrak.document_to_html!(document, @options) == html
 
-        xml = MDExNative.Comrak.markdown_to_xml(markdown, @options)
+        xml = MDExNative.Comrak.markdown_to_xml!(markdown, @options)
         assert xml =~ ~s(<callout type="my-type" metadata="a&amp;b" fold="#{fold}">)
         assert xml =~ "<callout_title>"
-        assert MDExNative.Comrak.document_to_xml(document, @options) == xml
+        assert MDExNative.Comrak.document_to_xml!(document, @options) == xml
 
-        commonmark = MDExNative.Comrak.document_to_commonmark(document, @options)
+        commonmark = MDExNative.Comrak.document_to_commonmark!(document, @options)
         assert commonmark =~ "> [!my-type|a&b]#{marker} **Title**"
-        assert MDExNative.Comrak.markdown_to_html(commonmark, @options) == html
+        assert MDExNative.Comrak.markdown_to_html!(commonmark, @options) == html
       end
     end
 
@@ -160,19 +160,19 @@ defmodule MDExNative.ComrakTest do
       markdown = "> [!note]\n> Body"
 
       assert %Document{nodes: [%MDExNative.Comrak.BlockQuote{}]} =
-               MDExNative.Comrak.parse_document(markdown)
+               MDExNative.Comrak.parse_document!(markdown)
 
       assert %Document{nodes: [%Callout{metadata: nil, fold: :none, nodes: [%Paragraph{}]}]} =
-               MDExNative.Comrak.parse_document(markdown, @options)
+               MDExNative.Comrak.parse_document!(markdown, @options)
 
-      html = MDExNative.Comrak.markdown_to_html(markdown, @options)
+      html = MDExNative.Comrak.markdown_to_html!(markdown, @options)
       assert html =~ ~s(<div class="callout-title">Note</div>)
 
       both = [extension: [ofm_callouts: true, alerts: true]]
-      assert MDExNative.Comrak.markdown_to_html(markdown, both) == html
+      assert MDExNative.Comrak.markdown_to_html!(markdown, both) == html
 
       assert %Document{nodes: [%MDExNative.Comrak.Alert{title: "Title"}]} =
-               MDExNative.Comrak.parse_document("> [!note]Title\n> Body", both)
+               MDExNative.Comrak.parse_document!("> [!note]Title\n> Body", both)
     end
   end
 
@@ -184,7 +184,7 @@ defmodule MDExNative.ComrakTest do
           ] do
         options = [extension: [{option, true}]]
         markdown = "![[#{target}]] [[#{target}]]"
-        document = MDExNative.Comrak.parse_document(markdown, options)
+        document = MDExNative.Comrak.parse_document!(markdown, options)
 
         assert %Document{
                  nodes: [
@@ -201,18 +201,18 @@ defmodule MDExNative.ComrakTest do
         html =
           ~s(<p><a href="page" data-wikilink="true">Label</a> <a href="page" data-wikilink="true">Label</a></p>\n)
 
-        assert MDExNative.Comrak.markdown_to_html(markdown, options) == html
-        assert MDExNative.Comrak.document_to_html(document, options) == html
-        assert MDExNative.Comrak.document_to_commonmark(document, options) == markdown <> "\n"
+        assert MDExNative.Comrak.markdown_to_html!(markdown, options) == html
+        assert MDExNative.Comrak.document_to_html!(document, options) == html
+        assert MDExNative.Comrak.document_to_commonmark!(document, options) == markdown <> "\n"
 
-        xml = MDExNative.Comrak.markdown_to_xml(markdown, options)
+        xml = MDExNative.Comrak.markdown_to_xml!(markdown, options)
         assert xml =~ ~s(<wikilink destination="page" embed="true">)
         assert xml =~ ~s(<wikilink destination="page" embed="false">)
-        assert MDExNative.Comrak.document_to_xml(document, options) == xml
+        assert MDExNative.Comrak.document_to_xml!(document, options) == xml
 
         ignore = [extension: [{option, true}, {:wikilinks_ignore_embeds, true}]]
 
-        assert MDExNative.Comrak.markdown_to_html(markdown, ignore) ==
+        assert MDExNative.Comrak.markdown_to_html!(markdown, ignore) ==
                  ~s(<p>![[#{target}]] <a href="page" data-wikilink="true">Label</a></p>\n)
       end
     end
@@ -249,13 +249,13 @@ defmodule MDExNative.ComrakTest do
         "<table>\n<thead>\n<tr>\n<th align=\"center\">center</th>\n</tr>\n</thead>\n" <>
         "<tbody>\n<tr>\n<td align=\"center\">last</td>\n</tr>\n</tbody>\n</table>\n"
 
-    assert MDExNative.Comrak.markdown_to_html(markdown, options) == expected
-    document = MDExNative.Comrak.parse_document(markdown, options)
-    assert MDExNative.Comrak.document_to_html(document, options) == expected
+    assert MDExNative.Comrak.markdown_to_html!(markdown, options) == expected
+    document = MDExNative.Comrak.parse_document!(markdown, options)
+    assert MDExNative.Comrak.document_to_html!(document, options) == expected
   end
 
   test "renders heading anchors using Comrak 0.54 markup" do
-    assert MDExNative.Comrak.markdown_to_html("# Hello",
+    assert MDExNative.Comrak.markdown_to_html!("# Hello",
              extension: [header_id_prefix: "user-content-"]
            ) ==
              ~s(<h1 id="user-content-hello">Hello) <>
@@ -266,11 +266,11 @@ defmodule MDExNative.ComrakTest do
   test "renders LaTeX-delimited math when math_latex is enabled" do
     markdown = ~S"Inline \(1 + 2\) and display \[x = y\]"
 
-    assert MDExNative.Comrak.markdown_to_html(markdown, extension: [math_latex: true]) ==
+    assert MDExNative.Comrak.markdown_to_html!(markdown, extension: [math_latex: true]) ==
              "<p>Inline <span data-math-style=\"inline\">1 + 2</span> and display " <>
                "<span data-math-style=\"display\">x = y</span></p>\n"
 
-    assert MDExNative.Comrak.markdown_to_html(markdown) ==
+    assert MDExNative.Comrak.markdown_to_html!(markdown) ==
              "<p>Inline (1 + 2) and display [x = y]</p>\n"
   end
 
@@ -288,7 +288,7 @@ defmodule MDExNative.ComrakTest do
     """
 
     document =
-      MDExNative.Comrak.parse_document(markdown,
+      MDExNative.Comrak.parse_document!(markdown,
         extension: [
           header_attributes: true,
           fenced_code_attributes: true,
@@ -338,7 +338,7 @@ defmodule MDExNative.ComrakTest do
 
     extension = [inline_code_attributes: true, link_attributes: true]
 
-    assert MDExNative.Comrak.markdown_to_html(markdown,
+    assert MDExNative.Comrak.markdown_to_html!(markdown,
              extension: extension,
              render: [unsafe: true]
            ) ==
@@ -346,7 +346,7 @@ defmodule MDExNative.ComrakTest do
                ~s(<code>code</code> ) <>
                ~s(<img src="i.png" alt="i" width="1" /></p>\n)
 
-    assert MDExNative.Comrak.markdown_to_html(markdown, extension: extension) ==
+    assert MDExNative.Comrak.markdown_to_html!(markdown, extension: extension) ==
              ~s(<p><a href="https://example.com">link</a> <code>code</code> <img src="i.png" alt="i" /></p>\n)
   end
 
@@ -366,17 +366,17 @@ defmodule MDExNative.ComrakTest do
       ]
     }
 
-    assert MDExNative.Comrak.document_to_html(document, render: [unsafe: true]) ==
+    assert MDExNative.Comrak.document_to_html!(document, render: [unsafe: true]) ==
              ~s(<p><a href="https://example.com" target="_blank">link</a></p>\n)
 
-    assert MDExNative.Comrak.document_to_html(document) ==
+    assert MDExNative.Comrak.document_to_html!(document) ==
              ~s(<p><a href="https://example.com">link</a></p>\n)
   end
 
   test "renders alerts with semantic HTML" do
     markdown = "> [!note]\n> Something of note"
 
-    assert MDExNative.Comrak.markdown_to_html(markdown,
+    assert MDExNative.Comrak.markdown_to_html!(markdown,
              extension: [alerts: true],
              render: [alert_style: :semantic]
            ) ==
@@ -387,15 +387,15 @@ defmodule MDExNative.ComrakTest do
   end
 
   test "renders markdown with sanitize keyword options" do
-    assert MDExNative.Comrak.markdown_to_html("<h1>Title</h1><p>Content</p>",
+    assert MDExNative.Comrak.markdown_to_html!("<h1>Title</h1><p>Content</p>",
              render: [unsafe: true],
              sanitize: [rm_tags: ["h1"]]
            ) == "Title<p>Content</p>\n"
   end
 
   test "render functions return rendered strings" do
-    assert MDExNative.Comrak.markdown_to_html("**bold**") == "<p><strong>bold</strong></p>\n"
-    assert MDExNative.Comrak.markdown_to_xml("# Hello") =~ ~s(<heading level="1">)
+    assert MDExNative.Comrak.markdown_to_html!("**bold**") == "<p><strong>bold</strong></p>\n"
+    assert MDExNative.Comrak.markdown_to_xml!("# Hello") =~ ~s(<heading level="1">)
   end
 
   test "preserves curly braces in code by default" do
@@ -407,7 +407,7 @@ defmodule MDExNative.ComrakTest do
     ```
     """
 
-    assert MDExNative.Comrak.markdown_to_html(markdown) ==
+    assert MDExNative.Comrak.markdown_to_html!(markdown) ==
              "<p>Inline <code>%{}</code>.</p>\n" <>
                "<pre><code class=\"language-elixir\">%{}\n</code></pre>\n"
   end
@@ -421,17 +421,17 @@ defmodule MDExNative.ComrakTest do
     ```
     """
 
-    assert MDExNative.Comrak.markdown_to_html(markdown, extension: [phoenix_heex: true]) ==
+    assert MDExNative.Comrak.markdown_to_html!(markdown, extension: [phoenix_heex: true]) ==
              "<p>Inline <code>%&lbrace;&rbrace;</code>.</p>\n" <>
                "<pre><code class=\"language-elixir\">%&lbrace;&rbrace;\n</code></pre>\n"
   end
 
   test "renders parsed documents" do
-    document = MDExNative.Comrak.parse_document("# Hello")
+    document = MDExNative.Comrak.parse_document!("# Hello")
 
-    assert MDExNative.Comrak.document_to_html(document) == "<h1>Hello</h1>\n"
-    assert MDExNative.Comrak.document_to_xml(document) =~ ~s(<heading level="1">)
-    assert MDExNative.Comrak.document_to_commonmark(document) == "# Hello\n"
+    assert MDExNative.Comrak.document_to_html!(document) == "<h1>Hello</h1>\n"
+    assert MDExNative.Comrak.document_to_xml!(document) =~ ~s(<heading level="1">)
+    assert MDExNative.Comrak.document_to_commonmark!(document) == "# Hello\n"
   end
 
   test "document_to_html escapes curly braces in code only when phoenix_heex is enabled" do
@@ -444,10 +444,10 @@ defmodule MDExNative.ComrakTest do
       ]
     }
 
-    assert MDExNative.Comrak.document_to_html(document) ==
+    assert MDExNative.Comrak.document_to_html!(document) ==
              "<pre><code class=\"language-elixir\">%{}\n</code></pre>\n"
 
-    assert MDExNative.Comrak.document_to_html(document, extension: [phoenix_heex: true]) ==
+    assert MDExNative.Comrak.document_to_html!(document, extension: [phoenix_heex: true]) ==
              "<pre><code class=\"language-elixir\">%&lbrace;&rbrace;\n</code></pre>\n"
   end
 
@@ -479,7 +479,7 @@ defmodule MDExNative.ComrakTest do
     """
 
     options = [extension: [tasklist: true, table: true]]
-    document = MDExNative.Comrak.parse_document(markdown, options)
+    document = MDExNative.Comrak.parse_document!(markdown, options)
 
     assert document == %MDExNative.Comrak.Document{
              nodes: [
@@ -844,13 +844,13 @@ defmodule MDExNative.ComrakTest do
              sourcepos: %MDExNative.Comrak.Sourcepos{start: {1, 1}, end: {23, 16}}
            }
 
-    assert MDExNative.Comrak.document_to_html(document, options) ==
-             MDExNative.Comrak.markdown_to_html(markdown, options)
+    assert MDExNative.Comrak.document_to_html!(document, options) ==
+             MDExNative.Comrak.markdown_to_html!(markdown, options)
   end
 
   test "parses deeply nested documents without crashing the NIF" do
     markdown = String.duplicate("> ", 5_000) <> "boom"
-    assert %MDExNative.Comrak.Document{} = MDExNative.Comrak.parse_document(markdown)
+    assert %MDExNative.Comrak.Document{} = MDExNative.Comrak.parse_document!(markdown)
   end
 
   test "renders deeply nested manually constructed documents without crashing the NIF" do
@@ -864,7 +864,7 @@ defmodule MDExNative.ComrakTest do
 
     document = %MDExNative.Comrak.Document{nodes: nodes}
 
-    assert is_binary(MDExNative.Comrak.document_to_html(document))
+    assert is_binary(MDExNative.Comrak.document_to_html!(document))
   end
 
   test "document_to_html renders arbitrary escaped tag literals as text" do
@@ -876,7 +876,7 @@ defmodule MDExNative.ComrakTest do
       ]
     }
 
-    assert MDExNative.Comrak.document_to_html(document, render: [unsafe: true], sanitize: nil) ==
+    assert MDExNative.Comrak.document_to_html!(document, render: [unsafe: true], sanitize: nil) ==
              "<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>\n"
   end
 
@@ -894,7 +894,7 @@ defmodule MDExNative.ComrakTest do
       ]
     }
 
-    assert MDExNative.Comrak.document_to_html(document, render: [unsafe: true], sanitize: nil) ==
+    assert MDExNative.Comrak.document_to_html!(document, render: [unsafe: true], sanitize: nil) ==
              "<p>|spoiler|</p>\n"
   end
 
@@ -912,11 +912,11 @@ defmodule MDExNative.ComrakTest do
                    ]
                  }
                ]
-             } = MDExNative.Comrak.parse_document(~S(\*escaped\*), @escaped_options)
+             } = MDExNative.Comrak.parse_document!(~S(\*escaped\*), @escaped_options)
     end
 
     test "Escaped children survive struct reconstruction" do
-      document = MDExNative.Comrak.parse_document(~S(\*escaped\*), @escaped_options)
+      document = MDExNative.Comrak.parse_document!(~S(\*escaped\*), @escaped_options)
       escaped = document.nodes |> hd() |> Map.fetch!(:nodes) |> hd()
 
       rebuilt = struct(Escaped, Map.from_struct(escaped))
@@ -926,10 +926,10 @@ defmodule MDExNative.ComrakTest do
     end
 
     test "document_to_commonmark and document_to_xml round trip the escaped character" do
-      document = MDExNative.Comrak.parse_document(~S(\*escaped\*), @escaped_options)
-      xml = MDExNative.Comrak.document_to_xml(document, @escaped_options)
+      document = MDExNative.Comrak.parse_document!(~S(\*escaped\*), @escaped_options)
+      xml = MDExNative.Comrak.document_to_xml!(document, @escaped_options)
 
-      assert MDExNative.Comrak.document_to_commonmark(document, @escaped_options) ==
+      assert MDExNative.Comrak.document_to_commonmark!(document, @escaped_options) ==
                "\\*escaped\\*\n"
 
       assert xml =~ ~r{<escaped>\s*<text xml:space="preserve">\*</text>\s*</escaped>}
@@ -941,9 +941,9 @@ defmodule MDExNative.ComrakTest do
         nodes: [%Paragraph{nodes: [%Escaped{nodes: [%Text{literal: "*"}]}]}]
       }
 
-      assert MDExNative.Comrak.document_to_commonmark(document, @escaped_options) == "\\*\n"
+      assert MDExNative.Comrak.document_to_commonmark!(document, @escaped_options) == "\\*\n"
 
-      assert MDExNative.Comrak.document_to_html(document, @escaped_options) ==
+      assert MDExNative.Comrak.document_to_html!(document, @escaped_options) ==
                "<p><span data-escaped-char>*</span></p>\n"
     end
   end
@@ -958,8 +958,8 @@ defmodule MDExNative.ComrakTest do
 
   test "raises when lumis is requested but no syntax highlighter is compiled" do
     error =
-      assert_raise RuntimeError, fn ->
-        MDExNative.Comrak.markdown_to_html(@code_block_markdown,
+      assert_raise MDExNative.SyntaxHighlightError, fn ->
+        MDExNative.Comrak.markdown_to_html!(@code_block_markdown,
           syntax_highlight: [
             engine: :lumis,
             opts: [
@@ -975,19 +975,46 @@ defmodule MDExNative.ComrakTest do
   end
 
   test "keeps Syntect options off the Lumis conversion path" do
-    assert MDExNative.Comrak.markdown_to_html(@code_block_markdown,
+    assert MDExNative.Comrak.markdown_to_html!(@code_block_markdown,
              syntax_highlight: [engine: :syntect, opts: [theme: "InspiredGitHub"]]
            ) =~ "syntax-highlighting"
   rescue
     # This NIF may be built without Syntect; the point is that `[theme: ...]`
     # never reaches Lumis's validation.
-    error in RuntimeError -> assert error.message =~ "Syntect is not enabled."
+    error in MDExNative.SyntaxHighlightError -> assert error.message =~ "Syntect is not enabled."
+  end
+
+  test "non-bang functions return ok and error tuples" do
+    {:ok, document} = MDExNative.Comrak.parse_document("# Hi")
+    assert %Document{nodes: [%Heading{}]} = document
+
+    assert MDExNative.Comrak.markdown_to_html("# Hi") == {:ok, "<h1>Hi</h1>\n"}
+    assert {:ok, "<?xml" <> _} = MDExNative.Comrak.markdown_to_xml("# Hi")
+    assert MDExNative.Comrak.document_to_html(document) == {:ok, "<h1>Hi</h1>\n"}
+    assert {:ok, "<?xml" <> _} = MDExNative.Comrak.document_to_xml(document)
+    assert MDExNative.Comrak.document_to_commonmark(document) == {:ok, "# Hi\n"}
+
+    # Without a compiled highlighter, both engines fail the same way.
+    for engine <- [:lumis, :syntect] do
+      options = [syntax_highlight: [engine: engine]]
+
+      assert {:error, %MDExNative.SyntaxHighlightError{message: message}} =
+               MDExNative.Comrak.markdown_to_html(@code_block_markdown, options)
+
+      assert message =~ "is not enabled."
+
+      assert {:error, %MDExNative.SyntaxHighlightError{}} =
+               MDExNative.Comrak.document_to_html(
+                 MDExNative.Comrak.parse_document!(@code_block_markdown),
+                 options
+               )
+    end
   end
 
   test "raises when syntect is requested but no syntax highlighter is compiled" do
     error =
-      assert_raise RuntimeError, fn ->
-        MDExNative.Comrak.markdown_to_html(@code_block_markdown,
+      assert_raise MDExNative.SyntaxHighlightError, fn ->
+        MDExNative.Comrak.markdown_to_html!(@code_block_markdown,
           syntax_highlight: [engine: :syntect]
         )
       end
@@ -997,17 +1024,17 @@ defmodule MDExNative.ComrakTest do
   end
 
   test "does not syntax highlight when syntax_highlight is absent" do
-    assert MDExNative.Comrak.markdown_to_html(@code_block_markdown) ==
+    assert MDExNative.Comrak.markdown_to_html!(@code_block_markdown) ==
              "<pre><code class=\"language-elixir\">IO.puts(&quot;Hello&quot;)\n</code></pre>\n"
   end
 
   test "does not syntax highlight when syntax_highlight is nil" do
-    assert MDExNative.Comrak.markdown_to_html(@code_block_markdown, syntax_highlight: nil) ==
+    assert MDExNative.Comrak.markdown_to_html!(@code_block_markdown, syntax_highlight: nil) ==
              "<pre><code class=\"language-elixir\">IO.puts(&quot;Hello&quot;)\n</code></pre>\n"
   end
 
   test "does not syntax highlight when syntax_highlight is false" do
-    assert MDExNative.Comrak.markdown_to_html(@code_block_markdown, syntax_highlight: false) ==
+    assert MDExNative.Comrak.markdown_to_html!(@code_block_markdown, syntax_highlight: false) ==
              "<pre><code class=\"language-elixir\">IO.puts(&quot;Hello&quot;)\n</code></pre>\n"
   end
 

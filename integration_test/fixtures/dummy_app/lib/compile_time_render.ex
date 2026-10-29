@@ -7,7 +7,7 @@ defmodule MDExNativeE2E.CompileTimeRender do
 
     # Rendered by `mix compile`, which starts no application. The first render
     # in a VM builds the store, so it goes first.
-    @from_keyword MDExNative.Comrak.markdown_to_html(@markdown,
+    @from_keyword MDExNative.Comrak.markdown_to_html!(@markdown,
                     syntax_highlight: [engine: :lumis, opts: @formatter]
                   )
 
@@ -15,7 +15,7 @@ defmodule MDExNativeE2E.CompileTimeRender do
 
     # The map MDEx 0.14.1 sends, with options in Lumis 0.10's wire format.
     if System.fetch_env!("MDEX_NATIVE_E2E_CASE") == "lumis" do
-      @from_map MDExNative.Comrak.markdown_to_html(@markdown,
+      @from_map MDExNative.Comrak.markdown_to_html!(@markdown,
                   syntax_highlight: %{
                     engine: :lumis,
                     opts: @formatter |> Lumis.validate_options!() |> Lumis.rust_options!()

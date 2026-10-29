@@ -43,5 +43,5 @@ options = [
 ]
 
 markdown
-|> MDExNative.Comrak.markdown_to_html(options)
+|> MDExNative.Comrak.markdown_to_html!(options)
 |> IO.puts()

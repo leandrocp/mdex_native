@@ -13,5 +13,5 @@ Markdown can render to XML too.
 options = [render: [sourcepos: true]]
 
 markdown
-|> MDExNative.Comrak.markdown_to_xml(options)
+|> MDExNative.Comrak.markdown_to_xml!(options)
 |> IO.puts()
