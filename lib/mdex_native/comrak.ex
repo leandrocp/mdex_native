@@ -165,8 +165,8 @@ defmodule MDExNative.Comrak do
 
     See the [Sanitization](sanitization.md) guide for more info.
 
-  - `:limits` - bounds parsing, as `[parse_time: milliseconds]`. Omitted, `nil`,
-    or `0` means no limit, which is the default.
+  - `:limits` - bounds parsing, as `[parse_time: milliseconds]`. Omitted, or
+    `parse_time` set to `nil` or `0`, means no limit, which is the default.
 
     Applies to the Comrak parse in `parse_document/2`, `markdown_to_html/2`, and
     `markdown_to_xml/2`; rendering, syntax highlighting, and sanitization are
