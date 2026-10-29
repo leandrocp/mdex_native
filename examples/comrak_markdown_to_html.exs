@@ -14,5 +14,5 @@ Visit https://github.com/leandrocp/mdex_native
 options = [extension: [tasklist: true, autolink: true, header_id_prefix: "example-"]]
 
 markdown
-|> MDExNative.Comrak.markdown_to_html(options)
+|> MDExNative.Comrak.markdown_to_html!(options)
 |> IO.puts()

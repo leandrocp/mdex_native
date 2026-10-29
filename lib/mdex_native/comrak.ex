@@ -12,6 +12,14 @@ defmodule MDExNative.Comrak do
   and use keyword lists. MDExNative also accepts `:sanitize` and
   `:syntax_highlight`.
 
+  ## Return values
+
+  `parse_document/2`, `markdown_to_html/2`, `markdown_to_xml/2`, and the
+  `document_to_*` functions return `{:ok, result}` or `{:error, exception}`.
+  A failed or unavailable syntax highlighter is a `MDExNative.SyntaxHighlightError`.
+  Each has a bang variant, such as `markdown_to_html!/2`, that returns the result
+  or raises the exception. Invalid options raise `ArgumentError` from both.
+
   The `:tagfilter` extension is deprecated but retains its existing behavior
   for compatibility. Use `:sanitize` to clean rendered HTML instead.
 
@@ -37,16 +45,16 @@ defmodule MDExNative.Comrak do
   ## Examples
 
       iex> MDExNative.Comrak.markdown_to_html("# Hello")
-      "<h1>Hello</h1>\n"
+      {:ok, "<h1>Hello</h1>\n"}
 
       iex> MDExNative.Comrak.markdown_to_html("- [x] done", extension: [tasklist: true])
-      "<ul>\n<li><input type=\"checkbox\" checked=\"\" disabled=\"\" /> done</li>\n</ul>\n"
+      {:ok, "<ul>\n<li><input type=\"checkbox\" checked=\"\" disabled=\"\" /> done</li>\n</ul>\n"}
 
       iex> MDExNative.Comrak.anchorize("Hello World")
       "hello-world"
 
       iex> MDExNative.Comrak.markdown_to_html("Visible %%hidden%% text", extension: [ofm_comments: true])
-      "<p>Visible  text</p>\n"
+      {:ok, "<p>Visible  text</p>\n"}
   """
 
   @typedoc "Markdown source text."
@@ -86,25 +94,35 @@ defmodule MDExNative.Comrak do
   ## Examples
 
       iex> MDExNative.Comrak.parse_document("# Hello")
-      %MDExNative.Comrak.Document{
-        nodes: [
-          %MDExNative.Comrak.Heading{
-            nodes: [
-              %MDExNative.Comrak.Text{literal: "Hello", sourcepos: %MDExNative.Comrak.Sourcepos{start: {1, 3}, end: {1, 7}}}
-            ],
-            level: 1,
-            setext: false,
-            sourcepos: %MDExNative.Comrak.Sourcepos{start: {1, 1}, end: {1, 7}}
-          }
-        ],
-        sourcepos: %MDExNative.Comrak.Sourcepos{start: {1, 1}, end: {1, 7}}
-      }
+      {:ok,
+       %MDExNative.Comrak.Document{
+         nodes: [
+           %MDExNative.Comrak.Heading{
+             nodes: [
+               %MDExNative.Comrak.Text{literal: "Hello", sourcepos: %MDExNative.Comrak.Sourcepos{start: {1, 3}, end: {1, 7}}}
+             ],
+             level: 1,
+             setext: false,
+             sourcepos: %MDExNative.Comrak.Sourcepos{start: {1, 1}, end: {1, 7}}
+           }
+         ],
+         sourcepos: %MDExNative.Comrak.Sourcepos{start: {1, 1}, end: {1, 7}}
+       }}
   """
-  @spec parse_document(markdown(), options()) :: MDExNative.Comrak.Document.t()
+  @spec parse_document(markdown(), options()) ::
+          {:ok, MDExNative.Comrak.Document.t()} | {:error, Exception.t()}
   def parse_document(markdown, options \\ []) when is_binary(markdown) do
     markdown
     |> MDExNative.Native.parse_document(options!(options))
-    |> check_native_output()
+    |> native_result()
+  end
+
+  @doc """
+  Same as `parse_document/2` but raises the error instead of returning it.
+  """
+  @spec parse_document!(markdown(), options()) :: MDExNative.Comrak.Document.t()
+  def parse_document!(markdown, options \\ []) when is_binary(markdown) do
+    markdown |> parse_document(options) |> unwrap!()
   end
 
   @doc ~S"""
@@ -150,35 +168,52 @@ defmodule MDExNative.Comrak do
   ## Examples
 
       iex> MDExNative.Comrak.markdown_to_html("**bold**")
-      "<p><strong>bold</strong></p>\n"
+      {:ok, "<p><strong>bold</strong></p>\n"}
 
       iex> MDExNative.Comrak.markdown_to_html("- [x] done", extension: [tasklist: true])
-      "<ul>\n<li><input type=\"checkbox\" checked=\"\" disabled=\"\" /> done</li>\n</ul>\n"
+      {:ok, "<ul>\n<li><input type=\"checkbox\" checked=\"\" disabled=\"\" /> done</li>\n</ul>\n"}
 
       iex> MDExNative.Comrak.markdown_to_html("<h1>Title</h1><p>Content</p>", render: [unsafe: true], sanitize: [rm_tags: ["h1"]])
-      "Title<p>Content</p>\n"
+      {:ok, "Title<p>Content</p>\n"}
 
       # default disabled syntax highlighter
       iex> markdown = "```rust\nfn main() {}\n```"
       iex> MDExNative.Comrak.markdown_to_html(markdown)
-      "<pre><code class=\"language-rust\">fn main() {}\n</code></pre>\n"
+      {:ok, "<pre><code class=\"language-rust\">fn main() {}\n</code></pre>\n"}
 
   """
-  @spec markdown_to_html(markdown(), options()) :: html()
+  @spec markdown_to_html(markdown(), options()) :: {:ok, html()} | {:error, Exception.t()}
   def markdown_to_html(markdown, options \\ []) when is_binary(markdown) do
     markdown
     |> MDExNative.Native.markdown_to_html_with_options(options!(options))
-    |> check_native_output()
+    |> native_result()
+  end
+
+  @doc """
+  Same as `markdown_to_html/2` but raises the error instead of returning it.
+  """
+  @spec markdown_to_html!(markdown(), options()) :: html()
+  def markdown_to_html!(markdown, options \\ []) when is_binary(markdown) do
+    markdown |> markdown_to_html(options) |> unwrap!()
   end
 
   @doc ~S"""
   Converts a generic MDExNative.Comrak document to HTML.
   """
-  @spec document_to_html(MDExNative.Comrak.Document.t(), options()) :: html()
+  @spec document_to_html(MDExNative.Comrak.Document.t(), options()) ::
+          {:ok, html()} | {:error, Exception.t()}
   def document_to_html(%MDExNative.Comrak.Document{} = document, options \\ []) do
     document
     |> MDExNative.Native.document_to_html_with_options(options!(options))
-    |> check_native_output()
+    |> native_result()
+  end
+
+  @doc """
+  Same as `document_to_html/2` but raises the error instead of returning it.
+  """
+  @spec document_to_html!(MDExNative.Comrak.Document.t(), options()) :: html()
+  def document_to_html!(%MDExNative.Comrak.Document{} = document, options \\ []) do
+    document |> document_to_html(options) |> unwrap!()
   end
 
   @doc ~S"""
@@ -187,36 +222,62 @@ defmodule MDExNative.Comrak do
   ## Examples
 
       iex> MDExNative.Comrak.markdown_to_xml("# Hello")
-      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE document SYSTEM \"CommonMark.dtd\">\n<document xmlns=\"http://commonmark.org/xml/1.0\">\n  <heading level=\"1\">\n    <text xml:space=\"preserve\">Hello</text>\n  </heading>\n</document>\n"
+      {:ok, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE document SYSTEM \"CommonMark.dtd\">\n<document xmlns=\"http://commonmark.org/xml/1.0\">\n  <heading level=\"1\">\n    <text xml:space=\"preserve\">Hello</text>\n  </heading>\n</document>\n"}
 
       iex> MDExNative.Comrak.markdown_to_xml("# Hello", render: [sourcepos: true])
-      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE document SYSTEM \"CommonMark.dtd\">\n<document sourcepos=\"1:1-1:7\" xmlns=\"http://commonmark.org/xml/1.0\">\n  <heading sourcepos=\"1:1-1:7\" level=\"1\">\n    <text sourcepos=\"1:3-1:7\" xml:space=\"preserve\">Hello</text>\n  </heading>\n</document>\n"
+      {:ok, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE document SYSTEM \"CommonMark.dtd\">\n<document sourcepos=\"1:1-1:7\" xmlns=\"http://commonmark.org/xml/1.0\">\n  <heading sourcepos=\"1:1-1:7\" level=\"1\">\n    <text sourcepos=\"1:3-1:7\" xml:space=\"preserve\">Hello</text>\n  </heading>\n</document>\n"}
   """
-  @spec markdown_to_xml(markdown(), options()) :: xml()
+  @spec markdown_to_xml(markdown(), options()) :: {:ok, xml()} | {:error, Exception.t()}
   def markdown_to_xml(markdown, options \\ []) when is_binary(markdown) do
     markdown
     |> MDExNative.Native.markdown_to_xml_with_options(options!(options))
-    |> check_native_output()
+    |> native_result()
+  end
+
+  @doc """
+  Same as `markdown_to_xml/2` but raises the error instead of returning it.
+  """
+  @spec markdown_to_xml!(markdown(), options()) :: xml()
+  def markdown_to_xml!(markdown, options \\ []) when is_binary(markdown) do
+    markdown |> markdown_to_xml(options) |> unwrap!()
   end
 
   @doc ~S"""
   Converts a generic MDExNative.Comrak document to XML.
   """
-  @spec document_to_xml(MDExNative.Comrak.Document.t(), options()) :: xml()
+  @spec document_to_xml(MDExNative.Comrak.Document.t(), options()) ::
+          {:ok, xml()} | {:error, Exception.t()}
   def document_to_xml(%MDExNative.Comrak.Document{} = document, options \\ []) do
     document
     |> MDExNative.Native.document_to_xml_with_options(options!(options))
-    |> check_native_output()
+    |> native_result()
+  end
+
+  @doc """
+  Same as `document_to_xml/2` but raises the error instead of returning it.
+  """
+  @spec document_to_xml!(MDExNative.Comrak.Document.t(), options()) :: xml()
+  def document_to_xml!(%MDExNative.Comrak.Document{} = document, options \\ []) do
+    document |> document_to_xml(options) |> unwrap!()
   end
 
   @doc ~S"""
   Converts a generic MDExNative.Comrak document to CommonMark.
   """
-  @spec document_to_commonmark(MDExNative.Comrak.Document.t(), options()) :: markdown()
+  @spec document_to_commonmark(MDExNative.Comrak.Document.t(), options()) ::
+          {:ok, markdown()} | {:error, Exception.t()}
   def document_to_commonmark(%MDExNative.Comrak.Document{} = document, options \\ []) do
     document
     |> MDExNative.Native.document_to_commonmark_with_options(options!(options))
-    |> check_native_output()
+    |> native_result()
+  end
+
+  @doc """
+  Same as `document_to_commonmark/2` but raises the error instead of returning it.
+  """
+  @spec document_to_commonmark!(MDExNative.Comrak.Document.t(), options()) :: markdown()
+  def document_to_commonmark!(%MDExNative.Comrak.Document{} = document, options \\ []) do
+    document |> document_to_commonmark(options) |> unwrap!()
   end
 
   @doc ~S"""
@@ -432,19 +493,21 @@ defmodule MDExNative.Comrak do
 
   defp syntax_highlight_option(option), do: option
 
-  defp check_native_output({:error, {:lumis_error, reason}}) do
-    raise """
+  # The NIF returns its value directly and reports failures as `{:error, term}`
+  # or a bare atom; this turns them into the public `{:ok, _} | {:error, _}`.
+  defp native_result({:error, {:lumis_error, reason}}) do
+    highlight_error("""
     Lumis failed to highlight a code block.
 
     #{reason}
 
-    """
+    """)
   end
 
-  defp check_native_output(:lumis_not_enabled), do: raise(lumis_not_enabled_message())
+  defp native_result(:lumis_not_enabled), do: highlight_error(lumis_not_enabled_message())
 
-  defp check_native_output(:syntect_not_enabled) do
-    raise """
+  defp native_result(:syntect_not_enabled) do
+    highlight_error("""
     Syntect is not enabled.
 
     Comrak tried to syntax highlight a code block with Syntect, but this NIF was not compiled with Syntect support.
@@ -453,10 +516,15 @@ defmodule MDExNative.Comrak do
 
         config :mdex_native, syntax_highlighter: :syntect
 
-    """
+    """)
   end
 
-  defp check_native_output(value), do: value
+  defp native_result(value), do: {:ok, value}
+
+  defp highlight_error(message), do: {:error, %MDExNative.SyntaxHighlightError{message: message}}
+
+  defp unwrap!({:ok, value}), do: value
+  defp unwrap!({:error, error}), do: raise(error)
 
   defp lumis_not_enabled_message do
     """

@@ -25,7 +25,7 @@ md = ~S"""
 ## Changes
 """
 
-MDExNative.Comrak.markdown_to_html(md)
+MDExNative.Comrak.markdown_to_html!(md)
 #=> "<h1>Release notes</h1>\n<!-- raw HTML omitted -->\n<h2>Changes</h2>\n"
 ```
 
@@ -34,7 +34,7 @@ MDExNative.Comrak.markdown_to_html(md)
 `render: [escape: true]` emits the raw HTML as escaped text:
 
 ```elixir
-MDExNative.Comrak.markdown_to_html("<h1>Hello</h1>", render: [escape: true])
+MDExNative.Comrak.markdown_to_html!("<h1>Hello</h1>", render: [escape: true])
 #=> "&lt;h1&gt;Hello&lt;/h1&gt;\n"
 ```
 
@@ -43,7 +43,7 @@ MDExNative.Comrak.markdown_to_html("<h1>Hello</h1>", render: [escape: true])
 To sanitize raw HTML in Markdown, render it first with `render: [unsafe: true]`:
 
 ```elixir
-MDExNative.Comrak.markdown_to_html(
+MDExNative.Comrak.markdown_to_html!(
   ~s|<p>Hello</p><script>trackPageView()</script>|,
   render: [unsafe: true],
   sanitize: :clean
@@ -57,7 +57,7 @@ MDExNative.Comrak.markdown_to_html(
 This also works with custom sanitizer options:
 
 ```elixir
-MDExNative.Comrak.markdown_to_html(
+MDExNative.Comrak.markdown_to_html!(
   "<h1>Title</h1><p>Content</p>",
   render: [unsafe: true],
   sanitize: [rm_tags: ["h1"]]
@@ -124,6 +124,6 @@ MDExNative.Ammonia.safe_html(
 If the input is trusted, render raw HTML without sanitizing:
 
 ```elixir
-MDExNative.Comrak.markdown_to_html("<script>hello</script>", render: [unsafe: true])
+MDExNative.Comrak.markdown_to_html!("<script>hello</script>", render: [unsafe: true])
 #=> "<script>hello</script>\n"
 ```

@@ -21,6 +21,6 @@ markdown = """
 This example downloads the precompiled NIF from Cloudflare.
 """
 
-html = MDExNative.Comrak.markdown_to_html(markdown)
+html = MDExNative.Comrak.markdown_to_html!(markdown)
 
 IO.puts(html)

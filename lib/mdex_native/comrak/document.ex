@@ -42,7 +42,7 @@ defmodule MDExNative.Comrak.Document do
 
   ## Example
 
-      MDExNative.Comrak.parse_document("# Hello")
+      MDExNative.Comrak.parse_document!("# Hello")
       %MDExNative.Comrak.Document{
         nodes: [
           %MDExNative.Comrak.Heading{

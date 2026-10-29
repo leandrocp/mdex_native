@@ -113,7 +113,7 @@ defmodule MDExNativeE2E.LumisRegressionTest do
       )
 
       markdown = "Before\\n\\n```rust\\nlet x = a < b && c > d;\\n```\\n\\n```elixir\\nIO.puts(:ok)\\n```\\n\\nAfter"
-      document = MDExNative.Comrak.parse_document(markdown)
+      document = MDExNative.Comrak.parse_document!(markdown)
 
       for formatter <- [
             :html_linked,
@@ -121,8 +121,8 @@ defmodule MDExNativeE2E.LumisRegressionTest do
             {:html_multi_themes, themes: [dark: "onedark"], default_theme: "dark"}
           ] do
         options = [syntax_highlight: [engine: :lumis, opts: [formatter: formatter]]]
-        html = MDExNative.Comrak.markdown_to_html(markdown, options)
-        assert MDExNative.Comrak.document_to_html(document, options) == html
+        html = MDExNative.Comrak.markdown_to_html!(markdown, options)
+        assert MDExNative.Comrak.document_to_html!(document, options) == html
         assert html =~ "<p>Before</p>"
         assert html =~ "<p>After</p>"
         assert html =~ "let x = a &lt; b &amp;&amp; c &gt; d;"
@@ -158,7 +158,7 @@ defmodule MDExNativeE2E.LumisRegressionTest do
 
       for syntax_highlight <- [[engine: :lumis, opts: wire], %{engine: :lumis, opts: wire}] do
         html =
-          MDExNative.Comrak.markdown_to_html("```elixir\n:ok\n```",
+          MDExNative.Comrak.markdown_to_html!("```elixir\n:ok\n```",
             render: [unsafe: true],
             syntax_highlight: syntax_highlight
           )
@@ -212,7 +212,7 @@ defmodule MDExNativeE2E.LumisRegressionTest do
       # 0.10's `Lumis.rust_options!/1` before calling mdex_native.
       test "legacy wire options and caller options render identically through both HTML APIs" do
         markdown = "```elixir\n" <> Enum.map_join(1..7, "\n", &"IO.puts(#{&1})") <> "\n```"
-        document = MDExNative.Comrak.parse_document(markdown)
+        document = MDExNative.Comrak.parse_document!(markdown)
 
         cases = [
           {[
@@ -287,10 +287,10 @@ defmodule MDExNativeE2E.LumisRegressionTest do
               ] do
             options = [render: [unsafe: true], syntax_highlight: syntax_highlight]
 
-            assert MDExNative.Comrak.markdown_to_html(markdown, options) == expected,
+            assert MDExNative.Comrak.markdown_to_html!(markdown, options) == expected,
                    "markdown_to_html/2 diverged for #{inspect(syntax_highlight)}"
 
-            assert MDExNative.Comrak.document_to_html(document, options) == expected,
+            assert MDExNative.Comrak.document_to_html!(document, options) == expected,
                    "document_to_html/2 diverged for #{inspect(syntax_highlight)}"
           end
         end
@@ -339,7 +339,7 @@ defmodule MDExNativeE2E.LumisRegressionTest do
         run_before_start("""
         Application.put_env(:lumis, :data_dir, #{inspect(Path.join(tmp_dir, "data"))})
         {:ok, _} = Application.ensure_all_started(:mdex_native)
-        MDExNative.Comrak.markdown_to_html("```elixir\\nIO.puts(:hello)\\n```", syntax_highlight: [engine: :lumis])
+        MDExNative.Comrak.markdown_to_html!("```elixir\\nIO.puts(:hello)\\n```", syntax_highlight: [engine: :lumis])
         IO.write("compiled_in_data_dir=" <> inspect(File.dir?(#{inspect(compiled)})))
         """)
 
@@ -357,10 +357,10 @@ defmodule MDExNativeE2E.LumisRegressionTest do
 
       output =
         run_before_start("""
-        MDExNative.Comrak.parse_document("# Hello")
+        MDExNative.Comrak.parse_document!("# Hello")
         Application.put_env(:lumis, :data_dir, #{inspect(Path.join(tmp_dir, "data"))})
         {:ok, _} = Application.ensure_all_started(:mdex_native)
-        MDExNative.Comrak.markdown_to_html("```elixir\\nIO.puts(:hello)\\n```", syntax_highlight: [engine: :lumis])
+        MDExNative.Comrak.markdown_to_html!("```elixir\\nIO.puts(:hello)\\n```", syntax_highlight: [engine: :lumis])
         IO.write("compiled_in_data_dir=" <> inspect(File.dir?(#{inspect(compiled)})))
         """)
 
@@ -381,11 +381,11 @@ defmodule MDExNativeE2E.LumisRegressionTest do
     end
 
     defp highlight(markdown) do
-      MDExNative.Comrak.markdown_to_html(markdown, syntax_highlight: [engine: :lumis])
+      MDExNative.Comrak.markdown_to_html!(markdown, syntax_highlight: [engine: :lumis])
     end
 
     defp render(markdown, opts) do
-      MDExNative.Comrak.markdown_to_html(markdown,
+      MDExNative.Comrak.markdown_to_html!(markdown,
         render: [unsafe: true],
         syntax_highlight: [engine: :lumis, opts: opts]
       )

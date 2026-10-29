@@ -67,13 +67,13 @@ artifacts support OTP 22 and newer.
 Markdown parsing and rendering.
 
 ```elixir
-html = MDExNative.Comrak.markdown_to_html("# Hello")
+html = MDExNative.Comrak.markdown_to_html!("# Hello")
 ```
 
 Comrak options are accepted as keyword lists. See [`comrak::Options`](https://docs.rs/comrak/latest/comrak/struct.Options.html). MDExNative also accepts `:sanitize` and `:syntax_highlight`.
 
 ```elixir
-html = MDExNative.Comrak.markdown_to_html("- [x] done", extension: [tasklist: true])
+html = MDExNative.Comrak.markdown_to_html!("- [x] done", extension: [tasklist: true])
 ```
 
 It also exposes XML, CommonMark, AST parsing, and heading anchor helpers. See the moduledoc.

@@ -37,7 +37,7 @@ fn main() {
 ```
 """
 
-html = MDExNative.Comrak.markdown_to_html(markdown,
+html = MDExNative.Comrak.markdown_to_html!(markdown,
   syntax_highlight: [
     engine: :lumis,
     opts: [
@@ -60,7 +60,7 @@ fences. This requires the `:lumis_wasm_diff` parser package.
 Pass a budget in the engine options to bound each code block:
 
 ```elixir
-MDExNative.Comrak.markdown_to_html(markdown,
+MDExNative.Comrak.markdown_to_html!(markdown,
   syntax_highlight: [
     engine: :lumis,
     opts: [
@@ -118,7 +118,7 @@ fn main() {
 ```
 """
 
-html = MDExNative.Comrak.markdown_to_html(markdown,
+html = MDExNative.Comrak.markdown_to_html!(markdown,
   syntax_highlight: [
     engine: :syntect,
     opts: [theme: "Catppuccin Macchiato"]
