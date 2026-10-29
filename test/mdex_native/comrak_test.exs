@@ -183,12 +183,12 @@ defmodule MDExNative.ComrakTest do
 
     test "a parse past its time limit returns an error without partial output" do
       for function <- [:parse_document, :markdown_to_html, :markdown_to_xml] do
-        assert {:error, %MDExNative.BudgetExhaustedError{time_limit: 1} = error} =
+        assert {:error, %MDExNative.ParseTimeExceededError{parse_time: 1} = error} =
                  apply(MDExNative.Comrak, function, [@slow_markdown, [limits: [parse_time: 1]]])
 
         assert Exception.message(error) == "Markdown parsing exceeded its 1 ms time limit"
 
-        assert_raise MDExNative.BudgetExhaustedError, fn ->
+        assert_raise MDExNative.ParseTimeExceededError, fn ->
           apply(MDExNative.Comrak, :"#{function}!", [@slow_markdown, [limits: [parse_time: 1]]])
         end
       end

@@ -172,7 +172,7 @@ defmodule MDExNative.Comrak do
     `markdown_to_xml/2`; rendering, syntax highlighting, and sanitization are
     not counted, and the `document_to_*` functions do not parse. Comrak checks
     the limit cooperatively, so a parse can run somewhat past it. Running out
-    returns `{:error, %MDExNative.BudgetExhaustedError{}}`, never partial output;
+    returns `{:error, %MDExNative.ParseTimeExceededError{}}`, never partial output;
     the bang variants raise it.
     Lumis highlighting has its own per-block `:budget` option; Syntect has none.
 
@@ -517,8 +517,8 @@ defmodule MDExNative.Comrak do
     """)
   end
 
-  defp native_result({:error, {:parse_time_exceeded, time_limit}}),
-    do: {:error, %MDExNative.BudgetExhaustedError{time_limit: time_limit}}
+  defp native_result({:error, {:parse_time_exceeded, parse_time}}),
+    do: {:error, %MDExNative.ParseTimeExceededError{parse_time: parse_time}}
 
   defp native_result(:lumis_not_enabled), do: highlight_error(lumis_not_enabled_message())
 
