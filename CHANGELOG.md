@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.3.0](https://github.com/leandrocp/mdex_native/compare/v0.2.14...v0.3.0) (2026-10-29)
+
 ### Breaking Changes
 
 - `MDExNative.Comrak.parse_document/2`, `markdown_to_html/2`, `markdown_to_xml/2`, `document_to_html/2`, `document_to_xml/2`, and `document_to_commonmark/2` now return `{:ok, result}` or `{:error, exception}` instead of a bare result. Syntax highlighting failures, including an engine that is not compiled in, are returned as `MDExNative.SyntaxHighlightError` instead of raising `RuntimeError`. To keep the old behavior, call the new bang variants (`markdown_to_html!/2` and so on), which return the result or raise.
@@ -24,6 +26,12 @@
 ### Compatibility
 
 - Downstream AST adapters (including MDEx's Comrak converter) must handle `Callout`, `CalloutTitle`, `CommentInline`, and `MultilineComment`, and preserve the new `WikiLink.embed` field. Wikilink XML now includes `embed="true"` or `embed="false"`.
+
+### Features
+
+- Upgrade Comrak to 0.59 in [\#119](https://github.com/leandrocp/mdex_native/pull/119)
+- **Breaking:** Return ok/error tuples from MDExNative.Comrak in [\#123](https://github.com/leandrocp/mdex_native/pull/123)
+- Add a parse time limit in [\#122](https://github.com/leandrocp/mdex_native/pull/122)
 
 ## [0.2.14](https://github.com/leandrocp/mdex_native/compare/v0.2.13...v0.2.14) (2026-10-28)
 
