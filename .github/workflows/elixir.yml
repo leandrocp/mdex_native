@@ -40,15 +40,15 @@ jobs:
       MDEX_NATIVE_E2E_MDEX_REF: lp-parse-budget
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
-      - uses: erlef/setup-beam@v1
+      - uses: erlef/setup-beam@v1.24.1
         with:
           otp-version: "29"
           elixir-version: "1.20"
 
       - name: Cache Mix deps
-        uses: actions/cache@v6
+        uses: actions/cache@v6.1.0
         with:
           path: |
             ~/.hex
@@ -62,7 +62,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Cache Rust build
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v2.9.3
         with:
           workspaces: |
             native/mdex_native_nif -> integration_test/tmp/cargo_target/default
