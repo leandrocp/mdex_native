@@ -37,7 +37,7 @@ jobs:
 
     env:
       # Companion budget option (stacked on lp-native-ok-error); return to main after it merges.
-      MDEX_NATIVE_E2E_MDEX_REF: lp-parse-budget
+      MDEX_NATIVE_E2E_MDEX_REF: lp-parse-memory-budget
 
     steps:
       - uses: actions/checkout@v7
