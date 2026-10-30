@@ -224,6 +224,67 @@ defmodule MDExNative.ComrakTest do
     end
   end
 
+  describe "parse memory limit" do
+    # Parsing this holds far more than 1 KB and far less than 1 GB.
+    @large_markdown String.duplicate("a *b* [c](d) ", 50_000)
+
+    test "a parse past its memory limit returns an error without partial output" do
+      for function <- [:parse_document, :markdown_to_html, :markdown_to_xml] do
+        assert {:error, %MDExNative.ParseMemoryExceededError{parse_memory: 1_000} = error} =
+                 apply(MDExNative.Comrak, function, [
+                   @large_markdown,
+                   [budget: [parse_memory: 1_000]]
+                 ])
+
+        assert Exception.message(error) ==
+                 "Markdown parsing exceeded its 1000 byte memory limit"
+
+        assert_raise MDExNative.ParseMemoryExceededError, fn ->
+          apply(MDExNative.Comrak, :"#{function}!", [
+            @large_markdown,
+            [budget: [parse_memory: 1_000]]
+          ])
+        end
+      end
+    end
+
+    test "zero, nil, and a generous memory limit leave the output unchanged" do
+      {:ok, html} = MDExNative.Comrak.markdown_to_html(@large_markdown)
+
+      for budget <- [[parse_memory: 0], [parse_memory: 1_000_000_000], [parse_memory: nil]] do
+        assert MDExNative.Comrak.markdown_to_html(@large_markdown, budget: budget) ==
+                 {:ok, html}
+      end
+    end
+
+    test "reports whichever limit the parse exceeded" do
+      assert {:error, %MDExNative.ParseMemoryExceededError{parse_memory: 1_000}} =
+               MDExNative.Comrak.markdown_to_html(@large_markdown,
+                 budget: [parse_time: 60_000, parse_memory: 1_000]
+               )
+
+      assert {:error, %MDExNative.ParseTimeExceededError{parse_time: 1}} =
+               MDExNative.Comrak.markdown_to_html(@large_markdown,
+                 budget: [parse_time: 1, parse_memory: 1_000_000_000]
+               )
+    end
+
+    test "counts memory the parse frees before it finishes" do
+      markdown = "[a]: /" <> String.duplicate("x", 100_000)
+
+      assert {:error, %MDExNative.ParseMemoryExceededError{parse_memory: 65_536}} =
+               MDExNative.Comrak.parse_document(markdown, budget: [parse_memory: 65_536])
+    end
+
+    test "rejects a memory limit that is not a non-negative integer" do
+      for parse_memory <- [-1, 1.5, "1000"] do
+        assert_raise ArgumentError, fn ->
+          MDExNative.Comrak.markdown_to_html("# Hi", budget: [parse_memory: parse_memory])
+        end
+      end
+    end
+  end
+
   describe "wikilink embeds" do
     test "preserves embed flags and both title conventions through all renderers" do
       for {option, target} <- [

@@ -11,6 +11,7 @@ mod lumis_adapter;
 mod lumis_render;
 #[cfg(feature = "lumis")]
 mod lumis_runtime;
+mod memory;
 mod types;
 
 use comrak::adapters::SyntaxHighlighterAdapter;
@@ -35,10 +36,15 @@ use types::{document::*, options::*};
 #[cfg(not(test))]
 rustler::init!("Elixir.MDExNative.Native");
 
+// Counts each thread's heap bytes for `budget: [parse_memory: bytes]`.
+#[global_allocator]
+static ALLOCATOR: memory::CountingAllocator = memory::CountingAllocator;
+
 mod atoms {
     rustler::atoms! {
         nodes,
         lumis_error,
+        parse_memory_exceeded,
         parse_time_exceeded
     }
 }
@@ -186,32 +192,49 @@ fn comrak_ast_to_document_term<'a, 'b>(env: Env<'a>, root: &'b AstNode<'b>) -> N
     }
 }
 
-/// Parses `md`, giving up once `parse_time` milliseconds have passed.
+/// Parses `md`, giving up once `parse_time` milliseconds have passed or the
+/// parse has held more than `parse_memory` bytes of heap.
 ///
-/// Comrak checks the deadline cooperatively, every 256 lines, inlines or nodes,
-/// so a parse can run somewhat past it. A cancelled parse returns no tree, so
-/// the caller gets `{:error, {:parse_time_exceeded, parse_time}}` rather than
-/// partial output.
+/// Comrak checks both limits cooperatively, every 256 lines, inlines or nodes,
+/// so a parse can run somewhat past them. A cancelled parse returns no tree, so
+/// the caller gets `{:error, {:parse_time_exceeded, parse_time}}` or
+/// `{:error, {:parse_memory_exceeded, parse_memory}}` rather than partial output.
 fn parse<'a>(
     arena: &'a Arena<'a>,
     md: &str,
     options: &Options,
     parse_time: Option<u64>,
+    parse_memory: Option<u64>,
 ) -> NifResult<&'a AstNode<'a>> {
     // A limit too far out for `Instant` to represent is no limit at all.
     let deadline = parse_time.and_then(|ms| Instant::now().checked_add(Duration::from_millis(ms)));
-    let Some(deadline) = deadline else {
+    if deadline.is_none() && parse_memory.is_none() {
         return Ok(comrak::parse_document(arena, md, options));
+    }
+
+    let past_deadline = || deadline.is_some_and(|deadline| Instant::now() >= deadline);
+    // Comrak parses on this thread, so the most the thread holds during the
+    // parse, beyond what it held before, is the most the parse has held.
+    let held_before = memory::start_peak();
+    let over_memory = || {
+        parse_memory.is_some_and(|max| {
+            u64::try_from(memory::peak().wrapping_sub(held_before)).is_ok_and(|peak| peak > max)
+        })
+    };
+    let should_cancel = || over_memory() || past_deadline();
+    let exhausted = || {
+        if over_memory() {
+            rustler::Error::Term(Box::new((atoms::parse_memory_exceeded(), parse_memory)))
+        } else {
+            rustler::Error::Term(Box::new((atoms::parse_time_exceeded(), parse_time)))
+        }
     };
 
-    let past_deadline = || Instant::now() >= deadline;
-    let exhausted = || rustler::Error::Term(Box::new((atoms::parse_time_exceeded(), parse_time)));
-
     let root =
-        comrak::try_parse_document(arena, md, options, &past_deadline).map_err(|_| exhausted())?;
-    // Comrak only asks at its checkpoints, so a parse can pass the last one in
-    // time and still finish late. Check once more so a late parse fails too.
-    if past_deadline() {
+        comrak::try_parse_document(arena, md, options, &should_cancel).map_err(|_| exhausted())?;
+    // Comrak only asks at its checkpoints, so a parse can pass the last one
+    // within its limits and still finish past one. Check once more so it fails too.
+    if should_cancel() {
         return Err(exhausted());
     }
     Ok(root)
@@ -221,7 +244,13 @@ fn parse<'a>(
 fn parse_document<'a>(env: Env<'a>, md: &str, options: ExOptions) -> NifResult<Term<'a>> {
     let comrak_options = options.comrak_options();
     let arena = Arena::new();
-    let root = parse(&arena, md, &comrak_options, options.parse_time_limit())?;
+    let root = parse(
+        &arena,
+        md,
+        &comrak_options,
+        options.parse_time_limit(),
+        options.parse_memory_limit(),
+    )?;
     comrak_ast_to_document_term(env, root)
 }
 
@@ -233,10 +262,11 @@ fn markdown_to_html_with_options<'a>(
 ) -> NifResult<Term<'a>> {
     let tagfilter = options.tagfilter();
     let time_limit = options.parse_time_limit();
+    let memory_limit = options.parse_memory_limit();
     let (comrak_options, lumis_adapter, sanitize) = render_parts(options)?;
     let escape_curly_braces_in_code = comrak_options.extension.phoenix_heex;
     let arena = Arena::new();
-    let root = parse(&arena, md, &comrak_options, time_limit)?;
+    let root = parse(&arena, md, &comrak_options, time_limit, memory_limit)?;
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
 
@@ -254,9 +284,10 @@ fn markdown_to_xml_with_options<'a>(
     options: ExOptions,
 ) -> NifResult<Term<'a>> {
     let time_limit = options.parse_time_limit();
+    let memory_limit = options.parse_memory_limit();
     let (comrak_options, lumis_adapter, _sanitize) = render_parts(options)?;
     let arena = Arena::new();
-    let root = parse(&arena, md, &comrak_options, time_limit)?;
+    let root = parse(&arena, md, &comrak_options, time_limit, memory_limit)?;
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
 
