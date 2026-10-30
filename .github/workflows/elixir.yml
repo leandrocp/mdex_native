@@ -36,8 +36,8 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # Companion budget option (stacked on lp-native-ok-error); return to main after it merges.
-      MDEX_NATIVE_E2E_MDEX_REF: lp-parse-budget
+      # Companion parse_memory option (leandrocp/mdex#472); return to main after it merges.
+      MDEX_NATIVE_E2E_MDEX_REF: lp-parse-memory-budget
 
     steps:
       - uses: actions/checkout@v7.0.1

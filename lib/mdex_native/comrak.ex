@@ -165,7 +165,8 @@ defmodule MDExNative.Comrak do
 
     See the [Sanitization](sanitization.md) guide for more info.
 
-  - `:budget` - bounds parsing, as `[parse_time: milliseconds]`. `0` or `nil` means no limit.
+  - `:budget` - bounds parsing, as `[parse_time: milliseconds, parse_memory: bytes]`.
+    `:parse_memory` caps the heap the parse holds. `0` or `nil` means no limit.
 
   ## Examples
 
@@ -508,6 +509,9 @@ defmodule MDExNative.Comrak do
 
   defp native_result({:error, {:parse_time_exceeded, parse_time}}),
     do: {:error, %MDExNative.ParseTimeExceededError{parse_time: parse_time}}
+
+  defp native_result({:error, {:parse_memory_exceeded, parse_memory}}),
+    do: {:error, %MDExNative.ParseMemoryExceededError{parse_memory: parse_memory}}
 
   defp native_result(:lumis_not_enabled), do: highlight_error(lumis_not_enabled_message())
 

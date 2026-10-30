@@ -64,6 +64,7 @@ mod atoms {
         ol_width,
         opts,
         parse,
+        parse_memory,
         parse_time,
         phoenix_heex,
         prefer_fenced,
@@ -527,6 +528,7 @@ impl<'a> Decoder<'a> for ExOptions {
 #[derive(Debug, Default)]
 pub struct ExParseBudget {
     pub parse_time: Option<u64>,
+    pub parse_memory: Option<u64>,
 }
 
 impl<'a> Decoder<'a> for ExParseBudget {
@@ -538,6 +540,7 @@ impl<'a> Decoder<'a> for ExParseBudget {
         }
         Ok(Self {
             parse_time: optional_field(term, atoms::parse_time())?,
+            parse_memory: optional_field(term, atoms::parse_memory())?,
         })
     }
 }
@@ -550,6 +553,15 @@ impl ExOptions {
             .as_ref()
             .and_then(|budget| budget.parse_time)
             .filter(|&ms| ms > 0)
+    }
+
+    /// Bytes the parse may hold, or `None` for no limit. As with `parse_time`,
+    /// an explicit zero means no limit.
+    pub fn parse_memory_limit(&self) -> Option<u64> {
+        self.budget
+            .as_ref()
+            .and_then(|budget| budget.parse_memory)
+            .filter(|&bytes| bytes > 0)
     }
 
     pub fn tagfilter(&self) -> bool {

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- Add `parse_memory` to the `budget` option: `budget: [parse_memory: bytes]` cancels a parse in `parse_document/2`, `markdown_to_html/2`, and `markdown_to_xml/2` once it holds more than `bytes` of heap. The NIF counts each thread's heap allocations to measure it. Running out returns `{:error, %MDExNative.ParseMemoryExceededError{}}` without partial output; the bang variants raise it. Omitting it, or setting it to `nil` or `0`, means no limit.
+
 ## [0.3.0](https://github.com/leandrocp/mdex_native/compare/v0.2.14...v0.3.0) (2026-10-29)
 
 ### Breaking Changes
