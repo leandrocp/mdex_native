@@ -27,7 +27,7 @@ jobs:
       # cargo-lumis-wasm-runtime/v0.6.0; update this reference and our lockfile together.
       LUMIS_REF: 040d29d373710bc6ed8bd437d9e26ca9410331d8
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
       - uses: dtolnay/rust-toolchain@stable
 
