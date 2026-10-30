@@ -1,6 +1,8 @@
 //! Counts the heap bytes each thread holds, so a parse can stop once it holds
 //! more memory than its budget allows.
 
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 
@@ -44,10 +46,12 @@ fn count(bytes: isize) {
     });
 }
 
-// `Layout` sizes never exceed `isize::MAX`, so the casts below are lossless.
+// `Layout` sizes never exceed `isize::MAX`, and neither does `realloc`'s
+// `new_size`, so the casts below are lossless.
 unsafe impl GlobalAlloc for CountingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        let ptr = System.alloc(layout);
+        // SAFETY: the caller upholds `alloc`'s contract, which `System` shares.
+        let ptr = unsafe { System.alloc(layout) };
         if !ptr.is_null() {
             count(layout.size() as isize);
         }
@@ -55,7 +59,8 @@ unsafe impl GlobalAlloc for CountingAllocator {
     }
 
     unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
-        let ptr = System.alloc_zeroed(layout);
+        // SAFETY: the caller upholds `alloc_zeroed`'s contract, which `System` shares.
+        let ptr = unsafe { System.alloc_zeroed(layout) };
         if !ptr.is_null() {
             count(layout.size() as isize);
         }
@@ -63,12 +68,16 @@ unsafe impl GlobalAlloc for CountingAllocator {
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        System.dealloc(ptr, layout);
+        // SAFETY: every block this allocator hands out comes from `System`, and
+        // the caller passes the layout it was allocated with.
+        unsafe { System.dealloc(ptr, layout) };
         count(-(layout.size() as isize));
     }
 
     unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
-        let new_ptr = System.realloc(ptr, layout, new_size);
+        // SAFETY: as in `dealloc`, `ptr` came from `System` with `layout`, and the
+        // caller upholds `realloc`'s contract for `new_size`.
+        let new_ptr = unsafe { System.realloc(ptr, layout, new_size) };
         if !new_ptr.is_null() {
             count(new_size as isize - layout.size() as isize);
         }
@@ -79,16 +88,20 @@ unsafe impl GlobalAlloc for CountingAllocator {
 #[cfg(test)]
 mod tests {
     use super::{held, peak, start_peak};
+    // The optimizer may drop or shrink allocations it can see aren't used,
+    // so the tests hide their buffers behind `black_box`.
+    use std::hint::black_box;
 
     const MIB: isize = 1 << 20;
 
     #[test]
     fn counts_what_this_thread_allocates_and_frees() {
         let before = held();
-        let mut buffer = vec![0u8; MIB as usize];
+        let mut buffer = black_box(vec![0u8; MIB as usize]);
         assert!(held() - before >= MIB);
 
         buffer.resize(4 * MIB as usize, 0);
+        black_box(&buffer);
         assert!(held() - before >= 4 * MIB);
 
         drop(buffer);
@@ -98,7 +111,7 @@ mod tests {
     #[test]
     fn peak_keeps_the_most_held_after_a_free() {
         let start = start_peak();
-        drop(vec![0u8; 4 * MIB as usize]);
+        drop(black_box(vec![0u8; 4 * MIB as usize]));
         assert!(held() - start < MIB);
         assert!(peak() - start >= 4 * MIB);
     }
@@ -106,7 +119,7 @@ mod tests {
     #[test]
     fn ignores_what_other_threads_allocate() {
         let before = held();
-        let kept = std::thread::spawn(|| vec![0u8; 4 * MIB as usize])
+        let kept = std::thread::spawn(|| black_box(vec![0u8; 4 * MIB as usize]))
             .join()
             .unwrap();
         assert!(held() - before < MIB);

@@ -18,6 +18,24 @@ jobs:
       manifest-path: "native/mdex_native_nif/Cargo.toml"
       msrv: "1.95"
 
+  # x86_64-pc-windows-gnu is the one release target without native thread
+  # locals, so std backs `thread_local!` with OS TLS keys there. Run the tests
+  # on it so the counting allocator in `memory.rs` is checked on that path too.
+  test-windows-gnu:
+    name: os windows-2022, target x86_64-pc-windows-gnu
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          targets: x86_64-pc-windows-gnu
+      - uses: Swatinem/rust-cache@v2.9.3
+        with:
+          key: x86_64-pc-windows-gnu
+      - run: cargo test --locked --lib --target x86_64-pc-windows-gnu --manifest-path native/mdex_native_nif/Cargo.toml
+
   lint:
     uses: leandrocp/github-actions/.github/workflows/rust-lint.yml@main
     with:
