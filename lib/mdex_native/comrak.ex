@@ -410,7 +410,9 @@ defmodule MDExNative.Comrak do
       # Legacy `syntax_highlight: [formatter: ...]`: the Lumis options
       # themselves, except `:inline_code`, which is ours.
       Keyword.has_key?(options, :formatter) ->
-        {inline_code, opts} = options |> Keyword.delete(:engine) |> Keyword.pop(:inline_code, true)
+        {inline_code, opts} =
+          options |> Keyword.delete(:engine) |> Keyword.pop(:inline_code, true)
+
         %{engine: engine, opts: normalize_opts(engine, opts), inline_code: inline_code}
 
       true ->
