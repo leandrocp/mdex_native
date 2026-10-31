@@ -68,7 +68,7 @@ pub struct LumisAdapter {
     rainbow_brackets: bool,
     word_diff: bool,
     budget: ExBudget,
-    pub code_spans: bool,
+    pub inline_code: bool,
     fence: Mutex<FenceState>,
     /// Comrak's adapter trait can only answer `fmt::Error`, which says nothing
     /// about why Lumis refused a fence. Park the reason here for the NIF to
@@ -82,14 +82,14 @@ impl LumisAdapter {
         rainbow_brackets: bool,
         word_diff: bool,
         budget: ExBudget,
-        code_spans: bool,
+        inline_code: bool,
     ) -> Self {
         Self {
             formatter,
             rainbow_brackets,
             word_diff,
             budget,
-            code_spans,
+            inline_code,
             fence: Mutex::new(FenceState::default()),
             failure: Mutex::new(None),
         }

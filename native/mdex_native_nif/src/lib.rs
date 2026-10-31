@@ -471,7 +471,7 @@ fn syntax_highlighter(
                         opts.rainbow_brackets,
                         opts.word_diff,
                         opts.budget,
-                        syntax_highlight.code_spans,
+                        syntax_highlight.inline_code,
                     ),
                 )))
             }
@@ -642,7 +642,7 @@ impl SyntaxHighlighterAdapter for CodeFenceSyntaxHighlighter {
 fn inline_code(syntax_highlighter: &Option<CodeFenceSyntaxHighlighter>) -> InlineCode {
     match syntax_highlighter {
         #[cfg(feature = "lumis")]
-        Some(CodeFenceSyntaxHighlighter::Lumis(adapter)) if adapter.code_spans => {
+        Some(CodeFenceSyntaxHighlighter::Lumis(adapter)) if adapter.inline_code => {
             Some(adapter.clone())
         }
         _ => None,

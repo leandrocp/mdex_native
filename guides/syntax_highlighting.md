@@ -68,7 +68,7 @@ Add `{:mdex, "~> 0.14"}{:elixir}` to your deps.
 
 The `<code>` gets the `lumis` class and the theme's colors, as a block's `<pre>`
 does. Inline code that names no language, or has a `nohighlight` or
-`no-highlight` class, keeps Comrak's output. Pass `code_spans: false` next to
+`no-highlight` class, keeps Comrak's output. Pass `inline_code: false` next to
 `:engine` to turn it off.
 
 ### Highlighting budgets
