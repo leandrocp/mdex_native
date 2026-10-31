@@ -11,7 +11,10 @@ workflows:
         - 'swatinem/rust-cache@v2.9.3'
     '.github/workflows/publish.yml': []
     '.github/workflows/release.yml': []
-    '.github/workflows/rust.yml': []
+    '.github/workflows/rust.yml':
+        - 'actions/checkout@v7.0.1'
+        - 'dtolnay/rust-toolchain@master'
+        - 'swatinem/rust-cache@v2.9.3'
     '.github/workflows/verify-lockfile.yml':
         - 'actions/checkout@v7.0.1'
     '.github/workflows/wasmtime-cache.yml':
@@ -28,6 +31,11 @@ dependencies:
         commit: 'sha1-3d3c42e5aac5ba805825da76410c181273ba90b1'
         owner_id: 44036562
         repo_id: 197814629
+    'dtolnay/rust-toolchain@master':
+        ref: 'master'
+        commit: 'sha1-683b588c487a69d01f6c6ddf40f036ff682cc2c8'
+        owner_id: 1940490
+        repo_id: 260749683
     'dtolnay/rust-toolchain@stable':
         ref: 'stable'
         commit: 'sha1-b725eda525362e7cf34af9a7243cac1e3f01a7ec'
