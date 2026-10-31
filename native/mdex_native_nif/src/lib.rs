@@ -457,8 +457,11 @@ fn render_parts(
         Some(syntax_highlight) => {
             let enabled = syntax_highlight.inline_code;
             let highlighter = syntax_highlighter(syntax_highlight)?;
-            let inline_code = enabled.then(|| highlighter.inline_code()).flatten();
-            (Some(highlighter), inline_code)
+            let inline_code = highlighter
+                .as_ref()
+                .filter(|_| enabled)
+                .and_then(CodeFenceSyntaxHighlighter::inline_code);
+            (highlighter, inline_code)
         }
         None => (None, None),
     };
@@ -473,19 +476,19 @@ fn render_parts(
 
 fn syntax_highlighter(
     syntax_highlight: ExSyntaxHighlightOptions,
-) -> NifResult<CodeFenceSyntaxHighlighter> {
+) -> NifResult<Option<CodeFenceSyntaxHighlighter>> {
     match syntax_highlight.opts {
         ExSyntaxHighlightEngineOptions::Lumis(opts) => {
             #[cfg(feature = "lumis")]
             {
-                Ok(CodeFenceSyntaxHighlighter::Lumis(Arc::new(
+                Ok(Some(CodeFenceSyntaxHighlighter::Lumis(Arc::new(
                     LumisAdapter::new(
                         opts.formatter,
                         opts.rainbow_brackets,
                         opts.word_diff,
                         opts.budget,
                     ),
-                )))
+                ))))
             }
 
             #[cfg(not(feature = "lumis"))]
@@ -508,7 +511,19 @@ fn syntax_highlighter(
                 // builds only one syntax/theme set for each cached adapter.
                 let mut adapters = ADAPTERS.lock();
                 if let Some(adapter) = adapters.get(&opts.theme) {
-                    return Ok(CodeFenceSyntaxHighlighter::Syntect(Arc::clone(adapter)));
+                    return Ok(Some(CodeFenceSyntaxHighlighter::Syntect(Arc::clone(
+                        adapter,
+                    ))));
+                }
+
+                // Comrak's adapter panics on a theme it has not loaded. Render
+                // plain text instead, the same as without a highlighter.
+                if opts.theme.as_deref().is_some_and(|name| {
+                    !two_face::theme::EmbeddedLazyThemeSet::theme_names()
+                        .iter()
+                        .any(|theme| theme.as_name() == name)
+                }) {
+                    return Ok(None);
                 }
 
                 let builder = SyntectAdapterBuilder::new()
@@ -520,17 +535,9 @@ fn syntax_highlighter(
                     None => builder.build(),
                 });
 
-                // Bound the cache to bundled themes plus CSS-class mode. Unknown
-                // names retain Comrak's behavior without becoming permanent keys.
-                if opts.theme.as_deref().is_none_or(|name| {
-                    two_face::theme::EmbeddedLazyThemeSet::theme_names()
-                        .iter()
-                        .any(|theme| theme.as_name() == name)
-                }) {
-                    adapters.insert(opts.theme, Arc::clone(&adapter));
-                }
+                adapters.insert(opts.theme, Arc::clone(&adapter));
 
-                Ok(CodeFenceSyntaxHighlighter::Syntect(adapter))
+                Ok(Some(CodeFenceSyntaxHighlighter::Syntect(adapter)))
             }
 
             #[cfg(not(feature = "syntect"))]
@@ -833,6 +840,25 @@ mod tests {
         .expect("writing to String is infallible");
 
         output
+    }
+
+    /// Comrak's adapter panics on a theme it has not loaded, so an unknown
+    /// name gets no highlighter and the document renders as plain text.
+    #[cfg(feature = "syntect")]
+    #[test]
+    fn unknown_syntect_theme_renders_plain_text() {
+        let highlighter = |theme: &str| {
+            syntax_highlighter(ExSyntaxHighlightOptions {
+                opts: ExSyntaxHighlightEngineOptions::Syntect(ExSyntectOptions {
+                    theme: Some(theme.to_string()),
+                }),
+                inline_code: true,
+            })
+            .unwrap()
+        };
+
+        assert!(highlighter("not-a-theme").is_none());
+        assert!(highlighter("InspiredGitHub").is_some());
     }
 
     #[cfg(feature = "syntect")]
