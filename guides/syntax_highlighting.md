@@ -55,6 +55,22 @@ needed. Install it only to build a custom `%Lumis.Theme{}`.
 Set `word_diff: true` in the engine options to mark changed words in `diff`
 fences. This requires the `:lumis_wasm_diff` parser package.
 
+### Inline code
+
+Inline code that names its language is highlighted too, with the formatter's
+inline structure. End the code span with a `{:lang}` suffix, which is removed,
+or, with `inline_code_attributes`, give it a `language-*` class or
+`data-language` attribute:
+
+```markdown
+Add `{:mdex, "~> 0.14"}{:elixir}` to your deps.
+```
+
+The `<code>` gets the `lumis` class and the theme's colors, as a block's `<pre>`
+does. Inline code that names no language, or has a `nohighlight` or
+`no-highlight` class, keeps Comrak's output. Pass `code_spans: false` next to
+`:engine` to turn it off.
+
 ### Highlighting budgets
 
 Pass a budget in the engine options to bound each code block:

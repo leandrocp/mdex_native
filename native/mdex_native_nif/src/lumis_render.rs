@@ -8,6 +8,8 @@
 use std::collections::HashMap;
 
 use lumis_core::events::HighlightEvent;
+use lumis_core::formatter::html::{multi_themes_pre_attrs, open_tag, pre_attrs, AttrValue};
+use lumis_core::formatter::BudgetExhausted;
 use lumis_core::languages::Language;
 
 use crate::types::options::ExBudget;
@@ -35,35 +37,7 @@ pub fn render_code_fence(
     let formatter = with_mdex_attributes(formatter.unwrap_or_default(), attributes);
     let formatter = formatter.into_formatter(language)?;
 
-    let plain = || {
-        vec![HighlightEvent::Source {
-            start: 0,
-            end: source.len(),
-        }]
-    };
-
-    let (events, exhausted) = if language == Language::PlainText {
-        (plain(), None)
-    } else {
-        let highlighted = crate::lumis_runtime::executor().ok().and_then(|executor| {
-            executor
-                .highlight(
-                    source,
-                    language.id_name(),
-                    rainbow_brackets,
-                    word_diff,
-                    budget,
-                )
-                .ok()
-        });
-        match highlighted {
-            Some(output) => (flatten_events(source, output.events), output.budget),
-            // Missing parsers, broken queries, and runtime failures cost only
-            // this fence's highlighting, not the surrounding document. Keep
-            // the formatter so it still escapes and styles the plain source.
-            None => (plain(), None),
-        }
-    };
+    let (events, exhausted) = highlight(source, language, rainbow_brackets, word_diff, budget);
 
     let mut output = Vec::new();
     formatter
@@ -75,6 +49,122 @@ pub fn render_code_fence(
         .strip_suffix("</code></pre>")
         .map(str::to_owned)
         .ok_or_else(|| "Lumis formatter did not produce HTML code-fence output".to_string())
+}
+
+/// Renders inline code as a whole `<code>` element: the token spans of the
+/// formatter's inline structure, inside a tag carrying the `lumis` class and the
+/// theme's colors merged with `attrs`, as a block's `<pre>` would carry them.
+///
+/// The formatter goes through the same mapping as a fence, so a terminal or
+/// BBCode formatter renders as inline HTML here too. Its `pre_class` and
+/// `pre_attrs` belong to blocks and are left out. A language that does not
+/// name a known one renders as plain text; nothing is guessed from content.
+pub fn render_inline_code(
+    source: &str,
+    language: &str,
+    formatter: Option<ExFormatterOption>,
+    rainbow_brackets: bool,
+    word_diff: bool,
+    budget: ExBudget,
+    attrs: &[(String, String)],
+) -> Result<String, String> {
+    let language = language.parse().unwrap_or(Language::PlainText);
+    let mut formatter = with_mdex_attributes(formatter.unwrap_or_default(), &HashMap::new());
+    let attrs: Vec<(String, AttrValue)> = attrs
+        .iter()
+        .map(|(name, value)| (name.clone(), AttrValue::Value(value.clone())))
+        .collect();
+
+    let code_attrs = match &mut formatter {
+        ExFormatterOption::HtmlInline {
+            structure, theme, ..
+        } => {
+            *structure = ExHtmlStructure::Inline;
+            let theme = theme.clone().and_then(|theme| match theme {
+                ThemeOrString::Theme(theme) => Some(theme.into()),
+                ThemeOrString::String(name) => lumis_core::themes::get(&name).ok(),
+            });
+            pre_attrs(None, theme.as_ref(), &attrs)
+        }
+        ExFormatterOption::HtmlMultiThemes {
+            structure,
+            themes,
+            default_theme,
+            css_variable_prefix,
+            ..
+        } => {
+            *structure = ExHtmlStructure::Inline;
+            let themes = themes
+                .iter()
+                .map(|(name, theme)| (name.clone(), theme.clone().into()))
+                .collect();
+            multi_themes_pre_attrs(
+                None,
+                &themes,
+                default_theme.as_deref(),
+                css_variable_prefix.as_deref().unwrap_or("--lumis"),
+                &attrs,
+            )
+        }
+        ExFormatterOption::HtmlLinked { structure, .. } => {
+            *structure = ExHtmlStructure::Inline;
+            pre_attrs(None, None, &attrs)
+        }
+        // `with_mdex_attributes` only returns the HTML formatters.
+        _ => pre_attrs(None, None, &attrs),
+    };
+
+    let (events, exhausted) = highlight(source, language, rainbow_brackets, word_diff, budget);
+    let mut output = Vec::new();
+    open_tag(&mut output, "code", &code_attrs).map_err(|error| error.to_string())?;
+    formatter
+        .into_formatter(language)?
+        .render_budgeted_or(source, &events, &mut output, exhausted)
+        .map_err(|error| error.to_string())?;
+    output.extend_from_slice(b"</code>");
+
+    String::from_utf8(output).map_err(|error| error.to_string())
+}
+
+/// Highlight events for `source`, flattened the way MDEx publishes them.
+///
+/// Missing parsers, broken queries, and runtime failures cost only this code's
+/// highlighting, not the surrounding document: the caller keeps its formatter
+/// so it still escapes and styles the plain source.
+fn highlight(
+    source: &str,
+    language: Language,
+    rainbow_brackets: bool,
+    word_diff: bool,
+    budget: ExBudget,
+) -> (Vec<HighlightEvent<'static>>, Option<BudgetExhausted>) {
+    let plain = || {
+        vec![HighlightEvent::Source {
+            start: 0,
+            end: source.len(),
+        }]
+    };
+
+    if language == Language::PlainText {
+        return (plain(), None);
+    }
+
+    let highlighted = crate::lumis_runtime::executor().ok().and_then(|executor| {
+        executor
+            .highlight(
+                source,
+                language.id_name(),
+                rainbow_brackets,
+                word_diff,
+                budget,
+            )
+            .ok()
+    });
+
+    match highlighted {
+        Some(output) => (flatten_events(source, output.events), output.budget),
+        None => (plain(), None),
+    }
 }
 
 /// Applies MDEx's info-string decorators over the formatter the caller asked for.
