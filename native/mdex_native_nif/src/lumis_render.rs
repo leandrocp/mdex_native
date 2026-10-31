@@ -126,7 +126,7 @@ pub fn render_inline_code(
     String::from_utf8(output).map_err(|error| error.to_string())
 }
 
-/// Highlight events for `source`, flattened the way MDEx publishes them.
+/// Highlight events for `source`, nested the way Lumis renders them.
 ///
 /// Missing parsers, broken queries, and runtime failures cost only this code's
 /// highlighting, not the surrounding document: the caller keeps its formatter
@@ -162,7 +162,7 @@ fn highlight(
     });
 
     match highlighted {
-        Some(output) => (flatten_events(source, output.events), output.budget),
+        Some(output) => (output.events, output.budget),
         None => (plain(), None),
     }
 }
@@ -393,53 +393,6 @@ fn line_background_from_name(theme: Option<&String>) -> String {
     line_background(&theme)
 }
 
-/// Collapses nested scopes so each span carries exactly one, and leaves
-/// whitespace-only spans unscoped.
-///
-/// Lumis's formatters nest: an inner scope renders inside its outer one. MDEx
-/// has always published the flat form, and `mdex_test.exs` pins it, so a fence
-/// deliberately renders differently from `Lumis.highlight/2` for languages with
-/// injected or nested scopes. Per-character colour is the same either way; only
-/// the element structure differs, and CSS written against the flat form would
-/// break without this.
-fn flatten_events(
-    source: &str,
-    events: Vec<HighlightEvent<'static>>,
-) -> Vec<HighlightEvent<'static>> {
-    let mut flattened = Vec::with_capacity(events.len());
-    let mut scopes = Vec::new();
-
-    for event in events {
-        match event {
-            HighlightEvent::Start {
-                scope_index,
-                language,
-            } => scopes.push((scope_index, language)),
-            HighlightEvent::End => {
-                scopes.pop();
-            }
-            HighlightEvent::Source { start, end } => {
-                let text = source.get(start..end).unwrap_or_default();
-                if text.trim().is_empty() || scopes.is_empty() {
-                    flattened.push(HighlightEvent::Source { start, end });
-                } else if let Some((scope_index, language)) = scopes.last() {
-                    flattened.push(HighlightEvent::Start {
-                        scope_index: *scope_index,
-                        language: language.clone(),
-                    });
-                    flattened.push(HighlightEvent::Source { start, end });
-                    flattened.push(HighlightEvent::End);
-                }
-            }
-            // Annotation events, which a code fence never produces: MDEx has no
-            // way to supply annotations through Comrak's adapter contract.
-            other => flattened.push(other),
-        }
-    }
-
-    flattened
-}
-
 fn linked_highlight_lines(
     attributes: &HashMap<String, String>,
 ) -> Option<ExHtmlLinkedHighlightLines> {
@@ -523,44 +476,6 @@ mod tests {
                 step: 1
             }
         ));
-    }
-
-    #[test]
-    fn flattens_nested_scopes_to_the_innermost_non_whitespace_scope() {
-        let events = vec![
-            HighlightEvent::Start {
-                scope_index: 1,
-                language: "elixir".to_string(),
-            },
-            HighlightEvent::Source { start: 0, end: 1 },
-            HighlightEvent::Start {
-                scope_index: 2,
-                language: "elixir".to_string(),
-            },
-            HighlightEvent::Source { start: 1, end: 2 },
-            HighlightEvent::End,
-            HighlightEvent::Source { start: 2, end: 3 },
-            HighlightEvent::End,
-        ];
-
-        assert_eq!(
-            flatten_events("a b", events),
-            vec![
-                HighlightEvent::Start {
-                    scope_index: 1,
-                    language: "elixir".to_string(),
-                },
-                HighlightEvent::Source { start: 0, end: 1 },
-                HighlightEvent::End,
-                HighlightEvent::Source { start: 1, end: 2 },
-                HighlightEvent::Start {
-                    scope_index: 1,
-                    language: "elixir".to_string(),
-                },
-                HighlightEvent::Source { start: 2, end: 3 },
-                HighlightEvent::End,
-            ]
-        );
     }
 
     #[test]

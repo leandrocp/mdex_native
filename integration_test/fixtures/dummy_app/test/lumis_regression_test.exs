@@ -71,6 +71,27 @@ defmodule MDExNativeE2E.LumisRegressionTest do
       assert render(markdown, formatter: :html_linked, word_diff: false) == plain
     end
 
+    test "a diff line keeps its scope around the marker and the injected tokens (issue #128)" do
+      source = """
+      diff --git a/a.exs b/a.exs
+      --- a/a.exs
+      +++ b/a.exs
+      @@ -1 +1 @@
+      -IO.puts("old")
+      +IO.puts("new")\
+      """
+
+      lines = "```diff\n#{source}\n```" |> render(formatter: :html_linked) |> String.split("\n")
+
+      for {number, marker, scope} <- [{5, "-", "l-diff-minus"}, {6, "+", "l-diff-plus"}] do
+        line = Enum.find(lines, &(&1 =~ ~s(data-line="#{number}")))
+
+        assert line |> String.replace(~r/<[^>]*>/, "") |> String.starts_with?(marker)
+        assert line =~ ~s(class="l-module">IO</span>)
+        assert text_outside(line, scope) == ""
+      end
+    end
+
     test "a declared parser highlights, an undeclared one renders plain" do
       declared = highlight("```elixir\nIO.puts(:hello)\n```")
       assert declared =~ "language-elixir"
@@ -389,6 +410,19 @@ defmodule MDExNativeE2E.LumisRegressionTest do
         render: [unsafe: true],
         syntax_highlight: [engine: :lumis, opts: opts]
       )
+    end
+
+    # The text in a rendered line that no span with `class` encloses.
+    defp text_outside(line, class) do
+      ~r/<span[^>]*class="([^"]*)"[^>]*>|<[^>]*>|[^<]+/
+      |> Regex.scan(line)
+      |> Enum.reduce({[], ""}, fn
+        ["</span>"], {[_ | open], outside} -> {open, outside}
+        [_tag, classes], {open, outside} -> {[classes | open], outside}
+        ["<" <> _other_tag], acc -> acc
+        [text], {open, outside} -> {open, if(class in open, do: outside, else: outside <> text)}
+      end)
+      |> elem(1)
     end
   end
 
