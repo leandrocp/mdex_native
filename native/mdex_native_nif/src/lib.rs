@@ -20,6 +20,8 @@ use comrak::options::Plugins;
 #[cfg(feature = "syntect")]
 use comrak::plugins::syntect::{SyntectAdapter, SyntectAdapterBuilder};
 use comrak::{Anchorizer, Arena, Options};
+#[cfg(feature = "syntect")]
+use html_formatter::InlineCodeHighlighter;
 use html_formatter::{InlineCode, MdexFormatter};
 use lol_html::html_content::ContentType;
 use lol_html::{rewrite_str, text, RewriteStrSettings};
@@ -263,7 +265,7 @@ fn markdown_to_html_with_options<'a>(
     let tagfilter = options.tagfilter();
     let time_limit = options.parse_time_limit();
     let memory_limit = options.parse_memory_limit();
-    let (comrak_options, lumis_adapter, sanitize) = render_parts(options)?;
+    let (comrak_options, lumis_adapter, inline_code, sanitize) = render_parts(options)?;
     let escape_curly_braces_in_code = comrak_options.extension.phoenix_heex;
     let arena = Arena::new();
     let root = parse(&arena, md, &comrak_options, time_limit, memory_limit)?;
@@ -277,7 +279,7 @@ fn markdown_to_html_with_options<'a>(
             &mut buffer,
             &plugins,
             tagfilter,
-            inline_code(&lumis_adapter),
+            inline_code.clone(),
         ),
         &lumis_adapter,
     )?;
@@ -292,7 +294,7 @@ fn markdown_to_xml_with_options<'a>(
 ) -> NifResult<Term<'a>> {
     let time_limit = options.parse_time_limit();
     let memory_limit = options.parse_memory_limit();
-    let (comrak_options, lumis_adapter, _sanitize) = render_parts(options)?;
+    let (comrak_options, lumis_adapter, _inline_code, _sanitize) = render_parts(options)?;
     let arena = Arena::new();
     let root = parse(&arena, md, &comrak_options, time_limit, memory_limit)?;
     let mut buffer = String::new();
@@ -326,7 +328,7 @@ fn document_to_commonmark_with_options<'a>(
 ) -> NifResult<Term<'a>> {
     let arena = Arena::new();
     let comrak_ast = document_term_to_comrak_ast(&arena, ex_document)?;
-    let (comrak_options, lumis_adapter, _sanitize) = render_parts(options)?;
+    let (comrak_options, lumis_adapter, _inline_code, _sanitize) = render_parts(options)?;
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
 
@@ -364,7 +366,7 @@ fn document_to_html_with_options<'a>(
     let tagfilter = options.tagfilter();
     let arena = Arena::new();
     let comrak_ast = document_term_to_comrak_ast(&arena, ex_document)?;
-    let (comrak_options, lumis_adapter, sanitize) = render_parts(options)?;
+    let (comrak_options, lumis_adapter, inline_code, sanitize) = render_parts(options)?;
     let escape_curly_braces_in_code = comrak_options.extension.phoenix_heex;
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
@@ -376,7 +378,7 @@ fn document_to_html_with_options<'a>(
             &mut buffer,
             &plugins,
             tagfilter,
-            inline_code(&lumis_adapter),
+            inline_code.clone(),
         ),
         &lumis_adapter,
     )?;
@@ -403,7 +405,7 @@ fn document_to_xml_with_options<'a>(
 ) -> NifResult<Term<'a>> {
     let arena = Arena::new();
     let comrak_ast = document_term_to_comrak_ast(&arena, ex_document)?;
-    let (comrak_options, lumis_adapter, _sanitize) = render_parts(options)?;
+    let (comrak_options, lumis_adapter, _inline_code, _sanitize) = render_parts(options)?;
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
 
@@ -447,33 +449,46 @@ fn render_parts(
 ) -> NifResult<(
     Options<'static>,
     Option<CodeFenceSyntaxHighlighter>,
+    InlineCode,
     Option<ExSanitizeOption>,
 )> {
     let comrak_options = options.comrak_options();
-    let syntax_highlighter = match options.syntax_highlight {
-        Some(syntax_highlight) => Some(syntax_highlighter(syntax_highlight)?),
-        None => None,
+    let (syntax_highlighter, inline_code) = match options.syntax_highlight {
+        Some(syntax_highlight) => {
+            let enabled = syntax_highlight.inline_code;
+            let highlighter = syntax_highlighter(syntax_highlight)?;
+            let inline_code = highlighter
+                .as_ref()
+                .filter(|_| enabled)
+                .and_then(CodeFenceSyntaxHighlighter::inline_code);
+            (highlighter, inline_code)
+        }
+        None => (None, None),
     };
 
-    Ok((comrak_options, syntax_highlighter, options.sanitize))
+    Ok((
+        comrak_options,
+        syntax_highlighter,
+        inline_code,
+        options.sanitize,
+    ))
 }
 
 fn syntax_highlighter(
     syntax_highlight: ExSyntaxHighlightOptions,
-) -> NifResult<CodeFenceSyntaxHighlighter> {
+) -> NifResult<Option<CodeFenceSyntaxHighlighter>> {
     match syntax_highlight.opts {
         ExSyntaxHighlightEngineOptions::Lumis(opts) => {
             #[cfg(feature = "lumis")]
             {
-                Ok(CodeFenceSyntaxHighlighter::Lumis(Arc::new(
+                Ok(Some(CodeFenceSyntaxHighlighter::Lumis(Arc::new(
                     LumisAdapter::new(
                         opts.formatter,
                         opts.rainbow_brackets,
                         opts.word_diff,
                         opts.budget,
-                        syntax_highlight.inline_code,
                     ),
-                )))
+                ))))
             }
 
             #[cfg(not(feature = "lumis"))]
@@ -496,7 +511,19 @@ fn syntax_highlighter(
                 // builds only one syntax/theme set for each cached adapter.
                 let mut adapters = ADAPTERS.lock();
                 if let Some(adapter) = adapters.get(&opts.theme) {
-                    return Ok(CodeFenceSyntaxHighlighter::Syntect(Arc::clone(adapter)));
+                    return Ok(Some(CodeFenceSyntaxHighlighter::Syntect(Arc::clone(
+                        adapter,
+                    ))));
+                }
+
+                // Comrak's adapter panics on a theme it has not loaded. Render
+                // plain text instead, the same as without a highlighter.
+                if opts.theme.as_deref().is_some_and(|name| {
+                    !two_face::theme::EmbeddedLazyThemeSet::theme_names()
+                        .iter()
+                        .any(|theme| theme.as_name() == name)
+                }) {
+                    return Ok(None);
                 }
 
                 let builder = SyntectAdapterBuilder::new()
@@ -508,17 +535,9 @@ fn syntax_highlighter(
                     None => builder.build(),
                 });
 
-                // Bound the cache to bundled themes plus CSS-class mode. Unknown
-                // names retain Comrak's behavior without becoming permanent keys.
-                if opts.theme.as_deref().is_none_or(|name| {
-                    two_face::theme::EmbeddedLazyThemeSet::theme_names()
-                        .iter()
-                        .any(|theme| theme.as_name() == name)
-                }) {
-                    adapters.insert(opts.theme, Arc::clone(&adapter));
-                }
+                adapters.insert(opts.theme, Arc::clone(&adapter));
 
-                Ok(CodeFenceSyntaxHighlighter::Syntect(adapter))
+                Ok(Some(CodeFenceSyntaxHighlighter::Syntect(adapter)))
             }
 
             #[cfg(not(feature = "syntect"))]
@@ -639,13 +658,49 @@ impl SyntaxHighlighterAdapter for CodeFenceSyntaxHighlighter {
     }
 }
 
-fn inline_code(syntax_highlighter: &Option<CodeFenceSyntaxHighlighter>) -> InlineCode {
-    match syntax_highlighter {
-        #[cfg(feature = "lumis")]
-        Some(CodeFenceSyntaxHighlighter::Lumis(adapter)) if adapter.inline_code => {
-            Some(adapter.clone())
+impl CodeFenceSyntaxHighlighter {
+    fn inline_code(&self) -> InlineCode {
+        match self {
+            #[cfg(feature = "lumis")]
+            Self::Lumis(adapter) => Some(adapter.clone()),
+            #[cfg(feature = "syntect")]
+            Self::Syntect(adapter) => Some(adapter.clone()),
+            #[cfg(not(any(feature = "lumis", feature = "syntect")))]
+            _ => None,
         }
-        _ => None,
+    }
+}
+
+/// Comrak's adapter only highlights fences, so inline code reuses the pieces it
+/// exposes: the spans `write_highlighted` writes, and the one attribute
+/// `write_pre_tag` puts on a fence's `<pre>`, the theme's background or the
+/// `syntax-highlighting` class, merged here with the span's own attributes.
+#[cfg(feature = "syntect")]
+impl InlineCodeHighlighter for SyntectAdapter {
+    fn write_inline_code(
+        &self,
+        output: &mut dyn std::fmt::Write,
+        source: &str,
+        language: &str,
+        attrs: &[(String, String)],
+    ) -> std::fmt::Result {
+        let mut pre = String::new();
+        self.write_pre_tag(&mut pre, std::collections::HashMap::new())?;
+        let (name, value) = pre
+            .strip_prefix("<pre ")
+            .and_then(|tag| tag.strip_suffix("\">"))
+            .and_then(|tag| tag.split_once("=\""))
+            .ok_or(std::fmt::Error)?;
+
+        let mut attrs = attrs.to_vec();
+        match attrs.iter_mut().find(|(key, _)| key == name) {
+            Some((_, authored)) => *authored = format!("{value} {authored}"),
+            None => attrs.insert(0, (name.to_string(), value.to_string())),
+        }
+
+        comrak::html::write_opening_tag(output, "code", attrs)?;
+        self.write_highlighted(output, Some(language), source)?;
+        output.write_str("</code>")
     }
 }
 
@@ -785,5 +840,68 @@ mod tests {
         .expect("writing to String is infallible");
 
         output
+    }
+
+    /// Comrak's adapter panics on a theme it has not loaded, so an unknown
+    /// name gets no highlighter and the document renders as plain text.
+    #[cfg(feature = "syntect")]
+    #[test]
+    fn unknown_syntect_theme_renders_plain_text() {
+        let highlighter = |theme: &str| {
+            syntax_highlighter(ExSyntaxHighlightOptions {
+                opts: ExSyntaxHighlightEngineOptions::Syntect(ExSyntectOptions {
+                    theme: Some(theme.to_string()),
+                }),
+                inline_code: true,
+            })
+            .unwrap()
+        };
+
+        assert!(highlighter("not-a-theme").is_none());
+        assert!(highlighter("InspiredGitHub").is_some());
+    }
+
+    #[cfg(feature = "syntect")]
+    #[test]
+    fn highlights_inline_code_with_syntect() {
+        let options = Options {
+            extension: comrak::options::Extension {
+                inline_code_attributes: true,
+                ..Default::default()
+            },
+            render: comrak::options::Render {
+                r#unsafe: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let render = |markdown: &str, adapter: SyntectAdapter| {
+            let arena = Arena::new();
+            let root = comrak::parse_document(&arena, markdown, &options);
+            let mut output = String::new();
+            MdexFormatter::format_document_with_plugins(
+                root,
+                &options,
+                &mut output,
+                &Plugins::default(),
+                Some(Arc::new(adapter)),
+            )
+            .unwrap();
+            output
+        };
+        let themed = || SyntectAdapterBuilder::new().theme("InspiredGitHub").build();
+
+        assert_eq!(
+            render("`let x = 1;{:rust}` `{:ok}`\n", themed()),
+            "<p><code style=\"background-color:#ffffff;\"><span style=\"font-weight:bold;color:#a71d5d;\">let</span><span style=\"color:#323232;\"> x </span><span style=\"font-weight:bold;color:#a71d5d;\">= </span><span style=\"color:#0086b3;\">1</span><span style=\"color:#323232;\">;</span></code> <code>{:ok}</code></p>\n"
+        );
+        // The theme's background is merged into an authored style.
+        assert!(
+            render("`1`{.language-rust style=\"padding:0\"}\n", themed()).starts_with(
+                "<p><code class=\"language-rust\" style=\"background-color:#ffffff; padding:0\">"
+            )
+        );
+        assert!(render("`1{:rust}`\n", SyntectAdapterBuilder::new().build())
+            .starts_with("<p><code class=\"syntax-highlighting\"><span class=\""));
     }
 }

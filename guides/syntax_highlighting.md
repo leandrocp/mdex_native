@@ -138,6 +138,11 @@ html = MDExNative.Comrak.markdown_to_html!(markdown,
 ````
 
 Syntect theme names come from [`two-face`](https://crates.io/crates/two-face).
+An unknown theme name renders code as plain text.
+
+Inline code is highlighted as with Lumis, see [Inline code](#inline-code). The
+`<code>` gets the theme's background, or the `syntax-highlighting` class without
+a theme.
 
 ## Artifact size
 
