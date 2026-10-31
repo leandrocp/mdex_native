@@ -57,19 +57,14 @@ fences. This requires the `:lumis_wasm_diff` parser package.
 
 ### Inline code
 
-Inline code that names its language is highlighted too, with the formatter's
-inline structure. End the code span with a `{:lang}` suffix, which is removed,
-or, with `inline_code_attributes`, give it a `language-*` class or
-`data-language` attribute:
+Inline code is highlighted when it names a language, with a `{:lang}` suffix
+or a `language-*` class:
 
 ```markdown
 Add `{:mdex, "~> 0.14"}{:elixir}` to your deps.
 ```
 
-The `<code>` gets the `lumis` class and the theme's colors, as a block's `<pre>`
-does. Inline code that names no language, or has a `nohighlight` or
-`no-highlight` class, keeps Comrak's output. Pass `inline_code: false` next to
-`:engine` to turn it off.
+Unlabeled inline code is left alone. Pass `inline_code: false` to turn it off.
 
 ### Highlighting budgets
 
