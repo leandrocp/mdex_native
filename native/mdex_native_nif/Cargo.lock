@@ -1181,7 +1181,7 @@ dependencies = [
 [[package]]
 name = "lumis-core"
 version = "6.0.0"
-source = "git+https://github.com/leandrocp/lumis?rev=7c13d6653df2c10ad54e706f040af63b69a3ddf4#7c13d6653df2c10ad54e706f040af63b69a3ddf4"
+source = "git+https://github.com/leandrocp/lumis?rev=a8cb7d1bbb217478f8f6528124826b0fde89d81a#a8cb7d1bbb217478f8f6528124826b0fde89d81a"
 dependencies = [
  "derive_builder",
  "glob",
@@ -1199,7 +1199,7 @@ dependencies = [
 [[package]]
 name = "lumis-wasm-runtime"
 version = "0.6.0"
-source = "git+https://github.com/leandrocp/lumis?rev=7c13d6653df2c10ad54e706f040af63b69a3ddf4#7c13d6653df2c10ad54e706f040af63b69a3ddf4"
+source = "git+https://github.com/leandrocp/lumis?rev=a8cb7d1bbb217478f8f6528124826b0fde89d81a#a8cb7d1bbb217478f8f6528124826b0fde89d81a"
 dependencies = [
  "etcetera",
  "lumis-core",
