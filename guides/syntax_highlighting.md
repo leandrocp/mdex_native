@@ -58,10 +58,10 @@ fences. This requires the `:lumis_wasm_diff` parser package.
 ### Inline code
 
 Inline code is highlighted when it names a language, with a `{:lang}` suffix
-or a `language-*` class:
+or, with `extension: [inline_code_attributes: true]`, a `language-*` class:
 
 ```markdown
-Add `{:mdex, "~> 0.14"}{:elixir}` to your deps.
+Add `{:mdex, "~> 0.14"}{:elixir}` to your deps, then call `MDEx.to_html!(md)`{.language-elixir}.
 ```
 
 Unlabeled inline code is left alone. Pass `inline_code: false` to turn it off.
