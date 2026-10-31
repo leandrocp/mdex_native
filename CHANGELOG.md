@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.3.1](https://github.com/leandrocp/mdex_native/compare/v0.3.0...v0.3.1) (2026-10-31)
+
 ### Features
 
 - Highlight inline code with Syntect too, with the same markers as Lumis. The `<code>` gets the theme's background, or the `syntax-highlighting` class without a theme. `syntax_highlight: [inline_code: false]` turns it off for either engine.
@@ -12,6 +14,20 @@
 
 - Lumis code fences keep nested scopes, as `Lumis.highlight/2` renders them, so a diff's added and removed lines keep their background across the marker and the injected language's tokens. Fixes [\#128](https://github.com/leandrocp/mdex_native/issues/128)
 - An unknown Syntect theme name renders code as plain text instead of panicking.
+
+### Features
+
+- Add a parse memory limit by @ericmj in [\#129](https://github.com/leandrocp/mdex_native/pull/129)
+- Highlight inline code with Lumis in [\#132](https://github.com/leandrocp/mdex_native/pull/132)
+- Highlight inline code with Syntect in [\#133](https://github.com/leandrocp/mdex_native/pull/133)
+
+### Bug Fixes
+
+- Keep nested Lumis scopes in code fences in [\#135](https://github.com/leandrocp/mdex_native/pull/135)
+
+### Other Changes
+
+- Adopt GitHub Actions workflow dependency lockfile in [\#130](https://github.com/leandrocp/mdex_native/pull/130)
 
 ## [0.3.0](https://github.com/leandrocp/mdex_native/compare/v0.2.14...v0.3.0) (2026-10-29)
 
