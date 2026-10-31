@@ -1181,7 +1181,8 @@ dependencies = [
 [[package]]
 name = "lumis-core"
 version = "6.0.0"
-source = "git+https://github.com/leandrocp/lumis?rev=a8cb7d1bbb217478f8f6528124826b0fde89d81a#a8cb7d1bbb217478f8f6528124826b0fde89d81a"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d333883c9dcfe73ab399354e290ec1d5c2fc829c99b83b90a45e42eb99308bb6"
 dependencies = [
  "derive_builder",
  "glob",
@@ -1198,8 +1199,9 @@ dependencies = [
 
 [[package]]
 name = "lumis-wasm-runtime"
-version = "0.6.0"
-source = "git+https://github.com/leandrocp/lumis?rev=a8cb7d1bbb217478f8f6528124826b0fde89d81a#a8cb7d1bbb217478f8f6528124826b0fde89d81a"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3dcbe8d3ac198a9ac1541022b78f2f2534a616dbb9c9db74f1cf84a61bc88768"
 dependencies = [
  "etcetera",
  "lumis-core",
@@ -2343,9 +2345,9 @@ checksum = "6af6ae20167a9ece4bcb41af5b80f8a1f1df981f6391189ce00fd257af04126a"
 
 [[package]]
 name = "typed-path"
-version = "0.13.0"
+version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ce898823d8cd0f028662d2f349694b1af0a5cc9be83f1d213a00d3147445e1e"
+checksum = "54ec2755506471f54baf5e4bb5499d8e510cc1caf271270e778a736bd2d7336c"
 
 [[package]]
 name = "typenum"

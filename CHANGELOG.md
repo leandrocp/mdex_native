@@ -2,10 +2,6 @@
 
 ## Unreleased
 
-### Breaking Changes
-
-- Lumis code fences keep nested scopes, as `Lumis.highlight/2` renders them, instead of only the innermost scope per token. A scope that wraps others, such as a diff's added or removed line around the injected language's tokens, keeps its background and other styles across the whole line. Elements are now nested in fences with injected or nested scopes; CSS that relied on one scope per element may need updating. Fixes [\#128](https://github.com/leandrocp/mdex_native/issues/128)
-
 ### Features
 
 - Highlight inline code with Syntect too, with the same markers as Lumis. The `<code>` gets the theme's background, or the `syntax-highlighting` class without a theme. `syntax_highlight: [inline_code: false]` turns it off for either engine.
@@ -14,6 +10,7 @@
 
 ### Bug Fixes
 
+- Lumis code fences keep nested scopes, as `Lumis.highlight/2` renders them, so a diff's added and removed lines keep their background across the marker and the injected language's tokens. Fixes [\#128](https://github.com/leandrocp/mdex_native/issues/128)
 - An unknown Syntect theme name renders code as plain text instead of panicking.
 
 ## [0.3.0](https://github.com/leandrocp/mdex_native/compare/v0.2.14...v0.3.0) (2026-10-29)
