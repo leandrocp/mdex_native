@@ -83,9 +83,10 @@ defmodule MDExNativeE2E.LumisRegressionTest do
 
       lines = "```diff\n#{source}\n```" |> render(formatter: :html_linked) |> String.split("\n")
 
-      for {number, scope} <- [{5, "l-diff-minus"}, {6, "l-diff-plus"}] do
+      for {number, marker, scope} <- [{5, "-", "l-diff-minus"}, {6, "+", "l-diff-plus"}] do
         line = Enum.find(lines, &(&1 =~ ~s(data-line="#{number}")))
 
+        assert line |> String.replace(~r/<[^>]*>/, "") |> String.starts_with?(marker)
         assert line =~ ~s(class="l-module">IO</span>)
         assert text_outside(line, scope) == ""
       end
