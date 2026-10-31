@@ -6,7 +6,8 @@ use crate::types::options::ExBudget;
 use comrak::adapters::SyntaxHighlighterAdapter;
 use lumis_core::elixir::ExFormatterOption;
 
-use crate::lumis_render::render_code_fence;
+use crate::html_formatter::InlineCodeHighlighter;
+use crate::lumis_render::{render_code_fence, render_inline_code};
 
 const POISONED: &str = "a Lumis adapter lock is poisoned";
 
@@ -67,6 +68,7 @@ pub struct LumisAdapter {
     rainbow_brackets: bool,
     word_diff: bool,
     budget: ExBudget,
+    pub inline_code: bool,
     fence: Mutex<FenceState>,
     /// Comrak's adapter trait can only answer `fmt::Error`, which says nothing
     /// about why Lumis refused a fence. Park the reason here for the NIF to
@@ -80,12 +82,14 @@ impl LumisAdapter {
         rainbow_brackets: bool,
         word_diff: bool,
         budget: ExBudget,
+        inline_code: bool,
     ) -> Self {
         Self {
             formatter,
             rainbow_brackets,
             word_diff,
             budget,
+            inline_code,
             fence: Mutex::new(FenceState::default()),
             failure: Mutex::new(None),
         }
@@ -148,6 +152,29 @@ impl SyntaxHighlighterAdapter for LumisAdapter {
             self.word_diff,
             self.budget,
             &fence.attributes,
+        )
+        .map_err(|reason| self.fail(reason))?;
+
+        output.write_str(&highlighted)
+    }
+}
+
+impl InlineCodeHighlighter for LumisAdapter {
+    fn write_inline_code(
+        &self,
+        output: &mut dyn Write,
+        source: &str,
+        language: &str,
+        attrs: &[(String, String)],
+    ) -> fmt::Result {
+        let highlighted = render_inline_code(
+            source,
+            language,
+            Some(self.formatter.clone()),
+            self.rainbow_brackets,
+            self.word_diff,
+            self.budget,
+            attrs,
         )
         .map_err(|reason| self.fail(reason))?;
 

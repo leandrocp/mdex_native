@@ -407,10 +407,13 @@ defmodule MDExNative.Comrak do
         end)
         |> Map.put(:engine, engine)
 
-      # Legacy `syntax_highlight: [formatter: ...]`, which the NIF decodes
-      # without an engine key, as the Lumis options themselves.
-      Keyword.has_key?(options, :formatter) ->
-        normalize_opts(engine, options)
+      # Legacy `syntax_highlight: [formatter: ...]` or `[inline_code: false]`:
+      # the Lumis options themselves, except `:inline_code`, which is ours.
+      Keyword.has_key?(options, :formatter) or Keyword.has_key?(options, :inline_code) ->
+        {inline_code, opts} =
+          options |> Keyword.delete(:engine) |> Keyword.pop(:inline_code, true)
+
+        %{engine: engine, opts: normalize_opts(engine, opts), inline_code: inline_code}
 
       true ->
         Map.new(options, &syntax_highlight_option/1)

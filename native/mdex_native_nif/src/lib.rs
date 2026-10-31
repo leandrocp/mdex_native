@@ -20,14 +20,14 @@ use comrak::options::Plugins;
 #[cfg(feature = "syntect")]
 use comrak::plugins::syntect::{SyntectAdapter, SyntectAdapterBuilder};
 use comrak::{Anchorizer, Arena, Options};
-use html_formatter::MdexFormatter;
+use html_formatter::{InlineCode, MdexFormatter};
 use lol_html::html_content::ContentType;
 use lol_html::{rewrite_str, text, RewriteStrSettings};
 #[cfg(feature = "lumis")]
 use lumis_adapter::LumisAdapter;
 use rustler::types::list::ListIterator;
 use rustler::{Encoder, Env, NifResult, Term};
-#[cfg(feature = "syntect")]
+#[cfg(any(feature = "lumis", feature = "syntect"))]
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use types::{document::*, options::*};
@@ -271,7 +271,14 @@ fn markdown_to_html_with_options<'a>(
     let plugins = plugins(&lumis_adapter);
 
     finish_render(
-        MdexFormatter::format_html(root, &comrak_options, &mut buffer, &plugins, tagfilter),
+        MdexFormatter::format_html(
+            root,
+            &comrak_options,
+            &mut buffer,
+            &plugins,
+            tagfilter,
+            inline_code(&lumis_adapter),
+        ),
         &lumis_adapter,
     )?;
     Ok(do_safe_html(buffer, &sanitize, false, escape_curly_braces_in_code).encode(env))
@@ -342,6 +349,7 @@ fn document_to_html<'a>(env: Env<'a>, ex_document: Term<'a>) -> NifResult<Term<'
         &options,
         &mut buffer,
         &Plugins::default(),
+        None,
     )
     .expect("writing to String is infallible");
     Ok(buffer.encode(env))
@@ -368,6 +376,7 @@ fn document_to_html_with_options<'a>(
             &mut buffer,
             &plugins,
             tagfilter,
+            inline_code(&lumis_adapter),
         ),
         &lumis_adapter,
     )?;
@@ -456,12 +465,13 @@ fn syntax_highlighter(
         ExSyntaxHighlightEngineOptions::Lumis(opts) => {
             #[cfg(feature = "lumis")]
             {
-                Ok(CodeFenceSyntaxHighlighter::Lumis(Box::new(
+                Ok(CodeFenceSyntaxHighlighter::Lumis(Arc::new(
                     LumisAdapter::new(
                         opts.formatter,
                         opts.rainbow_brackets,
                         opts.word_diff,
                         opts.budget,
+                        syntax_highlight.inline_code,
                     ),
                 )))
             }
@@ -553,7 +563,7 @@ impl CodeFenceSyntaxHighlighter {
 
 enum CodeFenceSyntaxHighlighter {
     #[cfg(feature = "lumis")]
-    Lumis(Box<LumisAdapter>),
+    Lumis(Arc<LumisAdapter>),
     #[cfg(feature = "syntect")]
     Syntect(Arc<SyntectAdapter>),
 }
@@ -626,6 +636,16 @@ impl SyntaxHighlighterAdapter for CodeFenceSyntaxHighlighter {
         _attributes: std::collections::HashMap<&'static str, std::borrow::Cow<'_, str>>,
     ) -> std::fmt::Result {
         match *self {}
+    }
+}
+
+fn inline_code(syntax_highlighter: &Option<CodeFenceSyntaxHighlighter>) -> InlineCode {
+    match syntax_highlighter {
+        #[cfg(feature = "lumis")]
+        Some(CodeFenceSyntaxHighlighter::Lumis(adapter)) if adapter.inline_code => {
+            Some(adapter.clone())
+        }
+        _ => None,
     }
 }
 
@@ -760,6 +780,7 @@ mod tests {
             options,
             &mut output,
             &Plugins::default(),
+            None,
         )
         .expect("writing to String is infallible");
 

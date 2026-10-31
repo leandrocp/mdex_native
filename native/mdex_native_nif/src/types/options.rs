@@ -48,6 +48,7 @@ mod atoms {
         ignore_empty_links,
         ignore_setext,
         image_url_rewriter,
+        inline_code,
         inline_code_attributes,
         inline_footnotes,
         insert,
@@ -683,10 +684,15 @@ impl ExLumisOptions {
 #[derive(Debug)]
 pub struct ExSyntaxHighlightOptions {
     pub opts: ExSyntaxHighlightEngineOptions,
+    /// Also highlight inline code that names its language. Lumis only.
+    #[cfg_attr(not(feature = "lumis"), allow(dead_code))]
+    pub inline_code: bool,
 }
 
 impl<'a> Decoder<'a> for ExSyntaxHighlightOptions {
     fn decode(term: Term<'a>) -> NifResult<Self> {
+        let inline_code = optional_field(term, atoms::inline_code())?.unwrap_or(true);
+
         if let Some(engine) = optional_field(term, atoms::engine())? {
             let opts = match engine {
                 ExSyntaxHighlightEngine::Lumis => {
@@ -705,7 +711,7 @@ impl<'a> Decoder<'a> for ExSyntaxHighlightOptions {
                 }
             };
 
-            return Ok(Self { opts });
+            return Ok(Self { opts, inline_code });
         }
 
         // Legacy shape: syntax_highlight: [formatter: ...]
@@ -714,6 +720,7 @@ impl<'a> Decoder<'a> for ExSyntaxHighlightOptions {
                 term,
                 "invalid value for :syntax_highlight option: ",
             )?)),
+            inline_code,
         })
     }
 }

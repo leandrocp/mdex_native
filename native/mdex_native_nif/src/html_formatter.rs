@@ -6,7 +6,8 @@
 //! except `Link` and `Image`, where it writes the same markup comrak would,
 //! plus the attributes.
 //! The optional compatibility entry point also retains deprecated tag filtering
-//! for raw HTML nodes.
+//! for raw HTML nodes. Inline code that names its language goes to the
+//! [`InlineCodeHighlighter`] passed as the render's user data, if any.
 //!
 //! Attribute pairs are written verbatim rather than `data-` prefixed, so
 //! `{target=_blank}` renders as `target="_blank"`.
@@ -35,12 +36,29 @@
 
 use comrak::create_formatter;
 use comrak::html::{self, ChildRendering, Context};
-use comrak::nodes::{Node, NodeLink, NodeValue};
+use comrak::nodes::{Attributes, Node, NodeCode, NodeLink, NodeValue};
 use std::fmt::{self, Write};
+use std::sync::Arc;
 
 mod tagfilter;
 
-create_formatter!(MdexFormatter, {
+/// Writes inline code that names its language as a highlighted `<code>`.
+pub trait InlineCodeHighlighter {
+    fn write_inline_code(
+        &self,
+        output: &mut dyn Write,
+        source: &str,
+        language: &str,
+        attrs: &[(String, String)],
+    ) -> fmt::Result;
+}
+
+pub type InlineCode = Option<Arc<dyn InlineCodeHighlighter>>;
+
+create_formatter!(MdexFormatter<InlineCode>, {
+    NodeValue::Code(ref nc) => |context, node, entering| {
+        return render_code(context, node, entering, nc);
+    },
     NodeValue::Image(ref nl) => |context, node, entering| {
         return render_image(context, node, entering, nl);
     },
@@ -57,9 +75,11 @@ impl MdexFormatter {
         output: &'o mut dyn Write,
         plugins: &'o comrak::options::Plugins<'o>,
         tagfilter: bool,
+        inline_code: InlineCode,
     ) -> fmt::Result {
         if !tagfilter || !options.render.r#unsafe || options.render.escape {
-            return Self::format_document_with_plugins(root, options, output, plugins);
+            return Self::format_document_with_plugins(root, options, output, plugins, inline_code)
+                .map(drop);
         }
         html::format_document_with_formatter(
             root,
@@ -78,8 +98,9 @@ impl MdexFormatter {
                 }
                 Self::formatter(context, node, entering)
             },
-            (),
+            inline_code,
         )
+        .map(drop)
     }
 }
 
@@ -92,6 +113,88 @@ impl MdexFormatter {
 /// When this is false there is nothing to add, and rendering is comrak's to do.
 fn writes_attrs<T>(context: &Context<T>, node: Node<'_>) -> bool {
     context.options.render.r#unsafe && node.data().attrs.is_some()
+}
+
+/// Highlights inline code that names its language, as rehype-lumis and
+/// markdown-it-lumis do: a `language-*` class or `data-language` attribute, or
+/// else a trailing `{:lang}` marker, which is removed. Anything else, including
+/// `nohighlight`, keeps comrak's output.
+fn render_code(
+    context: &mut Context<InlineCode>,
+    node: Node<'_>,
+    entering: bool,
+    nc: &NodeCode,
+) -> Result<ChildRendering, fmt::Error> {
+    let ast = node.data();
+    let marked = context
+        .user
+        .clone()
+        .zip(inline_code_language(&nc.literal, ast.attrs.as_deref()));
+    let (Some((highlighter, (source, language))), true) = (marked, entering) else {
+        return html::format_node_default(context, node, entering);
+    };
+
+    let mut attrs = Vec::new();
+    if context.options.render.sourcepos && ast.sourcepos.start.line > 0 {
+        attrs.push(("data-sourcepos".to_string(), ast.sourcepos.to_string()));
+    }
+    if let (true, Some(authored)) = (writes_attrs(context, node), ast.attrs.as_deref()) {
+        attrs.extend(authored.id.iter().map(|id| ("id".to_string(), id.clone())));
+        if !authored.classes.is_empty() {
+            attrs.push(("class".to_string(), authored.classes.join(" ")));
+        }
+        attrs.extend(
+            authored
+                .pairs
+                .iter()
+                .filter(|(key, _)| is_attribute_name(key))
+                .cloned(),
+        );
+    }
+
+    highlighter.write_inline_code(context, source, language, &attrs)?;
+    Ok(ChildRendering::HTML)
+}
+
+fn inline_code_language<'a>(
+    literal: &'a str,
+    attrs: Option<&'a Attributes>,
+) -> Option<(&'a str, &'a str)> {
+    let classes = attrs.map_or(&[][..], |attrs| &attrs.classes);
+    if classes
+        .iter()
+        .any(|class| class == "nohighlight" || class == "no-highlight")
+    {
+        return None;
+    }
+
+    let language = classes
+        .iter()
+        .find_map(|class| class.strip_prefix("language-"))
+        .or_else(|| {
+            attrs?
+                .pairs
+                .iter()
+                .find_map(|(key, value)| (key == "data-language").then_some(value.as_str()))
+        })
+        .filter(|language| !language.is_empty());
+
+    match language {
+        Some(language) => Some((literal, language)),
+        None => split_language_suffix(literal),
+    }
+}
+
+/// Splits `` `x = 1{:python}` `` into its code and language. A name starting
+/// with `.` is rehype-pretty-code's highlight scope, not a language.
+fn split_language_suffix(literal: &str) -> Option<(&str, &str)> {
+    let (code, language) = literal.strip_suffix('}')?.rsplit_once("{:")?;
+    let valid = |c: char| c.is_ascii_alphanumeric() || matches!(c, '_' | '+' | '#' | '-');
+
+    (!code.is_empty()
+        && language.starts_with(valid)
+        && language.chars().all(|c| valid(c) || c == '.'))
+    .then_some((code, language))
 }
 
 /// Mirrors [comrak's `render_link`][upstream], adding attributes to the opening
@@ -274,6 +377,7 @@ mod tests {
             options,
             &mut buffer,
             &Plugins::default(),
+            None,
         )
         .unwrap();
         buffer
@@ -311,6 +415,7 @@ mod tests {
             options,
             &mut buffer,
             &Plugins::default(),
+            None,
         )
         .unwrap();
         buffer
@@ -384,6 +489,113 @@ mod tests {
         assert_eq!(
             render("`:ok`{.language-elixir}\n", &attr_options()),
             "<p><code>:ok</code></p>\n"
+        );
+    }
+
+    /// Writes what the formatter handed over, so a test sees the split.
+    struct Stub;
+
+    impl InlineCodeHighlighter for Stub {
+        fn write_inline_code(
+            &self,
+            output: &mut dyn Write,
+            source: &str,
+            language: &str,
+            attrs: &[(String, String)],
+        ) -> fmt::Result {
+            write!(output, "<hl {language} {attrs:?}>{source}</hl>")
+        }
+    }
+
+    fn render_inline(markdown: &str, options: &Options) -> String {
+        let arena = Arena::new();
+        let root = comrak::parse_document(&arena, markdown, options);
+        let mut buffer = String::new();
+        MdexFormatter::format_html(
+            root,
+            options,
+            &mut buffer,
+            &Plugins::default(),
+            false,
+            Some(Arc::new(Stub)),
+        )
+        .unwrap();
+        buffer
+    }
+
+    /// The cases of lumis's `fixtures/inline-code-markers.json`, which
+    /// rehype-lumis and markdown-it-lumis test against too.
+    #[test]
+    fn splits_the_language_suffix_like_the_lumis_integrations() {
+        for (text, expected) in [
+            (
+                "const x = 1{:javascript}",
+                Some(("const x = 1", "javascript")),
+            ),
+            ("%{a: 1} {:elixir}", Some(("%{a: 1} ", "elixir"))),
+            (
+                r#"{"a": "{:x}"}{:json}"#,
+                Some((r#"{"a": "{:x}"}"#, "json")),
+            ),
+            ("{:js}", None),
+            ("x{:js} y", None),
+            ("x{:}", None),
+            ("x{:.keyword}", None),
+            ("x{:java script}", None),
+            ("const x = 1", None),
+        ] {
+            assert_eq!(split_language_suffix(text), expected, "{text}");
+        }
+    }
+
+    #[test]
+    fn highlights_inline_code_that_names_its_language() {
+        let safe = Options {
+            extension: attr_options().extension,
+            ..Default::default()
+        };
+
+        assert_eq!(
+            render_inline("`:ok{:elixir}` `{:ok}`\n", &safe),
+            "<p><hl elixir []>:ok</hl> <code>{:ok}</code></p>\n"
+        );
+        // A class names the language and keeps the suffix as code; authored
+        // attributes go through only with `unsafe`, as on links.
+        assert_eq!(
+            render_inline("`a{:x}`{#i .language-rust k=v}\n", &safe),
+            "<p><hl rust []>a{:x}</hl></p>\n"
+        );
+        assert_eq!(
+            render_inline("`a`{#i .language-rust data-language=go}\n", &attr_options()),
+            r#"<p><hl rust [("id", "i"), ("class", "language-rust"), ("data-language", "go")]>a</hl></p>"#
+                .to_string()
+                + "\n"
+        );
+        assert_eq!(
+            render_inline("`a`{data-language=go}\n", &safe),
+            "<p><hl go []>a</hl></p>\n"
+        );
+        assert_eq!(
+            render_inline("`a{:rust}`{.nohighlight}\n", &safe),
+            "<p><code>a{:rust}</code></p>\n"
+        );
+    }
+
+    #[test]
+    fn keeps_sourcepos_on_highlighted_inline_code() {
+        let options = Options {
+            render: Render {
+                sourcepos: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        assert_eq!(
+            render_inline("`a{:rust}`\n", &options),
+            r#"<p data-sourcepos="1:1-1:10"><hl rust [("data-sourcepos", "1:1-1:10")]>a</hl></p>"#
+                .to_string()
+                + "\n"
         );
     }
 
