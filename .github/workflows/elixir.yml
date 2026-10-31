@@ -36,8 +36,9 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # Companion parse_memory option (leandrocp/mdex#472); return to main after it merges.
-      MDEX_NATIVE_E2E_MDEX_REF: lp-parse-memory-budget
+      # Companion parse_memory option (leandrocp/mdex#472) plus nested Lumis scopes
+      # (leandrocp/mdex_native#135); return to main after both land in MDEx.
+      MDEX_NATIVE_E2E_MDEX_REF: lp-nested-lumis-scopes
 
     steps:
       - uses: actions/checkout@v7.0.1
