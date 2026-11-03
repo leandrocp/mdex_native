@@ -1,0 +1,8 @@
+# cargo-mutants (https://mutants.rs) judges each mutant by `cargo test` only.
+# Most of this crate is NIF glue covered by the Elixir suite, which cargo-mutants
+# cannot run, so mutate only the modules the Rust unit tests own.
+examine_globs = [
+  "src/html_formatter.rs",
+  "src/memory.rs",
+  "src/types/document.rs",
+]

@@ -36,6 +36,33 @@ jobs:
           key: x86_64-pc-windows-gnu
       - run: cargo test --locked --lib --target x86_64-pc-windows-gnu --manifest-path native/mdex_native_nif/Cargo.toml
 
+  # Mutation-tests the Rust functions a pull request changes, within the modules
+  # listed in native/mdex_native_nif/.cargo/mutants.toml. Missed mutants show
+  # as warning annotations; the job does not fail on them yet.
+  mutants:
+    name: mutants (changed code)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: native/mdex_native_nif
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2.9.3
+        with:
+          workspaces: native/mdex_native_nif
+          key: mutants
+      - run: cargo install --locked cargo-mutants@27.1.0
+      - run: git diff --relative "origin/${{ github.base_ref }}..." -- '*.rs' > "$RUNNER_TEMP/pr.diff"
+      - run: cargo mutants --in-place --no-shuffle -vV --cargo-arg=--locked --in-diff "$RUNNER_TEMP/pr.diff"
+        continue-on-error: true
+
   lint:
     uses: leandrocp/github-actions/.github/workflows/rust-lint.yml@main
     with:
