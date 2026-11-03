@@ -40,7 +40,7 @@ jobs:
     name: mutants (changed code)
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: native/mdex_native_nif
