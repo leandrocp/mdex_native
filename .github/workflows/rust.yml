@@ -36,9 +36,6 @@ jobs:
           key: x86_64-pc-windows-gnu
       - run: cargo test --locked --lib --target x86_64-pc-windows-gnu --manifest-path native/mdex_native_nif/Cargo.toml
 
-  # Mutation-tests the Rust functions a pull request changes, within the modules
-  # listed in native/mdex_native_nif/.cargo/mutants.toml. Missed mutants show
-  # as warning annotations; the job does not fail on them yet.
   mutants:
     name: mutants (changed code)
     if: github.event_name == 'pull_request'
@@ -60,9 +57,7 @@ jobs:
           key: mutants
       - run: cargo install --locked cargo-mutants@27.1.0
       - run: git diff --relative "origin/${{ github.base_ref }}..." -- '*.rs' > "$RUNNER_TEMP/pr.diff"
-      # Exit 2 (missed mutants) and 3 (mutants timed out) are reported but not
-      # failed yet; usage, diff, baseline, and internal errors still fail the job.
-      # A run past 25 minutes is cut short with a warning, before the job timeout.
+      # Missed (2) and timed-out (3) mutants only warn for now.
       - run: |
           status=0
           timeout 25m cargo mutants --in-place --no-shuffle -vV --cargo-arg=--locked --in-diff "$RUNNER_TEMP/pr.diff" || status=$?
