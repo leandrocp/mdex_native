@@ -60,8 +60,17 @@ jobs:
           key: mutants
       - run: cargo install --locked cargo-mutants@27.1.0
       - run: git diff --relative "origin/${{ github.base_ref }}..." -- '*.rs' > "$RUNNER_TEMP/pr.diff"
-      - run: cargo mutants --in-place --no-shuffle -vV --cargo-arg=--locked --in-diff "$RUNNER_TEMP/pr.diff"
-        continue-on-error: true
+      # Exit 2 (missed mutants) and 3 (mutants timed out) are reported but not
+      # failed yet; usage, diff, baseline, and internal errors still fail the job.
+      # A run past 25 minutes is cut short with a warning, before the job timeout.
+      - run: |
+          status=0
+          timeout 25m cargo mutants --in-place --no-shuffle -vV --cargo-arg=--locked --in-diff "$RUNNER_TEMP/pr.diff" || status=$?
+          case "$status" in
+            0 | 2 | 3) ;;
+            124) echo "::warning::cargo-mutants did not finish within 25 minutes" ;;
+            *) exit "$status" ;;
+          esac
 
   lint:
     uses: leandrocp/github-actions/.github/workflows/rust-lint.yml@main
