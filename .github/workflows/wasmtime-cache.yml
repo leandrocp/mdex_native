@@ -24,9 +24,9 @@ jobs:
   check:
     runs-on: ubuntu-latest
     env:
-      # leandrocp/lumis#1953, the packaged NIF lockfile on cargo-lumis-wasm-runtime/v0.6.1;
+      # Packaged NIF lockfile from hex-lumis/v0.10.7;
       # update this reference and our lockfile together.
-      LUMIS_REF: 11fb5c4a6b4def4a8e23546b8642f963f2f96a2b
+      LUMIS_REF: 0da925e035f8da2453dea11d8d7087eaaeebe4df
     steps:
       - uses: actions/checkout@v7.0.1
 
