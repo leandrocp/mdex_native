@@ -4,7 +4,7 @@
   "lumis_wasm_css": {:hex, :lumis_wasm_css, "0.26.3", "76e180fa14043b69a0c8e99967b72eaae3701b69c7d6b4b2d664bc54ffc88086", [:mix], [], "hexpm", "23b9bc1ffad853e7c897eed14adc45f57c016f7ed3257b2bebd1dcba02e00e3d"},
   "lumis_wasm_diff": {:hex, :lumis_wasm_diff, "0.26.7", "dd101d50117274d91d7cc1a36573be7a130b23c7083a5d3c3f4e89834aa326af", [:mix], [], "hexpm", "ec22c43427080c4f9b6c28b8e8baf99caeee440c3d5b2f3fb05f6fe6a5be1d9e"},
   "lumis_wasm_elixir": {:hex, :lumis_wasm_elixir, "0.26.8", "198129e29c469206c997a0f1fc710a30700ebbcb133eefd564dc9f0bc4bf0d0f", [:mix], [], "hexpm", "f65a95cd354b8aeae4d6fe183675f7ffab0f9f6bc84a88f2fc0bf72172d0dbb0"},
-  "lumis_wasm_html": {:hex, :lumis_wasm_html, "0.26.3", "5511dedc628e818624cd2e608d2c995cdcce9f1db11a13c55778f11391495692", [:mix], [], "hexpm", "8a78cf2eeda3547fcdc165e561abe4f3c46767996e02a4057e6e3a552ac5e952"},
+  "lumis_wasm_html": {:hex, :lumis_wasm_html, "0.26.6", "3fbdaea895f5eb2f79864342313f91679861d0d5a5da9cb21e4aec47daf75036", [:mix], [], "hexpm", "cf4e7b34abbbe0edd794f4daa578a7cce8d4ea98dabc33f78c29094440bbc5f2"},
   "lumis_wasm_javascript": {:hex, :lumis_wasm_javascript, "0.26.6", "dee676fe8ae23fe0d51aed91851736bd8070dc4ca870931925d9dd0555b27816", [:mix], [], "hexpm", "ee49039b337e962a4a7b74761959db8721fcd43775e572f58ff0e93a1f4f8c2d"},
   "lumis_wasm_json": {:hex, :lumis_wasm_json, "0.26.4", "ff240ca5e9c0cf66ca32c135620c1258e32b32489927e502236b754ee7403251", [:mix], [], "hexpm", "ae14398c4764ba04b12adab49350231f7fcae9dc28ce2330716810d19abba96d"},
   "lumis_wasm_rust": {:hex, :lumis_wasm_rust, "0.26.4", "3ee1859a92414d19599c60d4d653a9fe612575eb6d4d3b94314bf0f7511a51e6", [:mix], [], "hexpm", "b3f61e55bd44e028c3cd7c2b7aebfc973262ad95bb3742027b5da4e652ed0685"},
