@@ -1180,9 +1180,9 @@ dependencies = [
 
 [[package]]
 name = "lumis-core"
-version = "6.1.0"
+version = "6.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b76592057a9e33e2ba3471417bb2073efe0e6db589dc39fd23a924165de03aac"
+checksum = "b614f63c835614e6265f84bb485564f1a3e304ddc13a0b4b4852944516343410"
 dependencies = [
  "derive_builder",
  "glob",
