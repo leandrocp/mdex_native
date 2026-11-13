@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.3.2](https://github.com/leandrocp/mdex_native/compare/v0.3.1...v0.3.2) (2026-11-13)
+
+### Dependencies
+
+- **deps:** Update Lumis core and WASM runtime in [\#139](https://github.com/leandrocp/mdex_native/pull/139)
+
 ## [0.3.1](https://github.com/leandrocp/mdex_native/compare/v0.3.0...v0.3.1) (2026-10-31)
 
 ### Features
