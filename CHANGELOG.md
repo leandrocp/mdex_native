@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.2](https://github.com/leandrocp/mdex_native/compare/v0.3.1...v0.3.2) (2026-11-14)
+
+### Bug Fixes
+
+- Build linux-gnu NIFs against glibc 2.28 in [\#148](https://github.com/leandrocp/mdex_native/pull/148)
+
+### Dependencies
+
+- **deps:** Update Lumis core and WASM runtime in [\#139](https://github.com/leandrocp/mdex_native/pull/139)
+
 ## [0.3.1](https://github.com/leandrocp/mdex_native/compare/v0.3.0...v0.3.1) (2026-10-31)
 
 ### Features
