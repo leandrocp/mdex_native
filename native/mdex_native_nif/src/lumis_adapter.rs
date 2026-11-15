@@ -4,6 +4,7 @@ use std::sync::Mutex;
 
 use crate::types::options::ExBudget;
 use comrak::adapters::SyntaxHighlighterAdapter;
+use lumis_core::code_fence::{parse_meta, CodeFenceMeta};
 use lumis_core::elixir::ExFormatterOption;
 
 use crate::html_formatter::InlineCodeHighlighter;
@@ -16,22 +17,19 @@ const POISONED: &str = "a Lumis adapter lock is poisoned";
 /// on those tags and neither on the fence body.
 #[derive(Default)]
 struct FenceState {
-    attributes: HashMap<String, String>,
+    meta: CodeFenceMeta,
     language: Option<String>,
 }
 
 impl FenceState {
     fn reset(&mut self) {
-        self.attributes.clear();
+        self.meta = CodeFenceMeta::default();
         self.language = None;
     }
 
     fn update(&mut self, attributes: &HashMap<&'static str, std::borrow::Cow<'_, str>>) {
-        if let Some(custom_attributes) = attributes
-            .get("data-meta")
-            .and_then(|metadata| parse_custom_attributes(metadata.as_ref()))
-        {
-            self.attributes = custom_attributes;
+        if let Some(meta) = attributes.get("data-meta") {
+            self.meta = parse_meta(meta);
         }
 
         let language = attributes
@@ -48,19 +46,6 @@ impl FenceState {
             self.language = language;
         }
     }
-}
-
-fn parse_custom_attributes(info_string: &str) -> Option<HashMap<String, String>> {
-    let tokens = shlex::split(info_string)?;
-    let attributes = tokens
-        .into_iter()
-        .map(|token| match token.split_once('=') {
-            Some((key, value)) => (key.trim().to_string(), value.to_string()),
-            None => (token.trim().to_string(), "true".to_string()),
-        })
-        .collect();
-
-    Some(attributes)
 }
 
 pub struct LumisAdapter {
@@ -148,7 +133,7 @@ impl SyntaxHighlighterAdapter for LumisAdapter {
             self.rainbow_brackets,
             self.word_diff,
             self.budget,
-            &fence.attributes,
+            &fence.meta,
         )
         .map_err(|reason| self.fail(reason))?;
 
@@ -220,24 +205,11 @@ mod tests {
             ("class", "language-rust"),
             ("data-meta", "highlight_lines=1 theme=github_light"),
         ]));
-        assert_eq!(fence.attributes.len(), 2);
+        assert_eq!(fence.meta.theme.as_deref(), Some("github_light"));
 
         fence.reset();
         fence.update(&tag(&[("class", "language-rust")]));
 
-        assert!(fence.attributes.is_empty());
-    }
-
-    #[test]
-    fn a_bare_flag_in_the_info_string_reads_as_true() {
-        let attributes = parse_custom_attributes("include_highlights theme=onedark").unwrap();
-        assert_eq!(attributes["include_highlights"], "true");
-        assert_eq!(attributes["theme"], "onedark");
-    }
-
-    #[test]
-    fn a_quoted_decorator_value_keeps_its_spaces() {
-        let attributes = parse_custom_attributes(r#"highlight_lines_style="color: red;""#).unwrap();
-        assert_eq!(attributes["highlight_lines_style"], "color: red;");
+        assert_eq!(fence.meta, CodeFenceMeta::default());
     }
 }
