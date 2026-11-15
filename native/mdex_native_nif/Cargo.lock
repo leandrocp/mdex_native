@@ -1180,9 +1180,8 @@ dependencies = [
 
 [[package]]
 name = "lumis-core"
-version = "6.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b614f63c835614e6265f84bb485564f1a3e304ddc13a0b4b4852944516343410"
+version = "6.2.0"
+source = "git+https://github.com/leandrocp/lumis?branch=feat-code-fence-meta#329900781af072a193bd76b1411dc9a0a76f85eb"
 dependencies = [
  "derive_builder",
  "glob",
@@ -1259,7 +1258,6 @@ dependencies = [
  "pretty_assertions",
  "rustler",
  "serde",
- "shlex",
  "two-face",
  "typed-arena",
  "v_htmlescape",
