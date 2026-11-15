@@ -1181,7 +1181,7 @@ dependencies = [
 [[package]]
 name = "lumis-core"
 version = "6.2.0"
-source = "git+https://github.com/leandrocp/lumis?branch=feat-code-fence-meta#71407aa72aadac16bd89437f4a1a5b92410d18f9"
+source = "git+https://github.com/leandrocp/lumis?branch=feat-code-fence-meta#329900781af072a193bd76b1411dc9a0a76f85eb"
 dependencies = [
  "derive_builder",
  "glob",
