@@ -24,9 +24,9 @@ jobs:
   check:
     runs-on: ubuntu-latest
     env:
-      # Packaged NIF lockfile from hex-lumis/v0.10.7;
+      # Packaged NIF lockfile from hex-lumis/v0.10.9;
       # update this reference and our lockfile together.
-      LUMIS_REF: 0da925e035f8da2453dea11d8d7087eaaeebe4df
+      LUMIS_REF: 648138f323d77cfdef9ef6308e5e7571214f8473
     steps:
       - uses: actions/checkout@v7.0.1
 
