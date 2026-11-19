@@ -34,7 +34,7 @@ serde = "1.0"
 shlex = "2.0.1"
 two-face = { version = "0.5", optional = true }
 typed-arena = "2.0"
-v_htmlescape = "0.17"
+v_htmlescape = "1.0"
 
 [dev-dependencies]
 pretty_assertions = "1.4"
