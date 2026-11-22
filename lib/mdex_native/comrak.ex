@@ -65,7 +65,8 @@ defmodule MDExNative.Comrak do
 
   - with `render: [unsafe: true, attributes: true]`, on headings, code blocks
     (on the `<pre>`), code spans, links, and images.
-  - with `render: [unsafe: true]` alone, on links and images only.
+  - with `render: [unsafe: true]` alone, on links, images, and code spans
+    highlighted by the syntax highlighter's inline code support.
 
   Attributes Comrak writes itself, such as a link's `href` or `data-sourcepos`,
   take precedence over ones with the same name. Keys set on a document that are
