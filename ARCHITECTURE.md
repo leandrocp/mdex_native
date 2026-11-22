@@ -4,8 +4,9 @@ mdex_native is a single [Rustler] NIF, [`native/mdex_native_nif`][nif], loaded b
 
 ```text
 Markdown, or an MDEx document term
-  -> comrak parses it into an AST (attributes, shortcodes, phoenix_heex)
+  -> comrak parses it into an AST (attributes, shortcodes, phoenix_heex, grid_table)
   -> MdexFormatter writes comrak's HTML, plus node attributes on links and images
+       when :unsafe is set without :attributes (comrak writes them otherwise)
        code fences -> the build's highlighter adapter, if it has one
                         lumis:   lumis_adapter -> lumis_runtime -> lumis_render
                         syntect: comrak's SyntectAdapter with two-face syntaxes and themes

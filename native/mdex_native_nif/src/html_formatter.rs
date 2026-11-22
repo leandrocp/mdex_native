@@ -1,38 +1,41 @@
 //! HTML formatter that renders node attributes.
 //!
-//! comrak parses `{#id .class key=value}` into `Ast::attrs` but leaves rendering
-//! to custom formatters (see comrak PR #814), so its own HTML formatter ignores
-//! the field. This formatter delegates every node to `format_node_default`
-//! except `Link` and `Image`, where it writes the same markup comrak would,
-//! plus the attributes.
+//! comrak renders parsed attributes itself when both `render.attributes` and
+//! `render.unsafe` are set, on headings, code blocks, inline code, links and
+//! images. Before comrak 1.0 it left that to custom formatters, so MDExNative
+//! rendered attributes on links and images with `render.unsafe` alone. That
+//! behavior is kept for callers who don't set `render.attributes`: this
+//! formatter delegates every node to `format_node_default` except `Link` and
+//! `Image`, where, when there are attributes to write and comrak won't, it
+//! writes the same markup comrak would, plus the attributes.
 //! The optional compatibility entry point also retains deprecated tag filtering
 //! for raw HTML nodes. Inline code that names its language goes to the
 //! [`InlineCodeHighlighter`] passed as the render's user data, if any.
 //!
 //! Attribute pairs are written verbatim rather than `data-` prefixed, so
-//! `{target=_blank}` renders as `target="_blank"`.
+//! `{target=_blank}` renders as `target="_blank"`. As in comrak, an attribute
+//! comrak writes itself, such as a link's `href` or `data-sourcepos`, takes
+//! precedence over one with the same name, which is skipped.
 //!
 //! Attributes are document content that can execute, in the same class as raw
 //! HTML and `javascript:` links, so they follow the rule comrak applies to
-//! those: nothing is written unless `render.unsafe` is set. Values are escaped
-//! and keys that are not valid HTML attribute names are skipped even then,
-//! since comrak never emits structurally broken markup.
+//! those: nothing is written unless `render.unsafe` is set. Values are escaped.
+//! Keys are valid HTML attribute names: the parser only produces those, and
+//! attributes set from Elixir are filtered when the document is converted.
 //!
 //! # Where the mirrored code comes from
 //!
-//! `render_link` and `render_image` below are comrak's own, with a call to
-//! `write_attrs` added before the opening tag is closed. comrak keeps them
-//! private, so they cannot be called or wrapped. The original source was
-//! comrak 0.55.0:
+//! `render_link` and `render_image` below are comrak's own, writing the
+//! attributes without checking `render.attributes`. comrak keeps them private,
+//! so they cannot be called or wrapped. The source is comrak 1.1.0:
 //!
-//! - [`render_link`](https://github.com/kivikakk/comrak/blob/6fbe87fafde3953a9f3bc582804318593d703805/src/html.rs#L818-L852)
-//! - [`render_image`](https://github.com/kivikakk/comrak/blob/6fbe87fafde3953a9f3bc582804318593d703805/src/html.rs#L743-L783)
+//! - [`render_link`](https://github.com/kivikakk/comrak/blob/e08fdf4780505362f1537b7ce0b7e567a2e0f181/src/html.rs#L1051-L1095)
+//! - [`render_image`](https://github.com/kivikakk/comrak/blob/e08fdf4780505362f1537b7ce0b7e567a2e0f181/src/html.rs#L965-L1015)
 //!
-//! Both remain unchanged in comrak 0.59.0. When comrak is upgraded,
-//! re-read those two functions and mirror
-//! any change here. `mirrors_comrak_for_empty_attrs` is what catches drift: it
-//! renders links and images carrying empty attributes, so this code runs and
-//! adds nothing, and compares the result against `comrak::format_html`.
+//! When comrak is upgraded, re-read those two functions and mirror any change
+//! here. `mirrors_comrak_attributes` is what catches drift: it renders links
+//! and images with attributes both ways, through this code and through comrak
+//! with `render.attributes`, and compares the results.
 
 use comrak::create_formatter;
 use comrak::html::{self, ChildRendering, Context};
@@ -109,10 +112,26 @@ impl MdexFormatter {
 /// Attributes are document content that can execute, in the same class as raw
 /// HTML and `javascript:` links, so they follow the rule comrak applies to
 /// those: nothing is written unless `render.unsafe` is set.
-///
-/// When this is false there is nothing to add, and rendering is comrak's to do.
 fn writes_attrs<T>(context: &Context<T>, node: Node<'_>) -> bool {
     context.options.render.r#unsafe && node.data().attrs.is_some()
+}
+
+/// Whether this formatter writes the attributes of a link or image itself.
+///
+/// With `render.attributes` comrak writes them, so rendering is comrak's to do,
+/// as it is when there is nothing to add.
+fn mirrors_attrs<T>(context: &Context<T>, node: Node<'_>) -> bool {
+    writes_attrs(context, node) && !context.options.render.attributes
+}
+
+/// The names comrak wrote on the tag itself, which a node's attributes cannot
+/// override: `names`, plus `data-sourcepos` when source positions are on.
+fn written<'n, T>(context: &Context<T>, names: &[&'n str]) -> Vec<&'n str> {
+    let mut written = names.to_vec();
+    if context.options.render.sourcepos {
+        written.push("data-sourcepos");
+    }
+    written
 }
 
 /// Highlights inline code that names its language, as rehype-lumis and
@@ -139,6 +158,7 @@ fn render_code(
         attrs.push(("data-sourcepos".to_string(), ast.sourcepos.to_string()));
     }
     if let (true, Some(authored)) = (writes_attrs(context, node), ast.attrs.as_deref()) {
+        let written = written(context, &[]);
         attrs.extend(authored.id.iter().map(|id| ("id".to_string(), id.clone())));
         if !authored.classes.is_empty() {
             attrs.push(("class".to_string(), authored.classes.join(" ")));
@@ -147,7 +167,7 @@ fn render_code(
             authored
                 .pairs
                 .iter()
-                .filter(|(key, _)| is_attribute_name(key))
+                .filter(|(key, _)| !is_taken(&written, key))
                 .cloned(),
         );
     }
@@ -197,21 +217,21 @@ fn split_language_suffix(literal: &str) -> Option<(&str, &str)> {
     .then_some((code, language))
 }
 
-/// Mirrors [comrak's `render_link`][upstream], adding attributes to the opening
-/// tag.
+/// Mirrors [comrak's `render_link`][upstream], writing attributes on the
+/// opening tag without `render.attributes`.
 ///
-/// Nodes without attributes go to `format_node_default`, the same function the
-/// generated formatter falls back to for every node type not handled here, so
-/// comrak keeps ownership of link rendering unless there is something to add.
+/// Nodes this formatter has nothing to add to go to `format_node_default`, the
+/// same function the generated formatter falls back to for every node type not
+/// handled here, so comrak keeps ownership of link rendering.
 ///
-/// [upstream]: https://github.com/kivikakk/comrak/blob/6fbe87fafde3953a9f3bc582804318593d703805/src/html.rs#L818-L852
+/// [upstream]: https://github.com/kivikakk/comrak/blob/e08fdf4780505362f1537b7ce0b7e567a2e0f181/src/html.rs#L1051-L1095
 fn render_link<T>(
     context: &mut Context<T>,
     node: Node<'_>,
     entering: bool,
     nl: &NodeLink,
 ) -> Result<ChildRendering, fmt::Error> {
-    if !writes_attrs(context, node) {
+    if !mirrors_attrs(context, node) {
         return html::format_node_default(context, node, entering);
     }
 
@@ -239,7 +259,12 @@ fn render_link<T>(
             context.escape(&nl.title)?;
             context.write_str("\"")?;
         }
-        write_attrs(context, node)?;
+        let names: &[&str] = if nl.title.is_empty() {
+            &["href"]
+        } else {
+            &["href", "title"]
+        };
+        write_attrs(context, node, &written(context, names))?;
         context.write_str(">")?;
     } else {
         context.write_str("</a>")?;
@@ -248,21 +273,21 @@ fn render_link<T>(
     Ok(ChildRendering::HTML)
 }
 
-/// Mirrors [comrak's `render_image`][upstream], adding attributes to the `<img>`
-/// tag.
+/// Mirrors [comrak's `render_image`][upstream], writing attributes on the
+/// `<img>` tag without `render.attributes`.
 ///
 /// The children of an image render as its `alt` text, which is why entering
 /// returns `ChildRendering::Plain` and the tag is closed on exit. As with
-/// `render_link`, nodes without attributes are left to comrak.
+/// `render_link`, nodes this formatter has nothing to add to are left to comrak.
 ///
-/// [upstream]: https://github.com/kivikakk/comrak/blob/6fbe87fafde3953a9f3bc582804318593d703805/src/html.rs#L743-L783
+/// [upstream]: https://github.com/kivikakk/comrak/blob/e08fdf4780505362f1537b7ce0b7e567a2e0f181/src/html.rs#L965-L1015
 fn render_image<T>(
     context: &mut Context<T>,
     node: Node<'_>,
     entering: bool,
     nl: &NodeLink,
 ) -> Result<ChildRendering, fmt::Error> {
-    if !writes_attrs(context, node) {
+    if !mirrors_attrs(context, node) {
         return html::format_node_default(context, node, entering);
     }
 
@@ -289,7 +314,12 @@ fn render_image<T>(
         context.escape(&nl.title)?;
         context.write_str("\"")?;
     }
-    write_attrs(context, node)?;
+    let names: &[&str] = if nl.title.is_empty() {
+        &["src", "alt"]
+    } else {
+        &["src", "alt", "title"]
+    };
+    write_attrs(context, node, &written(context, names))?;
     context.write_str(" />")?;
 
     if context.options.render.figure_with_caption {
@@ -304,25 +334,26 @@ fn render_image<T>(
     Ok(ChildRendering::HTML)
 }
 
-/// Writes `id`, `class` and key/value attributes from the node's `attrs`.
+/// Writes `id`, `class` and key/value attributes from the node's `attrs`,
+/// skipping any named in `written`, as comrak's own `write_attributes` does.
 ///
-/// Only called when `writes_attrs` holds. Name/value pairs are written the way
+/// Only called when `mirrors_attrs` holds. Name/value pairs are written the way
 /// comrak's `write_opening_tag` writes them — ` name="escaped value"` — which is
 /// not reusable directly because it also emits the tag name and the closing `>`,
 /// and an `href` needs `escape_href` rather than `escape`.
-fn write_attrs<T>(context: &mut Context<T>, node: Node<'_>) -> fmt::Result {
+fn write_attrs<T>(context: &mut Context<T>, node: Node<'_>, written: &[&str]) -> fmt::Result {
     let ast = node.data();
     let Some(attrs) = ast.attrs.as_deref() else {
         return Ok(());
     };
 
-    if let Some(id) = &attrs.id {
+    if let Some(id) = attrs.id.as_ref().filter(|_| !is_taken(written, "id")) {
         context.write_str(" id=\"")?;
         context.escape(id)?;
         context.write_str("\"")?;
     }
 
-    if !attrs.classes.is_empty() {
+    if !attrs.classes.is_empty() && !is_taken(written, "class") {
         context.write_str(" class=\"")?;
         for (index, class) in attrs.classes.iter().enumerate() {
             if index > 0 {
@@ -334,7 +365,7 @@ fn write_attrs<T>(context: &mut Context<T>, node: Node<'_>) -> fmt::Result {
     }
 
     for (key, value) in &attrs.pairs {
-        if !is_attribute_name(key) {
+        if is_taken(written, key) {
             continue;
         }
         context.write_str(" ")?;
@@ -347,24 +378,17 @@ fn write_attrs<T>(context: &mut Context<T>, node: Node<'_>) -> fmt::Result {
     Ok(())
 }
 
-/// Whether `name` is safe to write as an HTML attribute name.
-///
-/// The parser only produces names made of these characters, but `pairs` is a
-/// plain list on the Elixir side, so a key like `x" onclick="alert(1)` would
-/// otherwise escape the tag.
-fn is_attribute_name(name: &str) -> bool {
-    !name.is_empty()
-        && name
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | ':' | '.'))
-        && name.starts_with(|c: char| c.is_ascii_alphabetic() || matches!(c, '_' | ':'))
+/// Whether comrak already wrote `name`. HTML attribute names are ASCII
+/// case-insensitive, so `HREF` is as taken as `href`.
+fn is_taken(written: &[&str], name: &str) -> bool {
+    written.iter().any(|taken| taken.eq_ignore_ascii_case(name))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use comrak::nodes::{Attributes, NodeValue};
-    use comrak::options::{Extension, Plugins, Render};
+    use comrak::options::Plugins;
     use comrak::{Arena, Options};
     use pretty_assertions::assert_eq;
 
@@ -391,13 +415,15 @@ mod tests {
         buffer
     }
 
-    /// Renders `markdown`, applying `attrs` to every node matching `matches`,
-    /// which is how a plugin reaches the field from Elixir.
-    fn render_with_attrs(
+    /// Parses `markdown` and sets `attrs` on every node matching `matches`,
+    /// which is how a plugin reaches the field from Elixir, then renders it
+    /// with `format`.
+    fn format_with_attrs(
         markdown: &str,
         options: &Options,
         matches: fn(&NodeValue) -> bool,
-        attrs: Attributes,
+        attrs: &Attributes,
+        format: fn(Node<'_>, &Options, &mut String) -> fmt::Result,
     ) -> String {
         let arena = Arena::new();
         let root = comrak::parse_document(&arena, markdown, options);
@@ -410,57 +436,67 @@ mod tests {
         }
 
         let mut buffer = String::new();
-        MdexFormatter::format_document_with_plugins(
-            root,
-            options,
-            &mut buffer,
-            &Plugins::default(),
-            None,
-        )
-        .unwrap();
+        format(root, options, &mut buffer).unwrap();
         buffer
     }
 
+    fn render_with_attrs(
+        markdown: &str,
+        options: &Options,
+        matches: fn(&NodeValue) -> bool,
+        attrs: Attributes,
+    ) -> String {
+        format_with_attrs(
+            markdown,
+            options,
+            matches,
+            &attrs,
+            |root, options, buffer| {
+                MdexFormatter::format_document_with_plugins(
+                    root,
+                    options,
+                    buffer,
+                    &Plugins::default(),
+                    None,
+                )
+                .map(drop)
+            },
+        )
+    }
+
+    fn options(configure: impl FnOnce(&mut Options<'static>)) -> Options<'static> {
+        let mut options = Options::default();
+        configure(&mut options);
+        options
+    }
+
     /// Attribute extensions on, `unsafe` on, which is what it takes for
-    /// attributes to reach the output.
+    /// attributes on links and images to reach the output.
     fn attr_options() -> Options<'static> {
-        Options {
-            extension: Extension {
-                header_attributes: true,
-                fenced_code_attributes: true,
-                inline_code_attributes: true,
-                link_attributes: true,
-                ..Default::default()
-            },
-            render: Render {
-                r#unsafe: true,
-                ..Default::default()
-            },
-            ..Default::default()
-        }
+        options(|options| {
+            options.extension.header_attributes = true;
+            options.extension.fenced_code_attributes = true;
+            options.extension.inline_code_attributes = true;
+            options.extension.link_attributes = true;
+            options.render.r#unsafe = true;
+        })
     }
 
     /// `unsafe` on, no extensions: the plugin case, where attributes are set on
     /// the AST rather than parsed.
     fn unsafe_options() -> Options<'static> {
-        Options {
-            render: Render {
-                r#unsafe: true,
-                ..Default::default()
-            },
-            ..Default::default()
-        }
+        options(|options| options.render.r#unsafe = true)
     }
 
     fn attributes(id: Option<&str>, classes: &[&str], pairs: &[(&str, &str)]) -> Attributes {
-        Attributes {
-            id: id.map(str::to_string),
-            classes: classes.iter().map(|c| c.to_string()).collect(),
-            pairs: pairs
-                .iter()
-                .map(|(k, v)| (k.to_string(), v.to_string()))
-                .collect(),
-        }
+        let mut attrs = Attributes::default();
+        attrs.id = id.map(str::to_string);
+        attrs.classes = classes.iter().map(|c| c.to_string()).collect();
+        attrs.pairs = pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        attrs
     }
 
     #[test]
@@ -482,14 +518,34 @@ mod tests {
         );
     }
 
-    /// Only Link and Image are handled, so inline code keeps comrak's output
-    /// even with `inline_code_attributes` and `unsafe` on.
+    /// Only Link and Image are handled, so without `render.attributes` inline
+    /// code keeps comrak's output even with `inline_code_attributes` and
+    /// `unsafe` on.
     #[test]
     fn leaves_inline_code_to_comrak() {
         assert_eq!(
             render("`:ok`{.language-elixir}\n", &attr_options()),
             "<p><code>:ok</code></p>\n"
         );
+    }
+
+    /// With `render.attributes` comrak writes every node's attributes, links
+    /// and images included, so each is written once.
+    #[test]
+    fn leaves_attributes_to_comrak_with_render_attributes() {
+        let options = options(|options| {
+            *options = attr_options();
+            options.render.attributes = true;
+        });
+        let markdown = "# Title {#t}\n\n[a](/u){.x} ![i](i.png){width=1} `c`{.y}\n";
+
+        assert_eq!(
+            render(markdown, &options),
+            "<h1 id=\"t\">Title</h1>\n\
+             <p><a href=\"/u\" class=\"x\">a</a> <img src=\"i.png\" alt=\"i\" width=\"1\" /> \
+             <code class=\"y\">c</code></p>\n"
+        );
+        assert_eq!(render(markdown, &options), comrak_html(markdown, &options));
     }
 
     /// Writes what the formatter handed over, so a test sees the split.
@@ -550,10 +606,7 @@ mod tests {
 
     #[test]
     fn highlights_inline_code_that_names_its_language() {
-        let safe = Options {
-            extension: attr_options().extension,
-            ..Default::default()
-        };
+        let safe = options(|options| options.extension = attr_options().extension);
 
         assert_eq!(
             render_inline("`:ok{:elixir}` `{:ok}`\n", &safe),
@@ -581,19 +634,17 @@ mod tests {
         );
     }
 
+    /// Comrak's own `data-sourcepos` takes precedence over an authored one.
     #[test]
     fn keeps_sourcepos_on_highlighted_inline_code() {
-        let options = Options {
-            render: Render {
-                sourcepos: true,
-                ..Default::default()
-            },
-            ..Default::default()
-        };
+        let options = options(|options| {
+            *options = attr_options();
+            options.render.sourcepos = true;
+        });
 
         assert_eq!(
-            render_inline("`a{:rust}`\n", &options),
-            r#"<p data-sourcepos="1:1-1:10"><hl rust [("data-sourcepos", "1:1-1:10")]>a</hl></p>"#
+            render_inline("`a{:rust}`{data-sourcepos=x k=v}\n", &options),
+            r#"<p data-sourcepos="1:1-1:32"><hl rust [("data-sourcepos", "1:1-1:32"), ("k", "v")]>a</hl></p>"#
                 .to_string()
                 + "\n"
         );
@@ -604,10 +655,10 @@ mod tests {
     /// of the default output.
     #[test]
     fn omits_attributes_unless_unsafe() {
-        let safe_options = Options {
-            extension: attr_options().extension,
-            ..Default::default()
-        };
+        let safe_options = options(|options| {
+            options.extension = attr_options().extension;
+            options.render.attributes = true;
+        });
         let markdown = "[link](https://example.com){#docs .external rel=nofollow}\n";
 
         assert_eq!(
@@ -666,25 +717,19 @@ mod tests {
         );
     }
 
+    /// As in comrak, attributes comrak writes itself win over authored ones.
     #[test]
-    fn skips_attribute_names_that_are_not_valid() {
+    fn skips_attributes_comrak_writes() {
         assert_eq!(
-            render_with_attrs(
-                "[link](https://example.com)\n",
-                &unsafe_options(),
-                |value| matches!(value, NodeValue::Link(..)),
-                attributes(
-                    None,
-                    &[],
-                    &[
-                        ("x\" onclick=\"alert(1)", "y"),
-                        ("", "empty"),
-                        ("2bad", "leading digit"),
-                        ("data-ok", "kept"),
-                    ],
-                ),
+            render(
+                "[a](/u \"Title\"){href=/v title=Other data-x=1} [b](/u){title=Used}\n",
+                &attr_options()
             ),
-            "<p><a href=\"https://example.com\" data-ok=\"kept\">link</a></p>\n"
+            "<p><a href=\"/u\" title=\"Title\" data-x=\"1\">a</a> <a href=\"/u\" title=\"Used\">b</a></p>\n"
+        );
+        assert_eq!(
+            render("![i](i.png){SRC=x Alt=y w=1}\n", &attr_options()),
+            "<p><img src=\"i.png\" alt=\"i\" w=\"1\" /></p>\n"
         );
     }
 
@@ -718,20 +763,13 @@ mod tests {
         for options in [
             Options::default(),
             attr_options(),
-            Options {
-                render: Render {
-                    r#unsafe: true,
-                    sourcepos: true,
-                    figure_with_caption: true,
-                    ..Default::default()
-                },
-                extension: Extension {
-                    table: true,
-                    header_id_prefix: Some("user-content-".to_string()),
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
+            options(|options| {
+                options.render.r#unsafe = true;
+                options.render.sourcepos = true;
+                options.render.figure_with_caption = true;
+                options.extension.table = true;
+                options.extension.header_id_prefix = Some("user-content-".to_string());
+            }),
         ] {
             assert_eq!(
                 render(markdown, &options),
@@ -743,58 +781,68 @@ mod tests {
 
     /// Catches drift in the copies of comrak's `render_link` and `render_image`.
     ///
-    /// Links and images carry empty attributes here, so `writes_attrs` holds and
-    /// the mirrored code runs, but it has nothing to add — meaning any byte it
-    /// writes differently from comrak shows up as a failure. comrak ignores
-    /// `attrs` entirely, so its output is the reference.
+    /// The same links and images, carrying the same attributes, render once
+    /// through the mirrored code (`unsafe` alone) and once through comrak's own
+    /// (`unsafe` and `render.attributes`). Any byte the copies write differently
+    /// shows up as a failure, including which conflicting names are skipped.
     #[test]
-    fn mirrors_comrak_for_empty_attrs() {
+    fn mirrors_comrak_attributes() {
         let markdown = concat!(
             "[plain](https://example.com) and [titled](https://example.com \"a title\").\n\n",
             "![img](image.png) and ![titled img](image.png \"image title\").\n\n",
             "[empty]() and [dangerous](javascript:alert(1)) and <https://auto.link>.\n\n",
             "![](\"\") and [nested [link](inner) text](outer).\n",
         );
+        let matches: fn(&NodeValue) -> bool =
+            |value| matches!(value, NodeValue::Link(..) | NodeValue::Image(..));
 
-        for options in [
-            unsafe_options(),
-            Options {
-                render: Render {
-                    r#unsafe: true,
-                    sourcepos: true,
-                    figure_with_caption: true,
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
-            Options {
-                render: Render {
-                    sourcepos: true,
-                    ignore_empty_links: true,
-                    ..Default::default()
-                },
-                extension: Extension {
-                    autolink: true,
-                    ..Default::default()
-                },
-                parse: comrak::options::Parse {
-                    relaxed_autolinks: true,
-                    ..Default::default()
-                },
-            },
+        for attrs in [
+            attributes(None, &[], &[]),
+            attributes(
+                Some("i"),
+                &["a", "b"],
+                &[
+                    ("HREF", "/x"),
+                    ("src", "x.png"),
+                    ("Alt", "x"),
+                    ("title", "t"),
+                    ("data-sourcepos", "9:9-9:9"),
+                    ("target", "_blank"),
+                ],
+            ),
         ] {
-            let with_empty_attrs = render_with_attrs(
-                markdown,
-                &options,
-                |value| matches!(value, NodeValue::Link(..) | NodeValue::Image(..)),
-                attributes(None, &[], &[]),
-            );
+            for mirrored in [
+                unsafe_options(),
+                options(|options| {
+                    options.render.r#unsafe = true;
+                    options.render.sourcepos = true;
+                    options.render.figure_with_caption = true;
+                }),
+                options(|options| {
+                    options.render.r#unsafe = true;
+                    options.render.sourcepos = true;
+                    options.render.ignore_empty_links = true;
+                    options.extension.autolink = true;
+                    options.parse.relaxed_autolinks = true;
+                }),
+            ] {
+                let upstream = options(|options| {
+                    *options = mirrored.clone();
+                    options.render.attributes = true;
+                });
 
-            assert_eq!(
-                with_empty_attrs,
-                comrak_html(markdown, &options),
-                "mirrored render_link/render_image diverged from comrak"
-            );
+                assert_eq!(
+                    render_with_attrs(markdown, &mirrored, matches, attrs.clone()),
+                    format_with_attrs(
+                        markdown,
+                        &upstream,
+                        matches,
+                        &attrs,
+                        |root, options, buffer| { comrak::format_html(root, options, buffer) }
+                    ),
+                    "mirrored render_link/render_image diverged from comrak"
+                );
+            }
         }
     }
 }

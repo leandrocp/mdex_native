@@ -19,6 +19,9 @@ use lumis_core::elixir::{
     ThemeOrString,
 };
 
+// The decorators and the `<pre>` attributes are both what Comrak reported
+// about this fence, alongside the adapter's own settings.
+#[allow(clippy::too_many_arguments)]
 pub fn render_code_fence(
     source: &str,
     language: Option<&str>,
@@ -27,6 +30,7 @@ pub fn render_code_fence(
     word_diff: bool,
     budget: ExBudget,
     attributes: &HashMap<String, String>,
+    pre_attrs: &[(String, String)],
 ) -> Result<String, String> {
     // Comrak includes the code-fence terminator's newline in the literal. Its
     // adapter contract historically did not turn that into another visual line.
@@ -34,7 +38,8 @@ pub fn render_code_fence(
     // A fence without an info string stays plain. Content detection would let a
     // shebang or a doctype inside a bare fence pick a language MDEx never named.
     let language = Language::guess(Some(language.unwrap_or("plaintext")), source);
-    let formatter = with_mdex_attributes(formatter.unwrap_or_default(), attributes);
+    let mut formatter = with_mdex_attributes(formatter.unwrap_or_default(), attributes);
+    extend_pre_attrs(&mut formatter, pre_attrs);
     let formatter = formatter.into_formatter(language)?;
 
     let (events, exhausted) = highlight(source, language, rainbow_brackets, word_diff, budget);
@@ -281,6 +286,24 @@ fn with_mdex_attributes(
     }
 }
 
+/// Adds the fence's own attributes after the formatter's `pre_attrs`. Lumis
+/// joins a `class` with its own and appends a `style` to the theme's, and any
+/// other name replaces an earlier value.
+fn extend_pre_attrs(formatter: &mut ExFormatterOption, authored: &[(String, String)]) {
+    use ExFormatterOption as F;
+
+    if let F::HtmlInline { pre_attrs, .. }
+    | F::HtmlLinked { pre_attrs, .. }
+    | F::HtmlMultiThemes { pre_attrs, .. } = formatter
+    {
+        pre_attrs.extend(
+            authored
+                .iter()
+                .map(|(name, value)| (name.clone(), ExAttrValue::Value(value.clone()))),
+        );
+    }
+}
+
 /// The inline HTML formatter's settings, as they stand before MDEx's
 /// info-string decorators are applied over them.
 #[derive(Default)]
@@ -459,6 +482,7 @@ mod tests {
             false,
             ExBudget::default(),
             &attributes,
+            &[],
         )
         .unwrap()
     }
