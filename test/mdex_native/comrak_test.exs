@@ -648,7 +648,7 @@ defmodule MDExNative.ComrakTest do
     assert MDExNative.Comrak.document_to_html!(document, render: [unsafe: true, attributes: true]) ==
              html
 
-    # Without `render.attributes`, only links and images carry them, as before.
+    # Without `render.attributes`, only links and images carry them.
     assert MDExNative.Comrak.markdown_to_html!(markdown,
              extension: extension,
              render: [unsafe: true]

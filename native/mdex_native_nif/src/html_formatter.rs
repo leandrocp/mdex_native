@@ -2,10 +2,8 @@
 //!
 //! comrak renders parsed attributes itself when both `render.attributes` and
 //! `render.unsafe` are set, on headings, code blocks, inline code, links and
-//! images. Before comrak 1.0 it left that to custom formatters, so MDExNative
-//! rendered attributes on links and images with `render.unsafe` alone. That
-//! behavior is kept for callers who don't set `render.attributes`: this
-//! formatter delegates every node to `format_node_default` except `Link` and
+//! images. With `render.unsafe` alone, this formatter renders them on links and
+//! images: it delegates every node to `format_node_default` except `Link` and
 //! `Image`, where, when there are attributes to write and comrak won't, it
 //! writes the same markup comrak would, plus the attributes.
 //! The optional compatibility entry point also retains deprecated tag filtering
@@ -32,10 +30,9 @@
 //! - [`render_link`](https://github.com/kivikakk/comrak/blob/e08fdf4780505362f1537b7ce0b7e567a2e0f181/src/html.rs#L1051-L1095)
 //! - [`render_image`](https://github.com/kivikakk/comrak/blob/e08fdf4780505362f1537b7ce0b7e567a2e0f181/src/html.rs#L965-L1015)
 //!
-//! When comrak is upgraded, re-read those two functions and mirror any change
-//! here. `mirrors_comrak_attributes` is what catches drift: it renders links
-//! and images with attributes both ways, through this code and through comrak
-//! with `render.attributes`, and compares the results.
+//! `mirrors_comrak_attributes` renders links and images with attributes through
+//! this code and through comrak with `render.attributes`, and fails when they
+//! differ.
 
 use comrak::create_formatter;
 use comrak::html::{self, ChildRendering, Context};
