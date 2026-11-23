@@ -10,9 +10,14 @@
 - Add `render: [attributes: true]`. With `render: [unsafe: true]`, it renders parsed attributes on headings, code blocks, and inline code too, not only on links and images. Code block attributes go on the `<pre>`, including the one Lumis writes ([Comrak #903](https://github.com/kivikakk/comrak/pull/903)).
 - `document_to_commonmark/2` writes attributes back when their extension is enabled ([Comrak #939](https://github.com/kivikakk/comrak/pull/939)).
 
+### Security
+
+- Fix quadratic time on escaped pipes in table cells, failing autolink domains, and non-literal emails ([GHSA-7f8r-4rh5-vr5h](https://github.com/kivikakk/comrak/security/advisories/GHSA-7f8r-4rh5-vr5h)), plus other quadratic cases in block IDs, attributes, alerts, multiline block quotes, strikethrough and highlight runs, unclosed inline footnotes, LaTeX math, and HEEx directives, and in CommonMark output of grid tables and deep nesting ([Comrak #948](https://github.com/kivikakk/comrak/pull/948), [#949](https://github.com/kivikakk/comrak/pull/949)).
+- Limit output amplification: lists, footnote definitions, description items, and fenced containers nest at most 100 deep, after which markers are read as text; autocompleted table cells share one allowance per document; CommonMark output writes lazy continuation lines past 64-byte container prefixes and falls back to cell contents for grid tables over its area allowance ([Comrak #948](https://github.com/kivikakk/comrak/pull/948)).
+
 ### Changes
 
-Comrak 1.0 has written specs for most extensions, and some parsing changed with them:
+Comrak 1.x has written specs for most extensions, and some parsing changed with them:
 
 - Footnotes: a label defined twice uses its first definition instead of rendering both; labels match as written, so `[^&#97;]` no longer matches `[^a]`; definitions nested in definitions are found; footnotes are numbered in reading order; a blank line inside a container no longer ends a definition. `FootnoteReference.texts` holds the label as written, such as `[{"^1", 2}]` ([Comrak #935](https://github.com/kivikakk/comrak/pull/935)).
 - Attributes: keys may start with `_` or `:`, values may be unquoted (`{k=a/b}`), entities in values are decoded, `id=` and `class=` set the id and add classes, and the last of repeated keys wins. Consecutive attribute blocks merge ([Comrak #939](https://github.com/kivikakk/comrak/pull/939)).
@@ -24,11 +29,15 @@ Comrak 1.0 has written specs for most extensions, and some parsing changed with 
 - `\r\n` and `\r` are normalized to `\n` in block content, so carriage returns no longer reach literals ([Comrak #915](https://github.com/kivikakk/comrak/pull/915)).
 - Reference links expand up to at least 100 KB or the document's size, whichever is larger, instead of at most the smaller ([Comrak #905](https://github.com/kivikakk/comrak/pull/905)).
 - Many source positions are corrected, including the end of a list's last item, inline footnotes, and unclosed fenced code, multiline block quotes, block directives, and alerts ([Comrak #901](https://github.com/kivikakk/comrak/pull/901), [#908](https://github.com/kivikakk/comrak/pull/908)).
-- XML writes table header rows as `<table_header>` ([Comrak #926](https://github.com/kivikakk/comrak/pull/926)).
+- Math: an escaped backslash no longer escapes the closer after it, code math (`` $`…`$ ``) needs matching backtick runs, dollar math keeps line endings, and ```` ```math ```` blocks are math only with `math_code: true` ([Comrak #941](https://github.com/kivikakk/comrak/pull/941)). Math code blocks get `data-meta` and attributes like other code blocks ([Comrak #942](https://github.com/kivikakk/comrak/pull/942)).
+- Description lists: `:` follows list marker rules, so it can stand alone and its content can start on the next line; a blank line between details makes the item loose. OFM block IDs label the `<dt>` or `<dd>` they end instead of the `<dl>` ([Comrak #945](https://github.com/kivikakk/comrak/pull/945)).
+- Superscript and subscript: superscript opens inside brackets, punctuation no longer affects `^` and `~` flanking, carets pair one at a time, and subscript no longer changes strikethrough flanking ([Comrak #946](https://github.com/kivikakk/comrak/pull/946)).
+- Header IDs never collide with explicit attribute IDs, footnote IDs, or OFM block IDs under `header_id_prefix`, and are never empty; an empty heading gets `-1` ([Comrak #944](https://github.com/kivikakk/comrak/pull/944)).
+- XML writes table header rows as `<table_header>`, escaped tags as `<escaped_tag tag="~~">`, `tight` on `description_item`, and escapes code block info strings ([Comrak #926](https://github.com/kivikakk/comrak/pull/926), [#945](https://github.com/kivikakk/comrak/pull/945), [#946](https://github.com/kivikakk/comrak/pull/946), [#949](https://github.com/kivikakk/comrak/pull/949)).
 
 ### Dependencies
 
-- Update Comrak from 0.59.0 to 1.1.0.
+- Update Comrak from 0.59.0 to 1.2.0.
 
 ### Compatibility
 

@@ -25,10 +25,10 @@
 //!
 //! `render_link` and `render_image` below are comrak's own, writing the
 //! attributes without checking `render.attributes`. comrak keeps them private,
-//! so they cannot be called or wrapped. The source is comrak 1.1.0:
+//! so they cannot be called or wrapped. The source is comrak 1.2.0:
 //!
-//! - [`render_link`](https://github.com/kivikakk/comrak/blob/e08fdf4780505362f1537b7ce0b7e567a2e0f181/src/html.rs#L1051-L1095)
-//! - [`render_image`](https://github.com/kivikakk/comrak/blob/e08fdf4780505362f1537b7ce0b7e567a2e0f181/src/html.rs#L965-L1015)
+//! - [`render_link`](https://github.com/kivikakk/comrak/blob/d9cf1705672f5a34e959a8db7c388a998c5d1b6b/src/html.rs#L1047-L1091)
+//! - [`render_image`](https://github.com/kivikakk/comrak/blob/d9cf1705672f5a34e959a8db7c388a998c5d1b6b/src/html.rs#L961-L1011)
 //!
 //! `mirrors_comrak_attributes` renders links and images with attributes through
 //! this code and through comrak with `render.attributes`, and fails when they
@@ -221,7 +221,7 @@ fn split_language_suffix(literal: &str) -> Option<(&str, &str)> {
 /// same function the generated formatter falls back to for every node type not
 /// handled here, so comrak keeps ownership of link rendering.
 ///
-/// [upstream]: https://github.com/kivikakk/comrak/blob/e08fdf4780505362f1537b7ce0b7e567a2e0f181/src/html.rs#L1051-L1095
+/// [upstream]: https://github.com/kivikakk/comrak/blob/d9cf1705672f5a34e959a8db7c388a998c5d1b6b/src/html.rs#L1047-L1091
 fn render_link<T>(
     context: &mut Context<T>,
     node: Node<'_>,
@@ -277,7 +277,7 @@ fn render_link<T>(
 /// returns `ChildRendering::Plain` and the tag is closed on exit. As with
 /// `render_link`, nodes this formatter has nothing to add to are left to comrak.
 ///
-/// [upstream]: https://github.com/kivikakk/comrak/blob/e08fdf4780505362f1537b7ce0b7e567a2e0f181/src/html.rs#L965-L1015
+/// [upstream]: https://github.com/kivikakk/comrak/blob/d9cf1705672f5a34e959a8db7c388a998c5d1b6b/src/html.rs#L961-L1011
 fn render_image<T>(
     context: &mut Context<T>,
     node: Node<'_>,
