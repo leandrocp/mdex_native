@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.3](https://github.com/leandrocp/mdex_native/compare/v0.3.2...v0.3.3) (2026-11-23)
+
+### Bug Fixes
+
+- **nif:** Ship precompiled Linux NIFs without static TLS in [\#161](https://github.com/leandrocp/mdex_native/pull/161)
+
+### Dependencies
+
+- Update Lumis core and WASM runtime in [\#152](https://github.com/leandrocp/mdex_native/pull/152) and [\#159](https://github.com/leandrocp/mdex_native/pull/159)
+
 ## [0.3.2](https://github.com/leandrocp/mdex_native/compare/v0.3.1...v0.3.2) (2026-11-14)
 
 ### Bug Fixes
