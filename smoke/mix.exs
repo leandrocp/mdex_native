@@ -12,7 +12,8 @@ defmodule MDExNativeSmoke.MixProject do
       {:mdex_native, path: ".."},
       # Another NIF in the same VM, as in an MDEx app: glibc shares one static
       # TLS reserve between them (leandrocp/lumis#2114).
-      {:lumis, "~> 0.10"}
+      {:lumis, "~> 0.10"},
+      {:lumis_wasm_elixir, "~> 0.26.0"}
     ]
   end
 end
