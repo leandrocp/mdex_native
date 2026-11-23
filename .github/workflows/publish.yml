@@ -10,6 +10,7 @@ on:
   pull_request:
     paths:
       - "native/**"
+      - "smoke/**"
       - ".github/workflows/publish.yml"
   workflow_dispatch:
 
@@ -24,11 +25,13 @@ jobs:
 
   release-nifs:
     needs: wasmtime-cache
-    uses: leandrocp/github-actions/.github/workflows/nif-release.yml@e2420331a2564082f2c5568563242f176224e9a8
+    uses: leandrocp/github-actions/.github/workflows/nif-release.yml@de7373d31377bfeea8f5f0070e7af1f15ce04406
     with:
       locked: true
       project-name: mdex_native_nif
       project-dir: native/mdex_native_nif
+      nif-module: MDExNative.Native
+      smoke-project: smoke
       feature-variants: '[{"features":"lumis","variant":"lumis"},{"features":"syntect","variant":"syntect"},{"features":"","variant":""}]'
       r2-path: releases/download/${{ github.ref_name }}
     secrets:
