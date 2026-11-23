@@ -8,8 +8,7 @@
 
 ### Dependencies
 
-- **deps:** Update Lumis core and WASM runtime in [\#152](https://github.com/leandrocp/mdex_native/pull/152)
-- Update Lumis core and WASM runtime in [\#159](https://github.com/leandrocp/mdex_native/pull/159)
+- Update Lumis core and WASM runtime in [\#152](https://github.com/leandrocp/mdex_native/pull/152) and [\#159](https://github.com/leandrocp/mdex_native/pull/159)
 
 ## [0.3.2](https://github.com/leandrocp/mdex_native/compare/v0.3.1...v0.3.2) (2026-11-14)
 
