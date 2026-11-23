@@ -1,8 +1,16 @@
 name: Publish
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     tags: ["v*"]
+  pull_request:
+    paths:
+      - "native/**"
+      - ".github/workflows/publish.yml"
   workflow_dispatch:
 
 permissions:
@@ -16,7 +24,7 @@ jobs:
 
   release-nifs:
     needs: wasmtime-cache
-    uses: leandrocp/github-actions/.github/workflows/nif-release.yml@72233f335b2ba9bc0371e9cf31adf47922cf37a4
+    uses: leandrocp/github-actions/.github/workflows/nif-release.yml@e2420331a2564082f2c5568563242f176224e9a8
     with:
       locked: true
       project-name: mdex_native_nif
