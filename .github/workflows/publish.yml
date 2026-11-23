@@ -25,7 +25,7 @@ jobs:
 
   release-nifs:
     needs: wasmtime-cache
-    uses: leandrocp/github-actions/.github/workflows/nif-release.yml@0c9fdebe970d704b0a5feff4fac4ac2432d4d504
+    uses: leandrocp/github-actions/.github/workflows/nif-release.yml@dc799bb3b5cc127472568015f8c747f439e1c4cb
     with:
       locked: true
       project-name: mdex_native_nif
