@@ -1,8 +1,17 @@
 name: Publish
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     tags: ["v*"]
+  pull_request:
+    paths:
+      - "native/**"
+      - "test/precompiled_smoke.exs"
+      - ".github/workflows/publish.yml"
   workflow_dispatch:
 
 permissions:
@@ -16,11 +25,13 @@ jobs:
 
   release-nifs:
     needs: wasmtime-cache
-    uses: leandrocp/github-actions/.github/workflows/nif-release.yml@72233f335b2ba9bc0371e9cf31adf47922cf37a4
+    uses: leandrocp/github-actions/.github/workflows/nif-release.yml@dc799bb3b5cc127472568015f8c747f439e1c4cb
     with:
       locked: true
       project-name: mdex_native_nif
       project-dir: native/mdex_native_nif
+      nif-module: MDExNative.Native
+      smoke-script: test/precompiled_smoke.exs
       feature-variants: '[{"features":"lumis","variant":"lumis"},{"features":"syntect","variant":"syntect"},{"features":"","variant":""}]'
       r2-path: releases/download/${{ github.ref_name }}
     secrets:
