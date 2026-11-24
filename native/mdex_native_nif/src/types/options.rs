@@ -19,6 +19,7 @@ mod atoms {
     rustler::atoms! {
         alert_style,
         alerts,
+        attributes,
         autolink,
         block_directive,
         budget,
@@ -40,6 +41,8 @@ mod atoms {
         gfm_quirks,
         github_pre_lang,
         greentext,
+        grid_table,
+        grid_table_widths,
         hardbreaks,
         header_attributes,
         header_id_prefix,
@@ -58,8 +61,10 @@ mod atoms {
         list_style,
         math_code,
         math_dollars,
+        math_dollars_block,
         math_latex,
         multiline_block_quotes,
+        ofm_block_ids,
         ofm_callouts,
         ofm_comments,
         ol_width,
@@ -157,6 +162,7 @@ pub struct ExExtensionOptions {
     // Deprecated compatibility option; rendered locally since Comrak 0.56.
     pub tagfilter: Option<bool>,
     pub table: Option<bool>,
+    pub grid_table: Option<bool>,
     pub autolink: Option<bool>,
     pub tasklist: Option<bool>,
     pub superscript: Option<bool>,
@@ -170,7 +176,9 @@ pub struct ExExtensionOptions {
     pub alerts: Option<bool>,
     pub ofm_callouts: Option<bool>,
     pub ofm_comments: Option<bool>,
+    pub ofm_block_ids: Option<bool>,
     pub math_dollars: Option<bool>,
+    pub math_dollars_block: Option<bool>,
     pub math_latex: Option<bool>,
     pub math_code: Option<bool>,
     pub shortcodes: Option<bool>,
@@ -201,6 +209,7 @@ impl<'a> Decoder<'a> for ExExtensionOptions {
             strikethrough: optional_field(term, atoms::strikethrough())?,
             tagfilter: optional_field(term, atoms::tagfilter())?,
             table: optional_field(term, atoms::table())?,
+            grid_table: optional_field(term, atoms::grid_table())?,
             autolink: optional_field(term, atoms::autolink())?,
             tasklist: optional_field(term, atoms::tasklist())?,
             superscript: optional_field(term, atoms::superscript())?,
@@ -214,7 +223,9 @@ impl<'a> Decoder<'a> for ExExtensionOptions {
             alerts: optional_field(term, atoms::alerts())?,
             ofm_callouts: optional_field(term, atoms::ofm_callouts())?,
             ofm_comments: optional_field(term, atoms::ofm_comments())?,
+            ofm_block_ids: optional_field(term, atoms::ofm_block_ids())?,
             math_dollars: optional_field(term, atoms::math_dollars())?,
+            math_dollars_block: optional_field(term, atoms::math_dollars_block())?,
             math_latex: optional_field(term, atoms::math_latex())?,
             math_code: optional_field(term, atoms::math_code())?,
             shortcodes: optional_field(term, atoms::shortcodes())?,
@@ -254,6 +265,7 @@ impl ExExtensionOptions {
     fn apply_common_options(&mut self, extension: &mut Extension<'static>) {
         overwrite(&mut extension.strikethrough, self.strikethrough);
         overwrite(&mut extension.table, self.table);
+        overwrite(&mut extension.grid_table, self.grid_table);
         overwrite(&mut extension.autolink, self.autolink);
         overwrite(&mut extension.tasklist, self.tasklist);
         overwrite(&mut extension.superscript, self.superscript);
@@ -282,7 +294,9 @@ impl ExExtensionOptions {
         overwrite(&mut extension.alerts, self.alerts);
         overwrite(&mut extension.ofm_callouts, self.ofm_callouts);
         overwrite(&mut extension.ofm_comments, self.ofm_comments);
+        overwrite(&mut extension.ofm_block_ids, self.ofm_block_ids);
         overwrite(&mut extension.math_dollars, self.math_dollars);
+        overwrite(&mut extension.math_dollars_block, self.math_dollars_block);
         overwrite(&mut extension.math_latex, self.math_latex);
         overwrite(&mut extension.math_code, self.math_code);
         overwrite(&mut extension.shortcodes, self.shortcodes);
@@ -428,6 +442,7 @@ pub struct ExRenderOptions {
     pub escape: Option<bool>,
     pub list_style: Option<ExListStyleType>,
     pub sourcepos: Option<bool>,
+    pub attributes: Option<bool>,
     pub escaped_char_spans: Option<bool>,
     pub ignore_empty_links: Option<bool>,
     pub gfm_quirks: Option<bool>,
@@ -438,6 +453,7 @@ pub struct ExRenderOptions {
     pub experimental_minimize_commonmark: Option<bool>,
     pub compact_html: Option<bool>,
     pub alert_style: Option<ExAlertStyleType>,
+    pub grid_table_widths: Option<bool>,
 }
 
 impl<'a> Decoder<'a> for ExRenderOptions {
@@ -451,6 +467,7 @@ impl<'a> Decoder<'a> for ExRenderOptions {
             escape: optional_field(term, atoms::escape())?,
             list_style: optional_field(term, atoms::list_style())?,
             sourcepos: optional_field(term, atoms::sourcepos())?,
+            attributes: optional_field(term, atoms::attributes())?,
             escaped_char_spans: optional_field(term, atoms::escaped_char_spans())?,
             ignore_empty_links: optional_field(term, atoms::ignore_empty_links())?,
             gfm_quirks: optional_field(term, atoms::gfm_quirks())?,
@@ -464,6 +481,7 @@ impl<'a> Decoder<'a> for ExRenderOptions {
             )?,
             compact_html: optional_field(term, atoms::compact_html())?,
             alert_style: optional_field(term, atoms::alert_style())?,
+            grid_table_widths: optional_field(term, atoms::grid_table_widths())?,
         })
     }
 }
@@ -481,6 +499,7 @@ impl ExRenderOptions {
             self.list_style.map(ListStyleType::from),
         );
         overwrite(&mut render.sourcepos, self.sourcepos);
+        overwrite(&mut render.attributes, self.attributes);
         overwrite(&mut render.escaped_char_spans, self.escaped_char_spans);
         overwrite(&mut render.ignore_empty_links, self.ignore_empty_links);
         overwrite(&mut render.gfm_quirks, self.gfm_quirks);
@@ -497,6 +516,7 @@ impl ExRenderOptions {
             &mut render.alert_style,
             self.alert_style.map(AlertStyleType::from),
         );
+        overwrite(&mut render.grid_table_widths, self.grid_table_widths);
     }
 }
 

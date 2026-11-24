@@ -1,5 +1,11 @@
 use comrak::nodes::{
-    AstNode, Attributes, HeexNode, LineColumn, NodeHeexBlock, NodeTaskItem, NodeValue, Sourcepos,
+    AstNode, Attributes, GridTableColumn, GridTableSection, HeexNode, LineColumn, ListDelimType,
+    ListType, NodeAlert, NodeBlockDirective, NodeBlockId, NodeCallout, NodeCode, NodeCodeBlock,
+    NodeComment, NodeCommentBlock, NodeDescriptionItem, NodeEmph, NodeFootnoteDefinition,
+    NodeFootnoteReference, NodeGridTable, NodeGridTableCell, NodeHeading, NodeHeexBlock,
+    NodeHtmlBlock, NodeLink, NodeList, NodeMath, NodeMathBlock, NodeMultilineBlockQuote,
+    NodeShortCode, NodeStrikethrough, NodeStrong, NodeTable, NodeTableRow, NodeTaskItem,
+    NodeThematicBreak, NodeValue, NodeWikiLink, Sourcepos, TableAlignment,
 };
 use typed_arena::Arena as TypedArena;
 
@@ -55,14 +61,38 @@ pub struct ExAttributes {
     pub pairs: Vec<(String, String)>,
 }
 
+/// Keys that are not valid HTML attribute names are dropped: comrak writes keys
+/// as they are, in HTML and in CommonMark, so a key like `x" onclick="alert(1)`
+/// set from Elixir would otherwise escape the tag.
+///
+/// TODO: upstream `write_opening_tag` and the CommonMark attribute writer
+/// should skip or reject keys their parser can't produce, so this filter can
+/// go. comrak only checks keys while parsing:
+///
+/// - [`write_opening_tag`](https://github.com/kivikakk/comrak/blob/d9cf1705672f5a34e959a8db7c388a998c5d1b6b/src/html.rs#L2145-L2158)
+/// - [`format_attributes`](https://github.com/kivikakk/comrak/blob/d9cf1705672f5a34e959a8db7c388a998c5d1b6b/src/cm.rs#L1376-L1396)
+/// - [parser key rule](https://github.com/kivikakk/comrak/blob/d9cf1705672f5a34e959a8db7c388a998c5d1b6b/src/parser/attributes.rs#L161-L175)
 impl From<ExAttributes> for Attributes {
     fn from(attributes: ExAttributes) -> Self {
-        Self {
-            id: attributes.id,
-            classes: attributes.classes,
-            pairs: attributes.pairs,
-        }
+        let mut attrs = Self::default();
+        attrs.id = attributes.id;
+        attrs.classes = attributes.classes;
+        attrs.pairs = attributes
+            .pairs
+            .into_iter()
+            .filter(|(key, _)| is_attribute_name(key))
+            .collect();
+        attrs
     }
+}
+
+/// Whether `name` is an attribute key, as comrak's parser reads one: an ASCII
+/// letter, `_` or `:`, then ASCII letters, digits, `-`, `_`, `:` and `.`.
+fn is_attribute_name(name: &str) -> bool {
+    name.starts_with(|c: char| c.is_ascii_alphabetic() || matches!(c, '_' | ':'))
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | ':' | '.'))
 }
 
 impl From<&Attributes> for ExAttributes {
@@ -97,6 +127,9 @@ pub enum NewNode {
     Table(ExTable),
     TableRow(ExTableRow),
     TableCell(ExTableCell),
+    GridTable(ExGridTable),
+    GridTableRow(ExGridTableRow),
+    GridTableCell(ExGridTableCell),
     Text(ExText),
     TaskItem(ExTaskItem),
     SoftBreak(ExSoftBreak),
@@ -114,6 +147,7 @@ pub enum NewNode {
     Image(ExImage),
     ShortCode(ExShortCode),
     Math(ExMath),
+    MathBlock(ExMathBlock),
     MultilineBlockQuote(ExMultilineBlockQuote),
     Escaped(ExEscaped),
     WikiLink(ExWikiLink),
@@ -125,6 +159,7 @@ pub enum NewNode {
     Alert(ExAlert),
     Callout(ExCallout),
     CalloutTitle(ExCalloutTitle),
+    BlockId(ExBlockId),
     CommentInline(ExCommentInline),
     MultilineComment(ExMultilineComment),
     HeexBlock(ExHeexBlock),
@@ -154,6 +189,9 @@ impl NewNode {
             | Self::Table(ExTable { sourcepos, .. })
             | Self::TableRow(ExTableRow { sourcepos, .. })
             | Self::TableCell(ExTableCell { sourcepos, .. })
+            | Self::GridTable(ExGridTable { sourcepos, .. })
+            | Self::GridTableRow(ExGridTableRow { sourcepos, .. })
+            | Self::GridTableCell(ExGridTableCell { sourcepos, .. })
             | Self::Text(ExText { sourcepos, .. })
             | Self::TaskItem(ExTaskItem { sourcepos, .. })
             | Self::SoftBreak(ExSoftBreak { sourcepos })
@@ -171,6 +209,7 @@ impl NewNode {
             | Self::Image(ExImage { sourcepos, .. })
             | Self::ShortCode(ExShortCode { sourcepos, .. })
             | Self::Math(ExMath { sourcepos, .. })
+            | Self::MathBlock(ExMathBlock { sourcepos, .. })
             | Self::MultilineBlockQuote(ExMultilineBlockQuote { sourcepos, .. })
             | Self::Escaped(ExEscaped { sourcepos, .. })
             | Self::WikiLink(ExWikiLink { sourcepos, .. })
@@ -182,6 +221,7 @@ impl NewNode {
             | Self::Alert(ExAlert { sourcepos, .. })
             | Self::Callout(ExCallout { sourcepos, .. })
             | Self::CalloutTitle(ExCalloutTitle { sourcepos, .. })
+            | Self::BlockId(ExBlockId { sourcepos, .. })
             | Self::CommentInline(ExCommentInline { sourcepos, .. })
             | Self::MultilineComment(ExMultilineComment { sourcepos, .. })
             | Self::HeexBlock(ExHeexBlock { sourcepos, .. })
@@ -211,6 +251,9 @@ impl NewNode {
             | Self::Table(ExTable { nodes, .. })
             | Self::TableRow(ExTableRow { nodes, .. })
             | Self::TableCell(ExTableCell { nodes, .. })
+            | Self::GridTable(ExGridTable { nodes, .. })
+            | Self::GridTableRow(ExGridTableRow { nodes, .. })
+            | Self::GridTableCell(ExGridTableCell { nodes, .. })
             | Self::TaskItem(ExTaskItem { nodes, .. })
             | Self::Emph(ExEmph { nodes, .. })
             | Self::Strong(ExStrong { nodes, .. })
@@ -270,6 +313,9 @@ impl From<NewNode> for NodeValue {
             NewNode::Table(n) => n.into(),
             NewNode::TableRow(n) => n.into(),
             NewNode::TableCell(n) => n.into(),
+            NewNode::GridTable(n) => n.into(),
+            NewNode::GridTableRow(n) => n.into(),
+            NewNode::GridTableCell(n) => n.into(),
             NewNode::Text(n) => n.into(),
             NewNode::TaskItem(n) => n.into(),
             NewNode::SoftBreak(n) => n.into(),
@@ -287,6 +333,7 @@ impl From<NewNode> for NodeValue {
             NewNode::Image(n) => n.into(),
             NewNode::ShortCode(n) => n.into(),
             NewNode::Math(n) => n.into(),
+            NewNode::MathBlock(n) => n.into(),
             NewNode::MultilineBlockQuote(n) => n.into(),
             NewNode::Escaped(n) => n.into(),
             NewNode::WikiLink(n) => n.into(),
@@ -298,6 +345,7 @@ impl From<NewNode> for NodeValue {
             NewNode::Alert(n) => n.into(),
             NewNode::Callout(n) => n.into(),
             NewNode::CalloutTitle(n) => n.into(),
+            NewNode::BlockId(n) => n.into(),
             NewNode::CommentInline(n) => n.into(),
             NewNode::MultilineComment(n) => n.into(),
             NewNode::HeexBlock(n) => n.into(),
@@ -375,22 +423,16 @@ pub struct ExList {
 
 impl From<ExList> for NodeValue {
     fn from(node: ExList) -> Self {
-        NodeValue::List(comrak::nodes::NodeList {
-            list_type: match node.list_type {
-                ExListType::Bullet => comrak::nodes::ListType::Bullet,
-                ExListType::Ordered => comrak::nodes::ListType::Ordered,
-            },
-            marker_offset: node.marker_offset,
-            padding: node.padding,
-            start: node.start,
-            delimiter: match node.delimiter {
-                ExListDelimType::Period => comrak::nodes::ListDelimType::Period,
-                ExListDelimType::Paren => comrak::nodes::ListDelimType::Paren,
-            },
-            bullet_char: string_to_char(node.bullet_char),
-            tight: node.tight,
-            is_task_list: node.is_task_list,
-        })
+        NodeValue::List(node_list(
+            &node.list_type,
+            node.marker_offset,
+            node.padding,
+            node.start,
+            &node.delimiter,
+            node.bullet_char,
+            node.tight,
+            node.is_task_list,
+        ))
     }
 }
 
@@ -411,24 +453,48 @@ pub struct ExListItem {
 
 impl From<ExListItem> for NodeValue {
     fn from(node: ExListItem) -> Self {
-        NodeValue::Item(comrak::nodes::NodeList {
-            list_type: match node.list_type {
-                ExListType::Bullet => comrak::nodes::ListType::Bullet,
-                ExListType::Ordered => comrak::nodes::ListType::Ordered,
-            },
-            marker_offset: node.marker_offset,
-            padding: node.padding,
-            start: node.start,
-            delimiter: match node.delimiter {
-                ExListDelimType::Period => comrak::nodes::ListDelimType::Period,
-                ExListDelimType::Paren => comrak::nodes::ListDelimType::Paren,
-            },
-            bullet_char: string_to_char(node.bullet_char),
-            tight: node.tight,
-            is_task_list: node.is_task_list,
-        })
+        NodeValue::Item(node_list(
+            &node.list_type,
+            node.marker_offset,
+            node.padding,
+            node.start,
+            &node.delimiter,
+            node.bullet_char,
+            node.tight,
+            node.is_task_list,
+        ))
     }
 }
+// `NodeList` is non-exhaustive, so it is built from its default.
+#[allow(clippy::too_many_arguments)]
+fn node_list(
+    list_type: &ExListType,
+    marker_offset: usize,
+    padding: usize,
+    start: usize,
+    delimiter: &ExListDelimType,
+    bullet_char: String,
+    tight: bool,
+    is_task_list: bool,
+) -> NodeList {
+    let mut list = NodeList::default();
+    list.list_type = match list_type {
+        ExListType::Bullet => ListType::Bullet,
+        ExListType::Ordered => ListType::Ordered,
+    };
+    list.marker_offset = marker_offset;
+    list.padding = padding;
+    list.start = start;
+    list.delimiter = match delimiter {
+        ExListDelimType::Period => ListDelimType::Period,
+        ExListDelimType::Paren => ListDelimType::Paren,
+    };
+    list.bullet_char = string_to_char(bullet_char);
+    list.tight = tight;
+    list.is_task_list = is_task_list;
+    list
+}
+
 #[derive(Clone, Debug, NifStruct, PartialEq)]
 #[module = "MDExNative.Comrak.DescriptionList"]
 pub struct ExDescriptionList {
@@ -454,11 +520,10 @@ pub struct ExDescriptionItem {
 
 impl From<ExDescriptionItem> for NodeValue {
     fn from(node: ExDescriptionItem) -> Self {
-        NodeValue::DescriptionItem(comrak::nodes::NodeDescriptionItem {
-            marker_offset: node.marker_offset,
-            padding: node.padding,
-            tight: node.tight,
-        })
+        let mut item = NodeDescriptionItem::new(node.tight);
+        item.marker_offset = node.marker_offset;
+        item.padding = node.padding;
+        NodeValue::DescriptionItem(item)
     }
 }
 
@@ -505,15 +570,15 @@ pub struct ExCodeBlock {
 
 impl From<ExCodeBlock> for NodeValue {
     fn from(node: ExCodeBlock) -> Self {
-        NodeValue::CodeBlock(Box::new(comrak::nodes::NodeCodeBlock {
-            fenced: node.fenced,
-            fence_char: string_to_char(node.fence_char),
-            fence_length: node.fence_length,
-            fence_offset: node.fence_offset,
-            info: node.info,
-            literal: node.literal,
-            closed: node.closed,
-        }))
+        let mut code_block = NodeCodeBlock::default();
+        code_block.fenced = node.fenced;
+        code_block.fence_char = string_to_char(node.fence_char);
+        code_block.fence_length = node.fence_length;
+        code_block.fence_offset = node.fence_offset;
+        code_block.info = node.info;
+        code_block.literal = node.literal;
+        code_block.closed = node.closed;
+        NodeValue::CodeBlock(Box::new(code_block))
     }
 }
 
@@ -528,10 +593,9 @@ pub struct ExHtmlBlock {
 
 impl From<ExHtmlBlock> for NodeValue {
     fn from(node: ExHtmlBlock) -> Self {
-        NodeValue::HtmlBlock(comrak::nodes::NodeHtmlBlock {
-            block_type: node.block_type,
-            literal: node.literal,
-        })
+        let mut html_block = NodeHtmlBlock::new(node.literal);
+        html_block.block_type = node.block_type;
+        NodeValue::HtmlBlock(html_block)
     }
 }
 
@@ -561,11 +625,10 @@ pub struct ExHeading {
 
 impl From<ExHeading> for NodeValue {
     fn from(node: ExHeading) -> Self {
-        NodeValue::Heading(comrak::nodes::NodeHeading {
-            level: node.level,
-            setext: node.setext,
-            closed: node.closed,
-        })
+        let mut heading = NodeHeading::new(node.level);
+        heading.setext = node.setext;
+        heading.closed = node.closed;
+        NodeValue::Heading(heading)
     }
 }
 
@@ -577,7 +640,7 @@ pub struct ExThematicBreak {
 
 impl From<ExThematicBreak> for NodeValue {
     fn from(_node: ExThematicBreak) -> Self {
-        NodeValue::ThematicBreak
+        NodeValue::ThematicBreak(NodeThematicBreak::default())
     }
 }
 
@@ -592,10 +655,9 @@ pub struct ExFootnoteDefinition {
 
 impl From<ExFootnoteDefinition> for NodeValue {
     fn from(node: ExFootnoteDefinition) -> Self {
-        NodeValue::FootnoteDefinition(comrak::nodes::NodeFootnoteDefinition {
-            name: node.name.to_string(),
-            total_references: node.total_references,
-        })
+        let mut definition = NodeFootnoteDefinition::new(node.name);
+        definition.total_references = node.total_references;
+        NodeValue::FootnoteDefinition(definition)
     }
 }
 
@@ -611,12 +673,11 @@ pub struct ExFootnoteReference {
 
 impl From<ExFootnoteReference> for NodeValue {
     fn from(node: ExFootnoteReference) -> Self {
-        NodeValue::FootnoteReference(Box::new(comrak::nodes::NodeFootnoteReference {
-            name: node.name.to_string(),
-            ref_num: node.ref_num,
-            ix: node.ix,
-            texts: node.texts,
-        }))
+        let mut reference = NodeFootnoteReference::new(node.name);
+        reference.ref_num = node.ref_num;
+        reference.ix = node.ix;
+        reference.texts = node.texts;
+        NodeValue::FootnoteReference(Box::new(reference))
     }
 }
 
@@ -641,21 +702,11 @@ pub struct ExTable {
 
 impl From<ExTable> for NodeValue {
     fn from(node: ExTable) -> Self {
-        NodeValue::Table(Box::new(comrak::nodes::NodeTable {
-            alignments: node
-                .alignments
-                .into_iter()
-                .map(|a| match a {
-                    ExTableAlignment::None => comrak::nodes::TableAlignment::None,
-                    ExTableAlignment::Left => comrak::nodes::TableAlignment::Left,
-                    ExTableAlignment::Center => comrak::nodes::TableAlignment::Center,
-                    ExTableAlignment::Right => comrak::nodes::TableAlignment::Right,
-                })
-                .collect(),
-            num_columns: node.num_columns,
-            num_rows: node.num_rows,
-            num_nonempty_cells: node.num_nonempty_cells,
-        }))
+        let mut table = NodeTable::new(node.alignments.into_iter().map(Into::into).collect());
+        table.num_columns = node.num_columns;
+        table.num_rows = node.num_rows;
+        table.num_nonempty_cells = node.num_nonempty_cells;
+        NodeValue::Table(Box::new(table))
     }
 }
 
@@ -669,7 +720,7 @@ pub struct ExTableRow {
 
 impl From<ExTableRow> for NodeValue {
     fn from(node: ExTableRow) -> Self {
-        NodeValue::TableRow(node.header)
+        NodeValue::TableRow(NodeTableRow::new(node.header))
     }
 }
 
@@ -683,6 +734,99 @@ pub struct ExTableCell {
 impl From<ExTableCell> for NodeValue {
     fn from(_node: ExTableCell) -> Self {
         NodeValue::TableCell
+    }
+}
+
+impl From<ExTableAlignment> for TableAlignment {
+    fn from(alignment: ExTableAlignment) -> Self {
+        match alignment {
+            ExTableAlignment::None => TableAlignment::None,
+            ExTableAlignment::Left => TableAlignment::Left,
+            ExTableAlignment::Center => TableAlignment::Center,
+            ExTableAlignment::Right => TableAlignment::Right,
+        }
+    }
+}
+
+impl From<&TableAlignment> for ExTableAlignment {
+    fn from(alignment: &TableAlignment) -> Self {
+        match alignment {
+            TableAlignment::None => ExTableAlignment::None,
+            TableAlignment::Left => ExTableAlignment::Left,
+            TableAlignment::Center => ExTableAlignment::Center,
+            TableAlignment::Right => ExTableAlignment::Right,
+        }
+    }
+}
+
+#[derive(Clone, Debug, NifStruct, PartialEq)]
+#[module = "MDExNative.Comrak.GridTableColumn"]
+pub struct ExGridTableColumn {
+    pub alignment: ExTableAlignment,
+    pub width: usize,
+}
+
+#[derive(Clone, Debug, NifStruct, PartialEq)]
+#[module = "MDExNative.Comrak.GridTable"]
+pub struct ExGridTable {
+    pub nodes: Vec<NewNode>,
+    pub columns: Vec<ExGridTableColumn>,
+    pub sourcepos: ExSourcepos,
+}
+
+impl From<ExGridTable> for NodeValue {
+    fn from(node: ExGridTable) -> Self {
+        NodeValue::GridTable(Box::new(NodeGridTable::new(
+            node.columns
+                .into_iter()
+                .map(|column| GridTableColumn::new(column.alignment.into(), column.width))
+                .collect(),
+        )))
+    }
+}
+
+#[derive(Clone, Debug, NifUnitEnum, PartialEq)]
+pub enum ExGridTableSection {
+    Head,
+    Body,
+    Foot,
+}
+
+#[derive(Clone, Debug, NifStruct, PartialEq)]
+#[module = "MDExNative.Comrak.GridTableRow"]
+pub struct ExGridTableRow {
+    pub nodes: Vec<NewNode>,
+    pub section: ExGridTableSection,
+    pub sourcepos: ExSourcepos,
+}
+
+impl From<ExGridTableRow> for NodeValue {
+    fn from(node: ExGridTableRow) -> Self {
+        NodeValue::GridTableRow(match node.section {
+            ExGridTableSection::Head => GridTableSection::Head,
+            ExGridTableSection::Body => GridTableSection::Body,
+            ExGridTableSection::Foot => GridTableSection::Foot,
+        })
+    }
+}
+
+#[derive(Clone, Debug, NifStruct, PartialEq)]
+#[module = "MDExNative.Comrak.GridTableCell"]
+pub struct ExGridTableCell {
+    pub nodes: Vec<NewNode>,
+    pub column: usize,
+    pub colspan: usize,
+    pub rowspan: usize,
+    pub sourcepos: ExSourcepos,
+}
+
+impl From<ExGridTableCell> for NodeValue {
+    fn from(node: ExGridTableCell) -> Self {
+        NodeValue::GridTableCell(NodeGridTableCell::new(
+            node.column,
+            node.colspan,
+            node.rowspan,
+        ))
     }
 }
 
@@ -710,13 +854,7 @@ pub struct ExTaskItem {
 
 impl From<ExTaskItem> for NodeValue {
     fn from(node: ExTaskItem) -> Self {
-        NodeValue::TaskItem(NodeTaskItem {
-            symbol: node.marker.chars().next(),
-            symbol_sourcepos: Sourcepos {
-                start: LineColumn::default(),
-                end: LineColumn::default(),
-            },
-        })
+        NodeValue::TaskItem(NodeTaskItem::new(node.marker.chars().next()))
     }
 }
 
@@ -755,10 +893,9 @@ pub struct ExCode {
 
 impl From<ExCode> for NodeValue {
     fn from(node: ExCode) -> Self {
-        NodeValue::Code(comrak::nodes::NodeCode {
-            num_backticks: node.num_backticks,
-            literal: node.literal,
-        })
+        let mut code = NodeCode::new(node.literal);
+        code.num_backticks = node.num_backticks;
+        NodeValue::Code(code)
     }
 }
 
@@ -793,10 +930,7 @@ impl From<ExHeexBlock> for NodeValue {
             "expression" => HeexNode::Expression,
             tag => HeexNode::Tag(tag.to_string()),
         };
-        NodeValue::HeexBlock(Box::new(NodeHeexBlock {
-            literal: node.literal,
-            node: heex_node,
-        }))
+        NodeValue::HeexBlock(Box::new(NodeHeexBlock::new(node.literal, heex_node)))
     }
 }
 
@@ -835,7 +969,7 @@ pub struct ExEmph {
 
 impl From<ExEmph> for NodeValue {
     fn from(_node: ExEmph) -> Self {
-        NodeValue::Emph
+        NodeValue::Emph(NodeEmph::default())
     }
 }
 
@@ -848,7 +982,7 @@ pub struct ExStrong {
 
 impl From<ExStrong> for NodeValue {
     fn from(_node: ExStrong) -> Self {
-        NodeValue::Strong
+        NodeValue::Strong(NodeStrong::default())
     }
 }
 
@@ -861,7 +995,7 @@ pub struct ExStrikethrough {
 
 impl From<ExStrikethrough> for NodeValue {
     fn from(_node: ExStrikethrough) -> Self {
-        NodeValue::Strikethrough
+        NodeValue::Strikethrough(NodeStrikethrough::default())
     }
 }
 
@@ -916,10 +1050,7 @@ pub struct ExLink {
 
 impl From<ExLink> for NodeValue {
     fn from(node: ExLink) -> Self {
-        NodeValue::Link(Box::new(comrak::nodes::NodeLink {
-            url: node.url,
-            title: node.title,
-        }))
+        NodeValue::Link(Box::new(NodeLink::new(node.url, node.title)))
     }
 }
 
@@ -935,10 +1066,7 @@ pub struct ExImage {
 
 impl From<ExImage> for NodeValue {
     fn from(node: ExImage) -> Self {
-        NodeValue::Image(Box::new(comrak::nodes::NodeLink {
-            url: node.url,
-            title: node.title,
-        }))
+        NodeValue::Image(Box::new(NodeLink::new(node.url, node.title)))
     }
 }
 #[derive(Clone, Debug, NifStruct, PartialEq)]
@@ -951,10 +1079,7 @@ pub struct ExShortCode {
 
 impl From<ExShortCode> for NodeValue {
     fn from(node: ExShortCode) -> Self {
-        NodeValue::ShortCode(Box::new(comrak::nodes::NodeShortCode {
-            code: node.code.to_string(),
-            emoji: node.emoji.to_string(),
-        }))
+        NodeValue::ShortCode(Box::new(NodeShortCode::new(node.code, node.emoji)))
     }
 }
 
@@ -969,11 +1094,27 @@ pub struct ExMath {
 
 impl From<ExMath> for NodeValue {
     fn from(node: ExMath) -> Self {
-        NodeValue::Math(comrak::nodes::NodeMath {
-            dollar_math: node.dollar_math,
-            display_math: node.display_math,
-            literal: node.literal,
-        })
+        let mut math = NodeMath::new(node.literal, node.display_math);
+        math.dollar_math = node.dollar_math;
+        NodeValue::Math(math)
+    }
+}
+
+#[derive(Clone, Debug, NifStruct, PartialEq)]
+#[module = "MDExNative.Comrak.MathBlock"]
+pub struct ExMathBlock {
+    pub fence_offset: usize,
+    pub literal: String,
+    pub closed: bool,
+    pub sourcepos: ExSourcepos,
+}
+
+impl From<ExMathBlock> for NodeValue {
+    fn from(node: ExMathBlock) -> Self {
+        let mut math = NodeMathBlock::new(node.literal);
+        math.fence_offset = node.fence_offset;
+        math.closed = node.closed;
+        NodeValue::MathBlock(Box::new(math))
     }
 }
 
@@ -988,10 +1129,10 @@ pub struct ExMultilineBlockQuote {
 
 impl From<ExMultilineBlockQuote> for NodeValue {
     fn from(node: ExMultilineBlockQuote) -> Self {
-        NodeValue::MultilineBlockQuote(comrak::nodes::NodeMultilineBlockQuote {
-            fence_length: node.fence_length,
-            fence_offset: node.fence_offset,
-        })
+        let mut block_quote = NodeMultilineBlockQuote::default();
+        block_quote.fence_length = node.fence_length;
+        block_quote.fence_offset = node.fence_offset;
+        NodeValue::MultilineBlockQuote(block_quote)
     }
 }
 
@@ -1019,10 +1160,7 @@ pub struct ExWikiLink {
 
 impl From<ExWikiLink> for NodeValue {
     fn from(node: ExWikiLink) -> Self {
-        NodeValue::WikiLink(comrak::nodes::NodeWikiLink {
-            url: node.url.to_string(),
-            embed: node.embed,
-        })
+        NodeValue::WikiLink(NodeWikiLink::new(node.url, node.embed))
     }
 }
 
@@ -1131,19 +1269,18 @@ pub struct ExAlert {
 
 impl From<ExAlert> for NodeValue {
     fn from(node: ExAlert) -> Self {
-        NodeValue::Alert(Box::new(comrak::nodes::NodeAlert {
-            alert_type: match node.alert_type {
-                ExAlertType::Note => comrak::nodes::AlertType::Note,
-                ExAlertType::Tip => comrak::nodes::AlertType::Tip,
-                ExAlertType::Important => comrak::nodes::AlertType::Important,
-                ExAlertType::Warning => comrak::nodes::AlertType::Warning,
-                ExAlertType::Caution => comrak::nodes::AlertType::Caution,
-            },
-            title: node.title,
-            multiline: node.multiline,
-            fence_length: node.fence_length,
-            fence_offset: node.fence_offset,
-        }))
+        let alert_type = match node.alert_type {
+            ExAlertType::Note => comrak::nodes::AlertType::Note,
+            ExAlertType::Tip => comrak::nodes::AlertType::Tip,
+            ExAlertType::Important => comrak::nodes::AlertType::Important,
+            ExAlertType::Warning => comrak::nodes::AlertType::Warning,
+            ExAlertType::Caution => comrak::nodes::AlertType::Caution,
+        };
+        let mut alert = NodeAlert::new(alert_type, node.title);
+        alert.multiline = node.multiline;
+        alert.fence_length = node.fence_length;
+        alert.fence_offset = node.fence_offset;
+        NodeValue::Alert(Box::new(alert))
     }
 }
 
@@ -1156,9 +1293,7 @@ pub struct ExCommentInline {
 
 impl From<ExCommentInline> for NodeValue {
     fn from(node: ExCommentInline) -> Self {
-        NodeValue::CommentInline(comrak::nodes::NodeComment {
-            literal: node.literal,
-        })
+        NodeValue::CommentInline(NodeComment::new(node.literal))
     }
 }
 
@@ -1172,10 +1307,9 @@ pub struct ExMultilineComment {
 
 impl From<ExMultilineComment> for NodeValue {
     fn from(node: ExMultilineComment) -> Self {
-        NodeValue::MultilineComment(comrak::nodes::NodeCommentBlock {
-            literal: node.literal,
-            closed: node.closed,
-        })
+        let mut comment = NodeCommentBlock::new(node.literal);
+        comment.closed = node.closed;
+        NodeValue::MultilineComment(comment)
     }
 }
 
@@ -1198,15 +1332,16 @@ pub struct ExCallout {
 
 impl From<ExCallout> for NodeValue {
     fn from(node: ExCallout) -> Self {
-        NodeValue::Callout(Box::new(comrak::nodes::NodeCallout {
-            callout_type: node.callout_type,
-            metadata: node.metadata,
-            fold: match node.fold {
-                ExCalloutFold::None => comrak::nodes::CalloutFold::None,
-                ExCalloutFold::Expanded => comrak::nodes::CalloutFold::Expanded,
-                ExCalloutFold::Collapsed => comrak::nodes::CalloutFold::Collapsed,
-            },
-        }))
+        let fold = match node.fold {
+            ExCalloutFold::None => comrak::nodes::CalloutFold::None,
+            ExCalloutFold::Expanded => comrak::nodes::CalloutFold::Expanded,
+            ExCalloutFold::Collapsed => comrak::nodes::CalloutFold::Collapsed,
+        };
+        NodeValue::Callout(Box::new(NodeCallout::new(
+            node.callout_type,
+            node.metadata,
+            fold,
+        )))
     }
 }
 
@@ -1224,6 +1359,19 @@ impl From<ExCalloutTitle> for NodeValue {
 }
 
 #[derive(Clone, Debug, NifStruct, PartialEq)]
+#[module = "MDExNative.Comrak.BlockId"]
+pub struct ExBlockId {
+    pub name: String,
+    pub sourcepos: ExSourcepos,
+}
+
+impl From<ExBlockId> for NodeValue {
+    fn from(node: ExBlockId) -> Self {
+        NodeValue::BlockId(Box::new(NodeBlockId::new(node.name)))
+    }
+}
+
+#[derive(Clone, Debug, NifStruct, PartialEq)]
 #[module = "MDExNative.Comrak.BlockDirective"]
 pub struct ExBlockDirective {
     pub nodes: Vec<NewNode>,
@@ -1235,11 +1383,10 @@ pub struct ExBlockDirective {
 
 impl From<ExBlockDirective> for NodeValue {
     fn from(node: ExBlockDirective) -> Self {
-        NodeValue::BlockDirective(Box::new(comrak::nodes::NodeBlockDirective {
-            info: node.info,
-            fence_length: node.fence_length,
-            fence_offset: node.fence_offset,
-        }))
+        let mut directive = NodeBlockDirective::new(node.info);
+        directive.fence_length = node.fence_length;
+        directive.fence_offset = node.fence_offset;
+        NodeValue::BlockDirective(Box::new(directive))
     }
 }
 
@@ -1388,7 +1535,7 @@ fn comrak_ast_to_ex_document_with_children<'a>(
             sourcepos,
         }),
 
-        NodeValue::ThematicBreak => NewNode::ThematicBreak(ExThematicBreak { sourcepos }),
+        NodeValue::ThematicBreak(_) => NewNode::ThematicBreak(ExThematicBreak { sourcepos }),
 
         NodeValue::FootnoteDefinition(ref attrs) => {
             NewNode::FootnoteDefinition(ExFootnoteDefinition {
@@ -1411,30 +1558,52 @@ fn comrak_ast_to_ex_document_with_children<'a>(
 
         NodeValue::Table(attrs) => NewNode::Table(ExTable {
             nodes: children,
-            alignments: attrs
-                .alignments
-                .iter()
-                .map(|a| match a {
-                    comrak::nodes::TableAlignment::None => ExTableAlignment::None,
-                    comrak::nodes::TableAlignment::Left => ExTableAlignment::Left,
-                    comrak::nodes::TableAlignment::Center => ExTableAlignment::Center,
-                    comrak::nodes::TableAlignment::Right => ExTableAlignment::Right,
-                })
-                .collect(),
+            alignments: attrs.alignments.iter().map(Into::into).collect(),
             num_columns: attrs.num_columns,
             num_rows: attrs.num_rows,
             num_nonempty_cells: attrs.num_nonempty_cells,
             sourcepos,
         }),
 
-        NodeValue::TableRow(header) => NewNode::TableRow(ExTableRow {
+        NodeValue::TableRow(row) => NewNode::TableRow(ExTableRow {
             nodes: children,
-            header: *header,
+            header: row.header,
             sourcepos,
         }),
 
         NodeValue::TableCell => NewNode::TableCell(ExTableCell {
             nodes: children,
+            sourcepos,
+        }),
+
+        NodeValue::GridTable(table) => NewNode::GridTable(ExGridTable {
+            nodes: children,
+            columns: table
+                .columns
+                .iter()
+                .map(|column| ExGridTableColumn {
+                    alignment: (&column.alignment).into(),
+                    width: column.width,
+                })
+                .collect(),
+            sourcepos,
+        }),
+
+        NodeValue::GridTableRow(section) => NewNode::GridTableRow(ExGridTableRow {
+            nodes: children,
+            section: match section {
+                GridTableSection::Head => ExGridTableSection::Head,
+                GridTableSection::Body => ExGridTableSection::Body,
+                GridTableSection::Foot => ExGridTableSection::Foot,
+            },
+            sourcepos,
+        }),
+
+        NodeValue::GridTableCell(cell) => NewNode::GridTableCell(ExGridTableCell {
+            nodes: children,
+            column: cell.column,
+            colspan: cell.colspan,
+            rowspan: cell.rowspan,
             sourcepos,
         }),
 
@@ -1471,17 +1640,17 @@ fn comrak_ast_to_ex_document_with_children<'a>(
             sourcepos,
         }),
 
-        NodeValue::Emph => NewNode::Emph(ExEmph {
+        NodeValue::Emph(_) => NewNode::Emph(ExEmph {
             nodes: children,
             sourcepos,
         }),
 
-        NodeValue::Strong => NewNode::Strong(ExStrong {
+        NodeValue::Strong(_) => NewNode::Strong(ExStrong {
             nodes: children,
             sourcepos,
         }),
 
-        NodeValue::Strikethrough => NewNode::Strikethrough(ExStrikethrough {
+        NodeValue::Strikethrough(_) => NewNode::Strikethrough(ExStrikethrough {
             nodes: children,
             sourcepos,
         }),
@@ -1527,6 +1696,13 @@ fn comrak_ast_to_ex_document_with_children<'a>(
             dollar_math: attrs.dollar_math,
             display_math: attrs.display_math,
             literal: attrs.literal.to_string(),
+            sourcepos,
+        }),
+
+        NodeValue::MathBlock(ref attrs) => NewNode::MathBlock(ExMathBlock {
+            fence_offset: attrs.fence_offset,
+            literal: attrs.literal.clone(),
+            closed: attrs.closed,
             sourcepos,
         }),
 
@@ -1585,6 +1761,7 @@ fn comrak_ast_to_ex_document_with_children<'a>(
                 comrak::nodes::AlertType::Important => ExAlertType::Important,
                 comrak::nodes::AlertType::Warning => ExAlertType::Warning,
                 comrak::nodes::AlertType::Caution => ExAlertType::Caution,
+                other => unreachable!("comrak 1.x has no alert type {other:?}"),
             },
             title: attrs.title.to_owned(),
             multiline: attrs.multiline,
@@ -1610,6 +1787,11 @@ fn comrak_ast_to_ex_document_with_children<'a>(
             sourcepos,
         }),
 
+        NodeValue::BlockId(ref attrs) => NewNode::BlockId(ExBlockId {
+            name: attrs.name.clone(),
+            sourcepos,
+        }),
+
         NodeValue::CommentInline(ref attrs) => NewNode::CommentInline(ExCommentInline {
             literal: attrs.literal.clone(),
             sourcepos,
@@ -1630,6 +1812,7 @@ fn comrak_ast_to_ex_document_with_children<'a>(
                 HeexNode::MultilineComment => "multiline_comment".to_string(),
                 HeexNode::Expression => "expression".to_string(),
                 HeexNode::Tag(tag) => tag.clone(),
+                other => unreachable!("comrak 1.x has no HEEx node {other:?}"),
             },
             sourcepos,
         }),
@@ -1646,6 +1829,10 @@ fn comrak_ast_to_ex_document_with_children<'a>(
             fence_offset: attrs.fence_offset,
             sourcepos,
         }),
+
+        // Comrak adds node types only with new options, and none reach here
+        // that this module does not decode.
+        other => unreachable!("comrak produced a node MDExNative does not know: {other:?}"),
     }
 }
 

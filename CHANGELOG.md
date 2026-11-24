@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- Add `extension: [grid_table: true]` for Pandoc-style grid tables, with the `GridTable`, `GridTableRow`, `GridTableCell`, and `GridTableColumn` AST nodes, and `render: [grid_table_widths: true]` to write their column widths.
+- Add `extension: [math_dollars: true, math_dollars_block: true]` and the `MathBlock` AST node for `$$` display math.
+- Add `extension: [ofm_block_ids: true]` and the `BlockId` AST node for Obsidian block IDs (`^name`).
+- Add `render: [attributes: true]`, which with `render: [unsafe: true]` renders parsed attributes on headings, code blocks, and inline code too. `document_to_commonmark/2` writes attributes back.
+
+### Security
+
+- Include Comrak's fixes for quadratic-time parsing ([GHSA-7f8r-4rh5-vr5h](https://github.com/kivikakk/comrak/security/advisories/GHSA-7f8r-4rh5-vr5h)) and its limits on nesting depth and output amplification.
+
+### Dependencies
+
+- Upgrade Comrak to 1.2 in [\#160](https://github.com/leandrocp/mdex_native/pull/160)
+
+### Compatibility
+
+- Comrak 1.x follows written specs for most extensions, so edge cases in footnotes, attributes, wikilinks, alerts, task lists, tables, math, description lists, and source positions parse differently. `FootnoteReference.texts` holds the label as written, such as `[{"^1", 2}]`. See the [Comrak releases](https://github.com/kivikakk/comrak/releases).
+- Attributes that MDExNative or Comrak writes on links and images, such as `href` and `src`, take precedence over parsed attributes with the same name. Invalid attribute keys are dropped.
+- Downstream AST adapters (including MDEx's Comrak converter) must handle `BlockId`, `GridTable`, `GridTableRow`, `GridTableCell`, `GridTableColumn`, and `MathBlock`.
+
 ## [0.3.3](https://github.com/leandrocp/mdex_native/compare/v0.3.2...v0.3.3) (2026-11-23)
 
 ### Bug Fixes

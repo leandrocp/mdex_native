@@ -363,6 +363,72 @@ defmodule MDExNative.Comrak.TableCell do
   defstruct nodes: [], sourcepos: %MDExNative.Comrak.Sourcepos{}
 end
 
+defmodule MDExNative.Comrak.GridTable do
+  @moduledoc """
+  A Pandoc-style grid table, enabled with `extension: [grid_table: true]`.
+
+  Its children are `MDExNative.Comrak.GridTableRow`s. `columns` holds one
+  `MDExNative.Comrak.GridTableColumn` per column. `render: [grid_table_widths: true]`
+  writes a `<colgroup>` with each column's share of the total width.
+
+  Spec: https://comrak.ee/extensions/grid-table.html
+  """
+
+  @type t :: %__MODULE__{
+          nodes: [MDExNative.Comrak.ast_node()],
+          columns: [MDExNative.Comrak.GridTableColumn.t()]
+        }
+  defstruct nodes: [], columns: [], sourcepos: %MDExNative.Comrak.Sourcepos{}
+end
+
+defmodule MDExNative.Comrak.GridTableColumn do
+  @moduledoc """
+  A column of a grid table: its alignment, and its `width` in display columns
+  between the borders, wide characters counting as two.
+
+  See `MDExNative.Comrak.GridTable`
+  """
+
+  @type t :: %__MODULE__{
+          alignment: :none | :left | :center | :right,
+          width: non_neg_integer()
+        }
+  defstruct alignment: :none, width: 0
+end
+
+defmodule MDExNative.Comrak.GridTableRow do
+  @moduledoc """
+  A row of a grid table, in its head, body, or foot `section`.
+
+  See `MDExNative.Comrak.GridTable`
+  """
+
+  @type t :: %__MODULE__{nodes: [MDExNative.Comrak.ast_node()], section: :head | :body | :foot}
+  defstruct nodes: [], section: :body, sourcepos: %MDExNative.Comrak.Sourcepos{}
+end
+
+defmodule MDExNative.Comrak.GridTableCell do
+  @moduledoc """
+  A cell of a grid table row. Unlike `MDExNative.Comrak.TableCell`, it holds
+  blocks, and it can span columns and rows. `column` is its zero-based starting
+  column.
+
+  See `MDExNative.Comrak.GridTable`
+  """
+
+  @type t :: %__MODULE__{
+          nodes: [MDExNative.Comrak.ast_node()],
+          column: non_neg_integer(),
+          colspan: pos_integer(),
+          rowspan: pos_integer()
+        }
+  defstruct nodes: [],
+            column: 0,
+            colspan: 1,
+            rowspan: 1,
+            sourcepos: %MDExNative.Comrak.Sourcepos{}
+end
+
 defmodule MDExNative.Comrak.Text do
   @moduledoc """
   Literal text.
@@ -574,6 +640,25 @@ defmodule MDExNative.Comrak.Math do
             sourcepos: %MDExNative.Comrak.Sourcepos{}
 end
 
+defmodule MDExNative.Comrak.MathBlock do
+  @moduledoc """
+  Display math between lines of only `$$`, enabled with
+  `extension: [math_dollars: true, math_dollars_block: true]`.
+
+  The literal is not parsed as Markdown. `closed` records whether a closing
+  `$$` line was present; an unclosed block runs to the end of its container.
+
+  Spec: https://comrak.ee/extensions/math-dollars-block.html
+  """
+
+  @type t :: %__MODULE__{
+          fence_offset: non_neg_integer(),
+          literal: String.t(),
+          closed: boolean()
+        }
+  defstruct fence_offset: 0, literal: "", closed: true, sourcepos: %MDExNative.Comrak.Sourcepos{}
+end
+
 defmodule MDExNative.Comrak.MultilineBlockQuote do
   @moduledoc """
   A multiline block quote.
@@ -686,6 +771,21 @@ defmodule MDExNative.Comrak.Alert do
             fence_length: 0,
             fence_offset: 0,
             sourcepos: %MDExNative.Comrak.Sourcepos{}
+end
+
+defmodule MDExNative.Comrak.BlockId do
+  @moduledoc """
+  An Obsidian block identifier, `^name` at the end of a block, enabled with
+  `extension: [ofm_block_ids: true]`.
+
+  It is the last inline of the block it labels. HTML does not render it as
+  text; the block gets `id="^name"` instead. `name` excludes the caret.
+
+  Spec: https://comrak.ee/extensions/ofm-block-ids.html
+  """
+
+  @type t :: %__MODULE__{name: String.t()}
+  defstruct name: "", sourcepos: %MDExNative.Comrak.Sourcepos{}
 end
 
 defmodule MDExNative.Comrak.CommentInline do

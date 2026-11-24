@@ -1,9 +1,10 @@
-use std::collections::HashMap;
+use std::borrow::Cow;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::{self, Write};
 use std::sync::Mutex;
 
 use crate::types::options::ExBudget;
-use comrak::adapters::SyntaxHighlighterAdapter;
+use comrak::adapters::{SyntaxHighlightMeta, SyntaxHighlighterAdapter};
 use lumis_core::elixir::ExFormatterOption;
 
 use crate::html_formatter::InlineCodeHighlighter;
@@ -11,41 +12,42 @@ use crate::lumis_render::{render_code_fence, render_inline_code};
 
 const POISONED: &str = "a Lumis adapter lock is poisoned";
 
-/// What the `<pre>` and `<code>` tags said about the fence Comrak is about to
-/// hand to `write_highlighted`. Comrak reports the info string and the language
-/// on those tags and neither on the fence body.
+/// What the `<pre>` and `<code>` tags carried for the fence Comrak is about to
+/// hand to `write_highlighted`: the decorators, which Comrak puts in
+/// `data-meta` only with `render: [full_info_string: true]`, and the fence's
+/// own attributes, which it puts on `<pre>` only with `render: [unsafe: true,
+/// attributes: true]`.
 #[derive(Default)]
 struct FenceState {
     attributes: HashMap<String, String>,
-    language: Option<String>,
+    pre_attrs: Vec<(String, String)>,
 }
+
+/// Attributes Comrak itself writes on a fence's `<pre>`. MDExNative never
+/// wrote them on a Lumis `<pre>`, and the language and decorators reach Lumis
+/// another way.
+const GENERATED_PRE_ATTRS: [&str; 4] = ["lang", "data-meta", "data-sourcepos", "data-math-style"];
 
 impl FenceState {
     fn reset(&mut self) {
         self.attributes.clear();
-        self.language = None;
+        self.pre_attrs.clear();
     }
 
-    fn update(&mut self, attributes: &HashMap<&'static str, std::borrow::Cow<'_, str>>) {
+    fn record_pre_attrs(&mut self, attributes: &BTreeMap<&str, Cow<'_, str>>) {
+        self.pre_attrs = attributes
+            .iter()
+            .filter(|(name, _)| !GENERATED_PRE_ATTRS.contains(name))
+            .map(|(name, value)| (name.to_string(), value.to_string()))
+            .collect();
+    }
+
+    fn update(&mut self, attributes: &BTreeMap<&str, Cow<'_, str>>) {
         if let Some(custom_attributes) = attributes
             .get("data-meta")
             .and_then(|metadata| parse_custom_attributes(metadata.as_ref()))
         {
             self.attributes = custom_attributes;
-        }
-
-        let language = attributes
-            .get("lang")
-            .map(|language| language.to_string())
-            .or_else(|| {
-                attributes
-                    .get("class")
-                    .and_then(|class| class.strip_prefix("language-"))
-                    .map(str::to_string)
-            });
-
-        if language.is_some() {
-            self.language = language;
         }
     }
 }
@@ -111,11 +113,13 @@ impl SyntaxHighlighterAdapter for LumisAdapter {
     fn write_pre_tag(
         &self,
         _output: &mut dyn Write,
-        attributes: HashMap<&'static str, std::borrow::Cow<'_, str>>,
+        _highlight: &SyntaxHighlightMeta<'_>,
+        attributes: BTreeMap<&str, Cow<'_, str>>,
     ) -> fmt::Result {
         let mut fence = self.fence.lock().map_err(|_| self.fail(POISONED.into()))?;
         fence.reset();
         fence.update(&attributes);
+        fence.record_pre_attrs(&attributes);
 
         Ok(())
     }
@@ -123,7 +127,8 @@ impl SyntaxHighlighterAdapter for LumisAdapter {
     fn write_code_tag(
         &self,
         _output: &mut dyn Write,
-        attributes: HashMap<&'static str, std::borrow::Cow<'_, str>>,
+        _highlight: &SyntaxHighlightMeta<'_>,
+        attributes: BTreeMap<&str, Cow<'_, str>>,
     ) -> fmt::Result {
         self.fence
             .lock()
@@ -136,19 +141,18 @@ impl SyntaxHighlighterAdapter for LumisAdapter {
     fn write_highlighted(
         &self,
         output: &mut dyn Write,
-        language: Option<&str>,
-        source: &str,
+        highlight: &SyntaxHighlightMeta<'_>,
     ) -> fmt::Result {
         let fence = self.fence.lock().map_err(|_| self.fail(POISONED.into()))?;
-        let language = fence.language.as_deref().or(language);
         let highlighted = render_code_fence(
-            source,
-            language,
+            highlight.code,
+            Some(highlight.lang),
             Some(self.formatter.clone()),
             self.rainbow_brackets,
             self.word_diff,
             self.budget,
             &fence.attributes,
+            &fence.pre_attrs,
         )
         .map_err(|reason| self.fail(reason))?;
 
@@ -182,35 +186,12 @@ impl InlineCodeHighlighter for LumisAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::borrow::Cow;
 
-    fn tag(attributes: &[(&'static str, &str)]) -> HashMap<&'static str, Cow<'static, str>> {
+    fn tag(attributes: &[(&'static str, &str)]) -> BTreeMap<&'static str, Cow<'static, str>> {
         attributes
             .iter()
             .map(|(key, value)| (*key, Cow::Owned(value.to_string())))
             .collect()
-    }
-
-    #[test]
-    fn reads_the_language_from_either_tag() {
-        let mut fence = FenceState::default();
-        fence.update(&tag(&[("class", "language-rust")]));
-        assert_eq!(fence.language.as_deref(), Some("rust"));
-
-        let mut fence = FenceState::default();
-        fence.update(&tag(&[("lang", "elixir")]));
-        assert_eq!(fence.language.as_deref(), Some("elixir"));
-    }
-
-    #[test]
-    fn a_language_does_not_leak_into_the_next_fence() {
-        let mut fence = FenceState::default();
-        fence.update(&tag(&[("class", "language-rust")]));
-
-        fence.reset();
-        fence.update(&tag(&[("class", "plain")]));
-
-        assert_eq!(fence.language, None);
     }
 
     #[test]
@@ -226,6 +207,28 @@ mod tests {
         fence.update(&tag(&[("class", "language-rust")]));
 
         assert!(fence.attributes.is_empty());
+    }
+
+    #[test]
+    fn keeps_only_authored_pre_attributes() {
+        let mut fence = FenceState::default();
+        fence.record_pre_attrs(&tag(&[
+            ("lang", "rust"),
+            ("data-sourcepos", "1:1-3:3"),
+            ("data-meta", "theme=x"),
+            ("id", "main"),
+            ("class", "n"),
+        ]));
+        assert_eq!(
+            fence.pre_attrs,
+            [
+                ("class".to_string(), "n".to_string()),
+                ("id".to_string(), "main".to_string())
+            ]
+        );
+
+        fence.reset();
+        assert!(fence.pre_attrs.is_empty());
     }
 
     #[test]

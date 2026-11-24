@@ -2,6 +2,7 @@ defmodule MDExNative.ComrakTest do
   use ExUnit.Case
 
   alias MDExNative.Comrak.Attributes
+  alias MDExNative.Comrak.BlockId
   alias MDExNative.Comrak.Callout
   alias MDExNative.Comrak.CalloutTitle
   alias MDExNative.Comrak.Code
@@ -10,9 +11,14 @@ defmodule MDExNative.ComrakTest do
   alias MDExNative.Comrak.Document
   alias MDExNative.Comrak.Escaped
   alias MDExNative.Comrak.EscapedTag
+  alias MDExNative.Comrak.GridTable
+  alias MDExNative.Comrak.GridTableCell
+  alias MDExNative.Comrak.GridTableColumn
+  alias MDExNative.Comrak.GridTableRow
   alias MDExNative.Comrak.Heading
   alias MDExNative.Comrak.Image
   alias MDExNative.Comrak.Link
+  alias MDExNative.Comrak.MathBlock
   alias MDExNative.Comrak.MultilineComment
   alias MDExNative.Comrak.Paragraph
   alias MDExNative.Comrak.Text
@@ -173,6 +179,160 @@ defmodule MDExNative.ComrakTest do
 
       assert %Document{nodes: [%MDExNative.Comrak.Alert{title: "Title"}]} =
                MDExNative.Comrak.parse_document!("> [!note]Title\n> Body", both)
+    end
+  end
+
+  describe "Obsidian block IDs" do
+    @options [extension: [ofm_block_ids: true]]
+
+    test "label the block they end and round-trip through the AST" do
+      markdown = "Some paragraph ^abc-1\n\n- item ^Up\n"
+      document = MDExNative.Comrak.parse_document!(markdown, @options)
+
+      assert %Document{
+               nodes: [
+                 %Paragraph{
+                   nodes: [
+                     %Text{literal: "Some paragraph "},
+                     %BlockId{name: "abc-1", sourcepos: %{start: {1, 16}, end: {1, 21}}}
+                   ]
+                 },
+                 %MDExNative.Comrak.List{
+                   nodes: [
+                     %MDExNative.Comrak.ListItem{
+                       nodes: [%Paragraph{nodes: [_, %BlockId{name: "Up"}]}]
+                     }
+                   ]
+                 }
+               ]
+             } = document
+
+      html = ~s(<p id="^abc-1">Some paragraph </p>\n<ul>\n<li id="^Up">item </li>\n</ul>\n)
+      assert MDExNative.Comrak.markdown_to_html!(markdown, @options) == html
+      assert MDExNative.Comrak.document_to_html!(document, @options) == html
+      assert MDExNative.Comrak.document_to_commonmark!(document, @options) == markdown
+
+      assert MDExNative.Comrak.document_to_xml!(document, @options) =~
+               ~s(<block_id name="abc-1" />)
+
+      assert MDExNative.Comrak.markdown_to_html!(markdown) ==
+               "<p>Some paragraph ^abc-1</p>\n<ul>\n<li>item ^Up</li>\n</ul>\n"
+    end
+  end
+
+  describe "grid tables" do
+    @options [extension: [grid_table: true]]
+
+    @grid_table """
+    +---+------+
+    | a | b    |
+    +:==+=====:+
+    | c | d    |
+    +---+ d    +
+    | e | d    |
+    +===+======+
+    | f        |
+    +===+======+
+    """
+
+    test "parse sections, spans, and column alignment and width" do
+      assert %Document{
+               nodes: [
+                 %GridTable{
+                   columns: [
+                     %GridTableColumn{alignment: :left, width: 3},
+                     %GridTableColumn{alignment: :right, width: 6}
+                   ],
+                   nodes: [
+                     %GridTableRow{
+                       section: :head,
+                       nodes: [%GridTableCell{column: 0}, %GridTableCell{column: 1}]
+                     },
+                     %GridTableRow{
+                       section: :body,
+                       nodes: [
+                         %GridTableCell{column: 0, colspan: 1, rowspan: 1},
+                         %GridTableCell{
+                           column: 1,
+                           colspan: 1,
+                           rowspan: 2,
+                           nodes: [%Paragraph{nodes: [%Text{literal: "d"} | _]}]
+                         }
+                       ]
+                     },
+                     %GridTableRow{section: :body, nodes: [%GridTableCell{column: 0}]},
+                     %GridTableRow{
+                       section: :foot,
+                       nodes: [%GridTableCell{column: 0, colspan: 2, rowspan: 1}]
+                     }
+                   ]
+                 }
+               ]
+             } = MDExNative.Comrak.parse_document!(@grid_table, @options)
+    end
+
+    test "render to HTML from Markdown and from the AST, and back to CommonMark" do
+      document = MDExNative.Comrak.parse_document!(@grid_table, @options)
+      html = MDExNative.Comrak.markdown_to_html!(@grid_table, @options)
+
+      assert html =~
+               ~s(<thead>\n<tr>\n<th align="left">a</th>\n<th align="right">b</th>\n</tr>\n</thead>)
+
+      assert html =~ ~s(<td rowspan="2" align="right">d\nd\nd</td>)
+      assert html =~ ~s(<tfoot>\n<tr>\n<td colspan="2" align="left">f</td>\n</tr>\n</tfoot>)
+      refute html =~ "<colgroup>"
+
+      assert MDExNative.Comrak.document_to_html!(document, @options) == html
+
+      commonmark = MDExNative.Comrak.document_to_commonmark!(document, @options)
+      assert MDExNative.Comrak.markdown_to_html!(commonmark, @options) == html
+
+      assert MDExNative.Comrak.markdown_to_html!(@grid_table,
+               extension: [grid_table: true],
+               render: [grid_table_widths: true]
+             ) =~
+               ~s(<colgroup>\n<col style="width:33.33%" />\n<col style="width:66.67%" />\n</colgroup>)
+    end
+
+    test "is opt-in" do
+      assert MDExNative.Comrak.markdown_to_html!(@grid_table) =~ "<p>+---+------+\n"
+    end
+  end
+
+  describe "math blocks" do
+    @options [extension: [math_dollars: true, math_dollars_block: true]]
+
+    test "parse lines between $$ fences as display math and round-trip through the AST" do
+      markdown = "$$\nx = *1*\n\ny\n$$\n"
+      document = MDExNative.Comrak.parse_document!(markdown, @options)
+
+      assert %Document{
+               nodes: [
+                 %MathBlock{
+                   literal: "x = *1*\n\ny\n",
+                   closed: true,
+                   fence_offset: 0,
+                   sourcepos: %{start: {1, 1}, end: {5, 2}}
+                 }
+               ]
+             } = document
+
+      html = ~s(<div data-math-style="display">\nx = *1*\n\ny\n</div>\n)
+      assert MDExNative.Comrak.markdown_to_html!(markdown, @options) == html
+      assert MDExNative.Comrak.document_to_html!(document, @options) == html
+      assert MDExNative.Comrak.document_to_commonmark!(document, @options) == markdown
+    end
+
+    test "run to the end of the document when unclosed" do
+      assert %Document{nodes: [%MathBlock{literal: "x\n", closed: false}]} =
+               MDExNative.Comrak.parse_document!("$$\nx\n", @options)
+    end
+
+    test "need math_dollars too" do
+      assert %Document{nodes: [%Paragraph{}]} =
+               MDExNative.Comrak.parse_document!("$$\nx\n$$\n",
+                 extension: [math_dollars_block: true]
+               )
     end
   end
 
@@ -459,6 +619,59 @@ defmodule MDExNative.ComrakTest do
              ~s(<p><a href="https://example.com">link</a> <code>code</code> <img src="i.png" alt="i" /></p>\n)
   end
 
+  test "renders node attributes on every supported node with render.attributes" do
+    markdown = """
+    # Title {#t .c}
+
+    ```rust {#main .n}
+    fn main() {}
+    ```
+
+    [a](/u "T"){href=/v title=O .x} `c`{.y} ![i](i.png){width=1}
+    """
+
+    extension = [
+      header_attributes: true,
+      fenced_code_attributes: true,
+      inline_code_attributes: true,
+      link_attributes: true
+    ]
+
+    html =
+      ~s(<h1 id="t" class="c">Title</h1>\n) <>
+        ~s|<pre class="n" id="main"><code class="language-rust">fn main() {}\n</code></pre>\n| <>
+        ~s(<p><a href="/u" title="T" class="x">a</a> <code class="y">c</code> <img src="i.png" alt="i" width="1" /></p>\n)
+
+    assert MDExNative.Comrak.markdown_to_html!(markdown,
+             extension: extension,
+             render: [unsafe: true, attributes: true]
+           ) == html
+
+    document = MDExNative.Comrak.parse_document!(markdown, extension: extension)
+
+    assert MDExNative.Comrak.document_to_html!(document, render: [unsafe: true, attributes: true]) ==
+             html
+
+    # Without `render.attributes`, only links and images carry them.
+    assert MDExNative.Comrak.markdown_to_html!(markdown,
+             extension: extension,
+             render: [unsafe: true]
+           ) ==
+             ~s|<h1>Title</h1>\n<pre><code class="language-rust">fn main() {}\n</code></pre>\n| <>
+               ~s(<p><a href="/u" title="T" class="x">a</a> <code>c</code> <img src="i.png" alt="i" width="1" /></p>\n)
+
+    assert MDExNative.Comrak.markdown_to_html!(markdown,
+             extension: extension,
+             render: [attributes: true]
+           ) ==
+             ~s|<h1>Title</h1>\n<pre><code class="language-rust">fn main() {}\n</code></pre>\n| <>
+               ~s(<p><a href="/u" title="T">a</a> <code>c</code> <img src="i.png" alt="i" /></p>\n)
+
+    assert MDExNative.Comrak.document_to_commonmark!(document, extension: extension) ==
+             ~s|# Title {#t .c}\n\n```rust {#main .n}\nfn main() {}\n```\n\n| <>
+               ~s|[a](/u "T"){.x href="/v" title=O} `c`{.y} ![i](i.png){width=1}\n|
+  end
+
   test "renders node attributes set on a document, skipping unsafe keys" do
     document = %Document{
       nodes: [
@@ -475,11 +688,16 @@ defmodule MDExNative.ComrakTest do
       ]
     }
 
-    assert MDExNative.Comrak.document_to_html!(document, render: [unsafe: true]) ==
-             ~s(<p><a href="https://example.com" target="_blank">link</a></p>\n)
+    for render <- [[unsafe: true], [unsafe: true, attributes: true]] do
+      assert MDExNative.Comrak.document_to_html!(document, render: render) ==
+               ~s(<p><a href="https://example.com" target="_blank">link</a></p>\n)
+    end
 
     assert MDExNative.Comrak.document_to_html!(document) ==
              ~s(<p><a href="https://example.com">link</a></p>\n)
+
+    assert MDExNative.Comrak.document_to_commonmark!(document, extension: [link_attributes: true]) ==
+             "[link](https://example.com){target=_blank}\n"
   end
 
   test "renders alerts with semantic HTML" do
@@ -784,7 +1002,7 @@ defmodule MDExNative.ComrakTest do
                      bullet_char: "",
                      tight: false,
                      is_task_list: false,
-                     sourcepos: %MDExNative.Comrak.Sourcepos{start: {11, 1}, end: {12, 0}}
+                     sourcepos: %MDExNative.Comrak.Sourcepos{start: {11, 1}, end: {11, 9}}
                    }
                  ],
                  list_type: :ordered,
@@ -835,7 +1053,7 @@ defmodule MDExNative.ComrakTest do
                      ],
                      checked: false,
                      marker: "",
-                     sourcepos: %MDExNative.Comrak.Sourcepos{start: {14, 1}, end: {15, 0}}
+                     sourcepos: %MDExNative.Comrak.Sourcepos{start: {14, 1}, end: {14, 13}}
                    }
                  ],
                  list_type: :bullet,

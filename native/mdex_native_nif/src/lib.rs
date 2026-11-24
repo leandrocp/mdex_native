@@ -14,7 +14,7 @@ mod lumis_runtime;
 mod memory;
 mod types;
 
-use comrak::adapters::SyntaxHighlighterAdapter;
+use comrak::adapters::{SyntaxHighlightMeta, SyntaxHighlighterAdapter};
 use comrak::nodes::AstNode;
 use comrak::options::Plugins;
 #[cfg(feature = "syntect")]
@@ -587,45 +587,48 @@ enum CodeFenceSyntaxHighlighter {
     Syntect(Arc<SyntectAdapter>),
 }
 
+type TagAttributes<'a> = std::collections::BTreeMap<&'a str, std::borrow::Cow<'a, str>>;
+
 #[cfg(any(feature = "lumis", feature = "syntect"))]
 impl SyntaxHighlighterAdapter for CodeFenceSyntaxHighlighter {
     fn write_highlighted(
         &self,
         output: &mut dyn std::fmt::Write,
-        lang: Option<&str>,
-        code: &str,
+        highlight: &SyntaxHighlightMeta<'_>,
     ) -> std::fmt::Result {
         match self {
             #[cfg(feature = "lumis")]
-            Self::Lumis(adapter) => adapter.write_highlighted(output, lang, code),
+            Self::Lumis(adapter) => adapter.write_highlighted(output, highlight),
             #[cfg(feature = "syntect")]
-            Self::Syntect(adapter) => adapter.write_highlighted(output, lang, code),
+            Self::Syntect(adapter) => adapter.write_highlighted(output, highlight),
         }
     }
 
     fn write_pre_tag(
         &self,
         output: &mut dyn std::fmt::Write,
-        attributes: std::collections::HashMap<&'static str, std::borrow::Cow<'_, str>>,
+        highlight: &SyntaxHighlightMeta<'_>,
+        attributes: TagAttributes<'_>,
     ) -> std::fmt::Result {
         match self {
             #[cfg(feature = "lumis")]
-            Self::Lumis(adapter) => adapter.write_pre_tag(output, attributes),
+            Self::Lumis(adapter) => adapter.write_pre_tag(output, highlight, attributes),
             #[cfg(feature = "syntect")]
-            Self::Syntect(adapter) => adapter.write_pre_tag(output, attributes),
+            Self::Syntect(adapter) => adapter.write_pre_tag(output, highlight, attributes),
         }
     }
 
     fn write_code_tag(
         &self,
         output: &mut dyn std::fmt::Write,
-        attributes: std::collections::HashMap<&'static str, std::borrow::Cow<'_, str>>,
+        highlight: &SyntaxHighlightMeta<'_>,
+        attributes: TagAttributes<'_>,
     ) -> std::fmt::Result {
         match self {
             #[cfg(feature = "lumis")]
-            Self::Lumis(adapter) => adapter.write_code_tag(output, attributes),
+            Self::Lumis(adapter) => adapter.write_code_tag(output, highlight, attributes),
             #[cfg(feature = "syntect")]
-            Self::Syntect(adapter) => adapter.write_code_tag(output, attributes),
+            Self::Syntect(adapter) => adapter.write_code_tag(output, highlight, attributes),
         }
     }
 }
@@ -635,8 +638,7 @@ impl SyntaxHighlighterAdapter for CodeFenceSyntaxHighlighter {
     fn write_highlighted(
         &self,
         _output: &mut dyn std::fmt::Write,
-        _lang: Option<&str>,
-        _code: &str,
+        _highlight: &SyntaxHighlightMeta<'_>,
     ) -> std::fmt::Result {
         match *self {}
     }
@@ -644,7 +646,8 @@ impl SyntaxHighlighterAdapter for CodeFenceSyntaxHighlighter {
     fn write_pre_tag(
         &self,
         _output: &mut dyn std::fmt::Write,
-        _attributes: std::collections::HashMap<&'static str, std::borrow::Cow<'_, str>>,
+        _highlight: &SyntaxHighlightMeta<'_>,
+        _attributes: TagAttributes<'_>,
     ) -> std::fmt::Result {
         match *self {}
     }
@@ -652,7 +655,8 @@ impl SyntaxHighlighterAdapter for CodeFenceSyntaxHighlighter {
     fn write_code_tag(
         &self,
         _output: &mut dyn std::fmt::Write,
-        _attributes: std::collections::HashMap<&'static str, std::borrow::Cow<'_, str>>,
+        _highlight: &SyntaxHighlightMeta<'_>,
+        _attributes: TagAttributes<'_>,
     ) -> std::fmt::Result {
         match *self {}
     }
@@ -684,8 +688,9 @@ impl InlineCodeHighlighter for SyntectAdapter {
         language: &str,
         attrs: &[(String, String)],
     ) -> std::fmt::Result {
+        let highlight = SyntaxHighlightMeta::new(language, "", source);
         let mut pre = String::new();
-        self.write_pre_tag(&mut pre, std::collections::HashMap::new())?;
+        self.write_pre_tag(&mut pre, &highlight, TagAttributes::new())?;
         let (name, value) = pre
             .strip_prefix("<pre ")
             .and_then(|tag| tag.strip_suffix("\">"))
@@ -699,7 +704,7 @@ impl InlineCodeHighlighter for SyntectAdapter {
         }
 
         comrak::html::write_opening_tag(output, "code", attrs)?;
-        self.write_highlighted(output, Some(language), source)?;
+        self.write_highlighted(output, &highlight)?;
         output.write_str("</code>")
     }
 }
@@ -864,17 +869,9 @@ mod tests {
     #[cfg(feature = "syntect")]
     #[test]
     fn highlights_inline_code_with_syntect() {
-        let options = Options {
-            extension: comrak::options::Extension {
-                inline_code_attributes: true,
-                ..Default::default()
-            },
-            render: comrak::options::Render {
-                r#unsafe: true,
-                ..Default::default()
-            },
-            ..Default::default()
-        };
+        let mut options = Options::default();
+        options.extension.inline_code_attributes = true;
+        options.render.r#unsafe = true;
         let render = |markdown: &str, adapter: SyntectAdapter| {
             let arena = Arena::new();
             let root = comrak::parse_document(&arena, markdown, &options);

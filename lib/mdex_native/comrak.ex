@@ -41,6 +41,36 @@ defmodule MDExNative.Comrak do
     `true`, preserve `!` in CommonMark, and render as ordinary links in HTML.
     Set `extension: [wikilinks_title_after_pipe: true, wikilinks_ignore_embeds: true]`
     to leave `![[url]]` as literal text while still parsing `[[url]]`.
+  - `extension: [ofm_block_ids: true]` parses a trailing `^name` as a
+    `MDExNative.Comrak.BlockId`, which HTML renders as `id="^name"` on the block
+    it ends.
+
+  ## Grid tables and math blocks
+
+  - `extension: [grid_table: true]` parses Pandoc-style grid tables into
+    `MDExNative.Comrak.GridTable` nodes, with cells that hold blocks and span
+    columns and rows. `render: [grid_table_widths: true]` adds a `<colgroup>`
+    with each column's share of the width.
+  - `extension: [math_dollars: true, math_dollars_block: true]` parses lines
+    between `$$` fences as a `MDExNative.Comrak.MathBlock`.
+
+  ## Attributes
+
+  `extension: [header_attributes: true, fenced_code_attributes: true, inline_code_attributes: true, link_attributes: true]`
+  parses `{#id .class key=value}` after a heading, a fenced code block's info
+  string, a code span, a link, or an image into the node's `:attrs`.
+
+  HTML includes attributes only with `render: [unsafe: true]`, as they can
+  run script like raw HTML can:
+
+  - with `render: [unsafe: true, attributes: true]`, on headings, code blocks
+    (on the `<pre>`), code spans, links, and images.
+  - with `render: [unsafe: true]` alone, on links, images, and code spans
+    highlighted by the syntax highlighter's inline code support.
+
+  Attributes Comrak writes itself, such as a link's `href` or `data-sourcepos`,
+  take precedence over ones with the same name. Keys set on a document that are
+  not valid attribute names are dropped. Sanitize the output of untrusted input.
 
   ## Examples
 
