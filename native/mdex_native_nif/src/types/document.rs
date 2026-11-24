@@ -64,6 +64,14 @@ pub struct ExAttributes {
 /// Keys that are not valid HTML attribute names are dropped: comrak writes keys
 /// as they are, in HTML and in CommonMark, so a key like `x" onclick="alert(1)`
 /// set from Elixir would otherwise escape the tag.
+///
+/// TODO: upstream `write_opening_tag` and the CommonMark attribute writer
+/// should skip or reject keys their parser can't produce, so this filter can
+/// go. comrak only checks keys while parsing:
+///
+/// - [`write_opening_tag`](https://github.com/kivikakk/comrak/blob/d9cf1705672f5a34e959a8db7c388a998c5d1b6b/src/html.rs#L2145-L2158)
+/// - [`format_attributes`](https://github.com/kivikakk/comrak/blob/d9cf1705672f5a34e959a8db7c388a998c5d1b6b/src/cm.rs#L1376-L1396)
+/// - [parser key rule](https://github.com/kivikakk/comrak/blob/d9cf1705672f5a34e959a8db7c388a998c5d1b6b/src/parser/attributes.rs#L161-L175)
 impl From<ExAttributes> for Attributes {
     fn from(attributes: ExAttributes) -> Self {
         let mut attrs = Self::default();
