@@ -5,7 +5,7 @@
 ### Features
 
 - Add `extension: [grid_table: true]` for Pandoc-style grid tables, with the `GridTable`, `GridTableRow`, `GridTableCell`, and `GridTableColumn` AST nodes, and `render: [grid_table_widths: true]` to write their column widths.
-- Add `extension: [math_dollars_block: true]` and the `MathBlock` AST node for `$$` display math.
+- Add `extension: [math_dollars: true, math_dollars_block: true]` and the `MathBlock` AST node for `$$` display math.
 - Add `extension: [ofm_block_ids: true]` and the `BlockId` AST node for Obsidian block IDs (`^name`).
 - Add `render: [attributes: true]`, which with `render: [unsafe: true]` renders parsed attributes on headings, code blocks, and inline code too. `document_to_commonmark/2` writes attributes back.
 
