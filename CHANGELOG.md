@@ -4,44 +4,24 @@
 
 ### Features
 
-- Add `extension: [grid_table: true]` for Pandoc-style grid tables, with the `GridTable`, `GridTableRow`, and `GridTableCell` AST nodes and `GridTableColumn` for its columns, and `render: [grid_table_widths: true]` to write their column widths ([Comrak #820](https://github.com/kivikakk/comrak/pull/820)).
-- Add `extension: [math_dollars_block: true]` for display math between `$$` lines, with the `MathBlock` AST node. Needs `math_dollars: true` too ([Comrak #931](https://github.com/kivikakk/comrak/pull/931)).
-- Add `extension: [ofm_block_ids: true]` for Obsidian block identifiers (`^name`), with the `BlockId` AST node ([Comrak #900](https://github.com/kivikakk/comrak/pull/900)).
-- Add `render: [attributes: true]`. With `render: [unsafe: true]`, it renders parsed attributes on headings, code blocks, and inline code too, not only on links and images. Code block attributes go on the `<pre>`, including the one Lumis writes ([Comrak #903](https://github.com/kivikakk/comrak/pull/903)).
-- `document_to_commonmark/2` writes attributes back when their extension is enabled ([Comrak #939](https://github.com/kivikakk/comrak/pull/939)).
+- Add `extension: [grid_table: true]` for Pandoc-style grid tables, with the `GridTable`, `GridTableRow`, `GridTableCell`, and `GridTableColumn` AST nodes, and `render: [grid_table_widths: true]` to write their column widths.
+- Add `extension: [math_dollars_block: true]` and the `MathBlock` AST node for `$$` display math.
+- Add `extension: [ofm_block_ids: true]` and the `BlockId` AST node for Obsidian block IDs (`^name`).
+- Add `render: [attributes: true]`, which with `render: [unsafe: true]` renders parsed attributes on headings, code blocks, and inline code too. `document_to_commonmark/2` writes attributes back.
 
 ### Security
 
-- Fix quadratic time on escaped pipes in table cells, failing autolink domains, and non-literal emails ([GHSA-7f8r-4rh5-vr5h](https://github.com/kivikakk/comrak/security/advisories/GHSA-7f8r-4rh5-vr5h)), plus other quadratic cases in block IDs, attributes, alerts, multiline block quotes, strikethrough and highlight runs, unclosed inline footnotes, LaTeX math, and HEEx directives, and in CommonMark output of grid tables and deep nesting ([Comrak #948](https://github.com/kivikakk/comrak/pull/948), [#949](https://github.com/kivikakk/comrak/pull/949)).
-- Limit output amplification: lists, footnote definitions, description items, and fenced containers nest at most 100 deep, after which markers are read as text; autocompleted table cells share one allowance per document; CommonMark output writes lazy continuation lines past 64-byte container prefixes and falls back to cell contents for grid tables over its area allowance ([Comrak #948](https://github.com/kivikakk/comrak/pull/948)).
-
-### Changes
-
-Comrak 1.x has written specs for most extensions, and some parsing changed with them:
-
-- Footnotes: a label defined twice uses its first definition instead of rendering both; labels match as written, so `[^&#97;]` no longer matches `[^a]`; definitions nested in definitions are found; footnotes are numbered in reading order; a blank line inside a container no longer ends a definition. `FootnoteReference.texts` holds the label as written, such as `[{"^1", 2}]` ([Comrak #935](https://github.com/kivikakk/comrak/pull/935)).
-- Attributes: keys may start with `_` or `:`, values may be unquoted (`{k=a/b}`), entities in values are decoded, `id=` and `class=` set the id and add classes, and the last of repeated keys wins. Consecutive attribute blocks merge ([Comrak #939](https://github.com/kivikakk/comrak/pull/939)).
-- Attributes that MDExNative or Comrak writes itself on a link or image, such as `href`, `src`, `alt`, `title`, or `data-sourcepos`, take precedence over attributes with the same name, which are no longer written twice. Keys that are not valid attribute names are dropped when a document is converted, so Comrak's HTML and CommonMark output never includes them.
-- Wikilinks: an unclosed `[` no longer stops a following wikilink from parsing, wikilinks parse in image descriptions, and line endings in destinations become spaces ([Comrak #936](https://github.com/kivikakk/comrak/pull/936)).
-- Alerts: `>[!note]`, and up to three spaces or a tab after `>`, start an alert ([Comrak #938](https://github.com/kivikakk/comrak/pull/938)).
-- Task lists: markers must appear literally and be followed by a space, tab, or line end, so `[x]*a*` is no longer a task item ([Comrak #923](https://github.com/kivikakk/comrak/pull/923)).
-- Tables: backslashes before a pipe pair correctly, so `c\\|` ends the cell after `c\`. Autolinks: emails containing entities no longer link, and `_www.example.com_` does. Strikethrough: a mismatched `~` no longer stops inline parsing ([Comrak #926](https://github.com/kivikakk/comrak/pull/926), [#927](https://github.com/kivikakk/comrak/pull/927), [#928](https://github.com/kivikakk/comrak/pull/928)).
-- `\r\n` and `\r` are normalized to `\n` in block content, so carriage returns no longer reach literals ([Comrak #915](https://github.com/kivikakk/comrak/pull/915)).
-- Reference links expand up to at least 100 KB or the document's size, whichever is larger, instead of at most the smaller ([Comrak #905](https://github.com/kivikakk/comrak/pull/905)).
-- Many source positions are corrected, including the end of a list's last item, inline footnotes, and unclosed fenced code, multiline block quotes, block directives, and alerts ([Comrak #901](https://github.com/kivikakk/comrak/pull/901), [#908](https://github.com/kivikakk/comrak/pull/908)).
-- Math: an escaped backslash no longer escapes the closer after it, code math (`` $`…`$ ``) needs matching backtick runs, dollar math keeps line endings, and ```` ```math ```` blocks are math only with `math_code: true` ([Comrak #941](https://github.com/kivikakk/comrak/pull/941)). Math code blocks get `data-meta` and attributes like other code blocks ([Comrak #942](https://github.com/kivikakk/comrak/pull/942)).
-- Description lists: `:` follows list marker rules, so it can stand alone and its content can start on the next line; a blank line between details makes the item loose. OFM block IDs label the `<dt>` or `<dd>` they end instead of the `<dl>` ([Comrak #945](https://github.com/kivikakk/comrak/pull/945)).
-- Superscript and subscript: superscript opens inside brackets, punctuation no longer affects `^` and `~` flanking, carets pair one at a time, and subscript no longer changes strikethrough flanking ([Comrak #946](https://github.com/kivikakk/comrak/pull/946)).
-- Header IDs never collide with explicit attribute IDs, footnote IDs, or OFM block IDs under `header_id_prefix`, and are never empty; an empty heading gets `-1` ([Comrak #944](https://github.com/kivikakk/comrak/pull/944)).
-- XML writes table header rows as `<table_header>`, escaped tags as `<escaped_tag tag="~~">`, `tight` on `description_item`, and escapes code block info strings ([Comrak #926](https://github.com/kivikakk/comrak/pull/926), [#945](https://github.com/kivikakk/comrak/pull/945), [#946](https://github.com/kivikakk/comrak/pull/946), [#949](https://github.com/kivikakk/comrak/pull/949)).
+- Include Comrak's fixes for quadratic-time parsing ([GHSA-7f8r-4rh5-vr5h](https://github.com/kivikakk/comrak/security/advisories/GHSA-7f8r-4rh5-vr5h)) and its limits on nesting depth and output amplification.
 
 ### Dependencies
 
-- Update Comrak from 0.59.0 to 1.2.0.
+- Upgrade Comrak to 1.2 in [\#160](https://github.com/leandrocp/mdex_native/pull/160)
 
 ### Compatibility
 
-- Downstream AST adapters (including MDEx's Comrak converter) must handle `BlockId`, `GridTable`, `GridTableRow`, `GridTableCell`, `GridTableColumn`, and `MathBlock`. They appear only when their extensions are enabled.
+- Comrak 1.x follows written specs for most extensions, so edge cases in footnotes, attributes, wikilinks, alerts, task lists, tables, math, description lists, and source positions parse differently. `FootnoteReference.texts` holds the label as written, such as `[{"^1", 2}]`. See the [Comrak releases](https://github.com/kivikakk/comrak/releases).
+- Attributes that MDExNative or Comrak writes on links and images, such as `href` and `src`, take precedence over parsed attributes with the same name. Invalid attribute keys are dropped.
+- Downstream AST adapters (including MDEx's Comrak converter) must handle `BlockId`, `GridTable`, `GridTableRow`, `GridTableCell`, `GridTableColumn`, and `MathBlock`.
 
 ## [0.3.3](https://github.com/leandrocp/mdex_native/compare/v0.3.2...v0.3.3) (2026-11-23)
 
