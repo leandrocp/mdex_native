@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.3.4](https://github.com/leandrocp/mdex_native/compare/v0.3.3...v0.3.4) (2026-11-24)
+
 ### Features
 
 - Add `extension: [grid_table: true]` for Pandoc-style grid tables, with the `GridTable`, `GridTableRow`, `GridTableCell`, and `GridTableColumn` AST nodes, and `render: [grid_table_widths: true]` to write their column widths.
@@ -22,6 +24,10 @@
 - Comrak 1.x follows written specs for most extensions, so edge cases in footnotes, attributes, wikilinks, alerts, task lists, tables, math, description lists, and source positions parse differently. `FootnoteReference.texts` holds the label as written, such as `[{"^1", 2}]`. See the [Comrak releases](https://github.com/kivikakk/comrak/releases).
 - Attributes that MDExNative or Comrak writes on links and images, such as `href` and `src`, take precedence over parsed attributes with the same name. Invalid attribute keys are dropped.
 - Downstream AST adapters (including MDEx's Comrak converter) must handle `BlockId`, `GridTable`, `GridTableRow`, `GridTableCell`, `GridTableColumn`, and `MathBlock`.
+
+### Features
+
+- Upgrade Comrak to 1.2 in [\#160](https://github.com/leandrocp/mdex_native/pull/160)
 
 ## [0.3.3](https://github.com/leandrocp/mdex_native/compare/v0.3.2...v0.3.3) (2026-11-23)
 
