@@ -4,7 +4,7 @@
 
 ### Features
 
-- Add `extension: [grid_table: true]` for Pandoc-style grid tables, with the `GridTable`, `GridTableRow`, and `GridTableCell` AST nodes, and `render: [grid_table_widths: true]` to write their column widths ([Comrak #820](https://github.com/kivikakk/comrak/pull/820)).
+- Add `extension: [grid_table: true]` for Pandoc-style grid tables, with the `GridTable`, `GridTableRow`, and `GridTableCell` AST nodes and `GridTableColumn` for its columns, and `render: [grid_table_widths: true]` to write their column widths ([Comrak #820](https://github.com/kivikakk/comrak/pull/820)).
 - Add `extension: [math_dollars_block: true]` for display math between `$$` lines, with the `MathBlock` AST node. Needs `math_dollars: true` too ([Comrak #931](https://github.com/kivikakk/comrak/pull/931)).
 - Add `extension: [ofm_block_ids: true]` for Obsidian block identifiers (`^name`), with the `BlockId` AST node ([Comrak #900](https://github.com/kivikakk/comrak/pull/900)).
 - Add `render: [attributes: true]`. With `render: [unsafe: true]`, it renders parsed attributes on headings, code blocks, and inline code too, not only on links and images. Code block attributes go on the `<pre>`, including the one Lumis writes ([Comrak #903](https://github.com/kivikakk/comrak/pull/903)).
@@ -41,7 +41,7 @@ Comrak 1.x has written specs for most extensions, and some parsing changed with 
 
 ### Compatibility
 
-- Downstream AST adapters (including MDEx's Comrak converter) must handle `BlockId`, `GridTable`, `GridTableRow`, `GridTableCell`, and `MathBlock`. They appear only when their extensions are enabled.
+- Downstream AST adapters (including MDEx's Comrak converter) must handle `BlockId`, `GridTable`, `GridTableRow`, `GridTableCell`, `GridTableColumn`, and `MathBlock`. They appear only when their extensions are enabled.
 
 ## [0.3.3](https://github.com/leandrocp/mdex_native/compare/v0.3.2...v0.3.3) (2026-11-23)
 

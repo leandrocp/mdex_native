@@ -368,18 +368,32 @@ defmodule MDExNative.Comrak.GridTable do
   A Pandoc-style grid table, enabled with `extension: [grid_table: true]`.
 
   Its children are `MDExNative.Comrak.GridTableRow`s. `columns` holds one
-  `%{alignment: :none | :left | :center | :right, width: width}` map per column,
-  where `width` counts display columns between the borders, wide characters as
-  two. `render: [grid_table_widths: true]` writes a `<colgroup>` with each
-  column's share of the total width.
+  `MDExNative.Comrak.GridTableColumn` per column. `render: [grid_table_widths: true]`
+  writes a `<colgroup>` with each column's share of the total width.
 
   Spec: https://comrak.ee/extensions/grid-table.html
   """
 
-  @type column :: %{alignment: :none | :left | :center | :right, width: non_neg_integer()}
-
-  @type t :: %__MODULE__{nodes: [MDExNative.Comrak.ast_node()], columns: [column()]}
+  @type t :: %__MODULE__{
+          nodes: [MDExNative.Comrak.ast_node()],
+          columns: [MDExNative.Comrak.GridTableColumn.t()]
+        }
   defstruct nodes: [], columns: [], sourcepos: %MDExNative.Comrak.Sourcepos{}
+end
+
+defmodule MDExNative.Comrak.GridTableColumn do
+  @moduledoc """
+  A column of a grid table: its alignment, and its `width` in display columns
+  between the borders, wide characters counting as two.
+
+  See `MDExNative.Comrak.GridTable`
+  """
+
+  @type t :: %__MODULE__{
+          alignment: :none | :left | :center | :right,
+          width: non_neg_integer()
+        }
+  defstruct alignment: :none, width: 0
 end
 
 defmodule MDExNative.Comrak.GridTableRow do

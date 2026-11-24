@@ -759,8 +759,8 @@ impl From<&TableAlignment> for ExTableAlignment {
     }
 }
 
-/// A grid table column, as a plain map: it is data on the table, not a node.
-#[derive(Clone, Debug, NifMap, PartialEq)]
+#[derive(Clone, Debug, NifStruct, PartialEq)]
+#[module = "MDExNative.Comrak.GridTableColumn"]
 pub struct ExGridTableColumn {
     pub alignment: ExTableAlignment,
     pub width: usize,

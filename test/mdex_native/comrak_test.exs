@@ -13,6 +13,7 @@ defmodule MDExNative.ComrakTest do
   alias MDExNative.Comrak.EscapedTag
   alias MDExNative.Comrak.GridTable
   alias MDExNative.Comrak.GridTableCell
+  alias MDExNative.Comrak.GridTableColumn
   alias MDExNative.Comrak.GridTableRow
   alias MDExNative.Comrak.Heading
   alias MDExNative.Comrak.Image
@@ -238,7 +239,10 @@ defmodule MDExNative.ComrakTest do
       assert %Document{
                nodes: [
                  %GridTable{
-                   columns: [%{alignment: :left, width: 3}, %{alignment: :right, width: 6}],
+                   columns: [
+                     %GridTableColumn{alignment: :left, width: 3},
+                     %GridTableColumn{alignment: :right, width: 6}
+                   ],
                    nodes: [
                      %GridTableRow{
                        section: :head,
