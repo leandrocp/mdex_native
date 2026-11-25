@@ -36,8 +36,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # Companion Comrak 1.x AST/options update; return to main after it merges.
-      MDEX_NATIVE_E2E_MDEX_REF: lp-comrak-110
+      MDEX_NATIVE_E2E_MDEX_REF: main
 
     steps:
       - uses: actions/checkout@v7.0.1
