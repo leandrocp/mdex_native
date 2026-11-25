@@ -20,7 +20,7 @@
 ### Compatibility
 
 - AST adapters must handle the new `BlockId`, `GridTable`, `GridTableRow`, `GridTableCell`, `GridTableColumn`, and `MathBlock` nodes.
-- See the [Comrak changelog](https://github.com/kivikakk/comrak/blob/main/CHANGELOG.md) for parsing changes in Comrak 1.x.
+- See the [Comrak changelog](https://github.com/kivikakk/comrak/blob/main/CHANGELOG.md) for parsing changes and other details in Comrak 1.x.
 
 ## [0.3.3](https://github.com/leandrocp/mdex_native/compare/v0.3.2...v0.3.3) (2026-11-23)
 
