@@ -19,9 +19,8 @@
 
 ### Compatibility
 
-- Comrak 1.x follows written specs for most extensions, so edge cases in footnotes, attributes, wikilinks, alerts, task lists, tables, math, description lists, and source positions parse differently. `FootnoteReference.texts` holds the label as written, such as `[{"^1", 2}]`. See the [Comrak releases](https://github.com/kivikakk/comrak/releases).
-- Attributes that MDExNative or Comrak writes on links and images, such as `href` and `src`, take precedence over parsed attributes with the same name. Invalid attribute keys are dropped.
-- Downstream AST adapters (including MDEx's Comrak converter) must handle `BlockId`, `GridTable`, `GridTableRow`, `GridTableCell`, `GridTableColumn`, and `MathBlock`.
+- Comrak 1.x follows written specs for most extensions, so some edge cases parse differently and `FootnoteReference.texts` holds the label as written. See the [Comrak releases](https://github.com/kivikakk/comrak/releases).
+- AST adapters must handle the new `BlockId`, `GridTable`, `GridTableRow`, `GridTableCell`, `GridTableColumn`, and `MathBlock` nodes.
 
 ## [0.3.3](https://github.com/leandrocp/mdex_native/compare/v0.3.2...v0.3.3) (2026-11-23)
 
