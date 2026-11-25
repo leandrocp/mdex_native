@@ -19,8 +19,8 @@
 
 ### Compatibility
 
-- Comrak 1.x follows written specs for most extensions, so some edge cases parse differently and `FootnoteReference.texts` holds the label as written. See the [Comrak releases](https://github.com/kivikakk/comrak/releases).
 - AST adapters must handle the new `BlockId`, `GridTable`, `GridTableRow`, `GridTableCell`, `GridTableColumn`, and `MathBlock` nodes.
+- See the [Comrak changelog](https://github.com/kivikakk/comrak/blob/main/CHANGELOG.md) for parsing changes in Comrak 1.x.
 
 ## [0.3.3](https://github.com/leandrocp/mdex_native/compare/v0.3.2...v0.3.3) (2026-11-23)
 
