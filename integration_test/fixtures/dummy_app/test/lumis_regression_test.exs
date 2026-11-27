@@ -280,9 +280,15 @@ defmodule MDExNativeE2E.LumisRegressionTest do
 
           for fragment <- fragments, do: assert(expected =~ fragment)
 
-          # Comrak owns the closing tags; headers are accepted but omitted.
-          refute expected =~ "<section"
-          refute expected =~ "</section>"
+          # A header wraps the whole fence, closing after Comrak's `</pre>`.
+          {_formatter, formatter_opts} = opts[:formatter]
+
+          if formatter_opts[:header] do
+            assert expected =~
+                     ~r{\A<section data-legacy="header"><pre[^>]*>.*</code></pre>\n</section>\z}s
+          else
+            refute expected =~ "<section"
+          end
 
           for line <- 1..7 do
             selected? =
