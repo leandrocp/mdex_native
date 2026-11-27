@@ -14,10 +14,19 @@ use lumis_core::languages::Language;
 
 use crate::types::options::ExBudget;
 use lumis_core::elixir::{
-    ExAppearance, ExAttrValue, ExFormatterOption, ExHtmlInlineHighlightLines,
+    ExAppearance, ExAttrValue, ExFormatterOption, ExHtmlElement, ExHtmlInlineHighlightLines,
     ExHtmlInlineHighlightLinesStyle, ExHtmlLinkedHighlightLines, ExHtmlStructure, ExLineSpec,
     ThemeOrString,
 };
+
+/// A fence as Lumis renders it, up to the `</code></pre>` Comrak writes.
+pub struct CodeFence {
+    /// The formatter's header open tag, if any, then the `<pre>` and its code.
+    pub html: String,
+    /// The formatter's header close tag, for whoever writes after Comrak's
+    /// `</code></pre>`.
+    pub close_tag: Option<String>,
+}
 
 // The decorators and the `<pre>` attributes are both what Comrak reported
 // about this fence, alongside the adapter's own settings.
@@ -31,7 +40,7 @@ pub fn render_code_fence(
     budget: ExBudget,
     attributes: &HashMap<String, String>,
     pre_attrs: &[(String, String)],
-) -> Result<String, String> {
+) -> Result<CodeFence, String> {
     // Comrak includes the code-fence terminator's newline in the literal. Its
     // adapter contract historically did not turn that into another visual line.
     let source = source.strip_suffix('\n').unwrap_or(source);
@@ -40,6 +49,7 @@ pub fn render_code_fence(
     let language = Language::guess(Some(language.unwrap_or("plaintext")), source);
     let mut formatter = with_mdex_attributes(formatter.unwrap_or_default(), attributes);
     extend_pre_attrs(&mut formatter, pre_attrs);
+    let close_tag = header_close_tag(&formatter);
     let formatter = formatter.into_formatter(language)?;
 
     let (events, exhausted) = highlight(source, language, rainbow_brackets, word_diff, budget);
@@ -51,9 +61,26 @@ pub fn render_code_fence(
     let output = String::from_utf8(output).map_err(|error| error.to_string())?;
 
     output
-        .strip_suffix("</code></pre>")
-        .map(str::to_owned)
+        .strip_suffix(close_tag.as_deref().unwrap_or_default())
+        .and_then(|output| output.strip_suffix("</code></pre>"))
+        .map(|html| CodeFence {
+            html: html.to_owned(),
+            close_tag,
+        })
         .ok_or_else(|| "Lumis formatter did not produce HTML code-fence output".to_string())
+}
+
+fn header_close_tag(formatter: &ExFormatterOption) -> Option<String> {
+    use ExFormatterOption as F;
+
+    match formatter {
+        F::HtmlInline { header, .. }
+        | F::HtmlLinked { header, .. }
+        | F::HtmlMultiThemes { header, .. } => {
+            header.as_ref().map(|header| header.close_tag.clone())
+        }
+        _ => None,
+    }
 }
 
 /// Renders inline code as a whole `<code>` element: the token spans of the
@@ -82,9 +109,13 @@ pub fn render_inline_code(
 
     let code_attrs = match &mut formatter {
         ExFormatterOption::HtmlInline {
-            structure, theme, ..
+            structure,
+            theme,
+            header,
+            ..
         } => {
             *structure = ExHtmlStructure::Inline;
+            *header = None;
             let theme = theme.clone().and_then(|theme| match theme {
                 ThemeOrString::Theme(theme) => Some(theme.into()),
                 ThemeOrString::String(name) => lumis_core::themes::get(&name).ok(),
@@ -96,9 +127,11 @@ pub fn render_inline_code(
             themes,
             default_theme,
             css_variable_prefix,
+            header,
             ..
         } => {
             *structure = ExHtmlStructure::Inline;
+            *header = None;
             let themes = themes
                 .iter()
                 .map(|(name, theme)| (name.clone(), theme.clone().into()))
@@ -111,8 +144,11 @@ pub fn render_inline_code(
                 &attrs,
             )
         }
-        ExFormatterOption::HtmlLinked { structure, .. } => {
+        ExFormatterOption::HtmlLinked {
+            structure, header, ..
+        } => {
             *structure = ExHtmlStructure::Inline;
+            *header = None;
             pre_attrs(None, None, &attrs)
         }
         // `with_mdex_attributes` only returns the HTML formatters.
@@ -175,9 +211,8 @@ fn highlight(
 /// Applies MDEx's info-string decorators over the formatter the caller asked for.
 ///
 /// A decorator wins over the option, an unset option falls back to what MDEx
-/// has always rendered, and `header` is dropped because Comrak writes the
-/// closing tags and an outer header could never be closed. A code fence is a
-/// block, so `structure` is always `:block`: inline output has no `</pre>` for
+/// has always rendered, and `header` passes through for the caller to close
+/// after Comrak's `</code></pre>`. A code fence is a block, so `structure` is always `:block`: inline output has no `</pre>` for
 /// Comrak's closing tags to match.
 fn with_mdex_attributes(
     formatter: ExFormatterOption,
@@ -196,7 +231,7 @@ fn with_mdex_attributes(
             include_highlights,
             highlight_lines,
             line_numbers,
-            header: _,
+            header,
         } => html_inline_with_attributes(
             InlineFormatter {
                 theme,
@@ -207,6 +242,7 @@ fn with_mdex_attributes(
                 include_highlights,
                 highlight_lines,
                 line_numbers,
+                header,
             },
             attributes,
         ),
@@ -217,7 +253,7 @@ fn with_mdex_attributes(
             code_attrs,
             highlight_lines,
             line_numbers,
-            header: _,
+            header,
         } => F::HtmlLinked {
             structure: ExHtmlStructure::Block,
             pre_class: mdex_attribute(attributes, "pre_class").or(pre_class),
@@ -225,7 +261,7 @@ fn with_mdex_attributes(
             code_attrs,
             highlight_lines: linked_highlight_lines(attributes).or(highlight_lines),
             line_numbers,
-            header: None,
+            header,
         },
         F::HtmlMultiThemes {
             structure: _,
@@ -239,7 +275,7 @@ fn with_mdex_attributes(
             include_highlights,
             highlight_lines,
             line_numbers,
-            header: _,
+            header,
         } => F::HtmlMultiThemes {
             structure: ExHtmlStructure::Block,
             themes,
@@ -252,7 +288,7 @@ fn with_mdex_attributes(
             include_highlights: include_highlights || attributes.contains_key("include_highlights"),
             highlight_lines: multi_theme_highlight_lines(highlight_lines, attributes),
             line_numbers,
-            header: None,
+            header,
         },
         // A terminal formatter cannot render into a code fence; MDEx has always
         // treated it as the inline HTML one.
@@ -316,10 +352,9 @@ struct InlineFormatter {
     include_highlights: bool,
     highlight_lines: Option<ExHtmlInlineHighlightLines>,
     line_numbers: bool,
+    header: Option<ExHtmlElement>,
 }
 
-/// `header` is always dropped: Comrak owns the closing tags, so an outer header
-/// could never be closed by its syntax-highlighter adapter contract.
 fn html_inline_with_attributes(
     formatter: InlineFormatter,
     attributes: &HashMap<String, String>,
@@ -342,7 +377,7 @@ fn html_inline_with_attributes(
             .or(formatter.highlight_lines),
         line_numbers: formatter.line_numbers,
         theme,
-        header: None,
+        header: formatter.header,
     }
 }
 
@@ -485,6 +520,14 @@ mod tests {
             &[],
         )
         .unwrap()
+        .html
+    }
+
+    fn header() -> Option<ExHtmlElement> {
+        Some(ExHtmlElement {
+            open_tag: "<div class=\"snippet\"><button>Copy</button>".to_string(),
+            close_tag: "</div>".to_string(),
+        })
     }
 
     #[test]
@@ -630,16 +673,66 @@ mod tests {
     }
 
     #[test]
-    fn a_header_never_survives_the_bridge() {
-        // Comrak writes the closing tags, so an outer header could never be closed.
-        let html = render(
+    fn a_header_opens_before_the_fence_and_closes_after_comrak() {
+        let formatter = ExFormatterOption::HtmlLinked {
+            structure: ExHtmlStructure::Block,
+            pre_class: None,
+            pre_attrs: Vec::new(),
+            code_attrs: Vec::new(),
+            highlight_lines: None,
+            line_numbers: false,
+            header: header(),
+        };
+        let fence = render_code_fence(
             "hello\n",
             Some("plaintext"),
-            None,
-            &[("pre_class", "plain")],
-        );
+            Some(formatter),
+            false,
+            false,
+            ExBudget::default(),
+            &HashMap::new(),
+            &[],
+        )
+        .unwrap();
 
-        assert!(html.starts_with("<pre"), "{html}");
+        assert!(
+            fence
+                .html
+                .starts_with("<div class=\"snippet\"><button>Copy</button><pre"),
+            "{}",
+            fence.html
+        );
+        assert!(!fence.html.contains("</pre>"), "{}", fence.html);
+        assert_eq!(fence.close_tag.as_deref(), Some("</div>"));
+    }
+
+    #[test]
+    fn inline_code_ignores_the_header() {
+        let formatter = ExFormatterOption::HtmlInline {
+            structure: ExHtmlStructure::Block,
+            theme: None,
+            pre_class: None,
+            pre_attrs: Vec::new(),
+            code_attrs: Vec::new(),
+            italic: false,
+            include_highlights: false,
+            highlight_lines: None,
+            line_numbers: false,
+            header: header(),
+        };
+        let html = render_inline_code(
+            "x = 1",
+            "python",
+            Some(formatter),
+            false,
+            false,
+            ExBudget::default(),
+            &[],
+        )
+        .unwrap();
+
+        assert!(html.starts_with("<code"), "{html}");
+        assert!(!html.contains("snippet"), "{html}");
     }
 
     #[test]
