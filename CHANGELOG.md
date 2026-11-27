@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.3.5](https://github.com/leandrocp/mdex_native/compare/v0.3.4...v0.3.5) (2026-11-27)
+
+### Features
+
+- **lumis:** Render the formatter's header around code blocks in [\#165](https://github.com/leandrocp/mdex_native/pull/165)
+
 ## [0.3.4](https://github.com/leandrocp/mdex_native/compare/v0.3.3...v0.3.4) (2026-11-24)
 
 ### Features
