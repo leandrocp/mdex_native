@@ -169,17 +169,12 @@ impl SyntaxHighlighterAdapter for LumisAdapter {
 }
 
 impl CodeBlockCloser for LumisAdapter {
-    fn close_code_block(&self, output: &mut dyn Write) -> fmt::Result {
-        let close_tag = self
+    fn take_close_tag(&self) -> Result<Option<String>, fmt::Error> {
+        Ok(self
             .close_tag
             .lock()
             .map_err(|_| self.fail(POISONED.into()))?
-            .take();
-
-        match close_tag {
-            Some(close_tag) => output.write_str(&close_tag),
-            None => Ok(()),
-        }
+            .take())
     }
 }
 

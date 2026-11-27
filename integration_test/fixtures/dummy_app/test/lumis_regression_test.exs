@@ -285,7 +285,7 @@ defmodule MDExNativeE2E.LumisRegressionTest do
 
           if formatter_opts[:header] do
             assert expected =~
-                     ~r{\A<section data-legacy="header"><pre[^>]*>.*</code></pre>\n</section>\z}s
+                     ~r{\A<section data-legacy="header"><pre[^>]*>.*</code></pre>\n</section>\n\z}s
           else
             refute expected =~ "<section"
           end

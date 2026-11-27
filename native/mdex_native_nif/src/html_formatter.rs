@@ -56,7 +56,8 @@ pub trait InlineCodeHighlighter {
 /// Closes what a syntax highlighter opened around a fence outside its `<pre>`,
 /// such as a Lumis header, once Comrak has written the fence's `</code></pre>`.
 pub trait CodeBlockCloser {
-    fn close_code_block(&self, output: &mut dyn Write) -> fmt::Result;
+    /// The close tag for the fence just rendered, if it needs one.
+    fn take_close_tag(&self) -> Result<Option<String>, fmt::Error>;
 }
 
 /// The highlighters a render passes to the formatter as its user data.
@@ -151,10 +152,6 @@ fn written<'n, T>(context: &Context<T>, names: &[&'n str]) -> Vec<&'n str> {
     written
 }
 
-/// Highlights inline code that names its language, as rehype-lumis and
-/// markdown-it-lumis do: a `language-*` class or `data-language` attribute, or
-/// else a trailing `{:lang}` marker, which is removed. Anything else, including
-/// `nohighlight`, keeps comrak's output.
 /// Renders a code block as Comrak does, then lets the syntax highlighter close
 /// whatever it opened around the fence, which Comrak's adapter cannot.
 fn render_code_block(
@@ -164,13 +161,24 @@ fn render_code_block(
 ) -> Result<ChildRendering, fmt::Error> {
     let rendering = html::format_node_default(context, node, entering)?;
 
-    if let (true, Some(closer)) = (entering, context.user.code_block.clone()) {
-        closer.close_code_block(context)?;
+    let close_tag = match (entering, &context.user.code_block) {
+        (true, Some(closer)) => closer.take_close_tag()?,
+        _ => None,
+    };
+
+    // Comrak ended the fence with a newline; the wrapper gets its own too.
+    if let Some(close_tag) = close_tag {
+        context.write_str(&close_tag)?;
+        context.lf()?;
     }
 
     Ok(rendering)
 }
 
+/// Highlights inline code that names its language, as rehype-lumis and
+/// markdown-it-lumis do: a `language-*` class or `data-language` attribute, or
+/// else a trailing `{:lang}` marker, which is removed. Anything else, including
+/// `nohighlight`, keeps comrak's output.
 fn render_code(
     context: &mut Context<Highlighters>,
     node: Node<'_>,

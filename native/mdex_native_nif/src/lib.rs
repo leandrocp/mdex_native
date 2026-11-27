@@ -901,13 +901,13 @@ mod tests {
 
         let fence = |text: &str| {
             format!(
-                "<div class=\"snippet\"><pre class=\"lumis\"><code class=\"language-plaintext\" translate=\"no\" tabindex=\"0\"><span class=\"l-line\" data-line=\"1\">{text}</span></code></pre>\n</div>"
+                "<div class=\"snippet\"><pre class=\"lumis\"><code class=\"language-plaintext\" translate=\"no\" tabindex=\"0\"><span class=\"l-line\" data-line=\"1\">{text}</span></code></pre>\n</div>\n"
             )
         };
         assert_eq!(
             output,
             format!(
-                "{}\n<p><code>b</code></p>\n<pre><code class=\"language-math\" data-math-style=\"display\">c\n</code></pre>\n{}",
+                "{}<p><code>b</code></p>\n<pre><code class=\"language-math\" data-math-style=\"display\">c\n</code></pre>\n{}",
                 fence("a"),
                 fence("d")
             )
