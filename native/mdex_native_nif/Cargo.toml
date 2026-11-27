@@ -25,8 +25,13 @@ comrak = { version = "1.2", default-features = false, features = [
 ] }
 # The same two crates `lumis_nif` links, with `rustler` for the option
 # decoders the two NIFs share. They share no runtime; see ARCHITECTURE.md.
-lumis-core = { version = "6.4.0", default-features = false, features = ["all-languages", "rustler"], optional = true }
-lumis-wasm-runtime = { version = "0.6.6", optional = true }
+#
+# The Lumis crates come from leandrocp/lumis#2123, which builds them for
+# wasm32-wasip1-threads, until a Lumis release has it; then they go back to
+# crates.io. Cargo takes one source per dependency across targets, so native
+# builds use this commit too. It is lumis-core 6.4.0 as released, and
+# lumis-wasm-runtime 0.6.6 with only a WASI-gated `Send + Sync` added.
+lumis-core = { version = "6.4.0", git = "https://github.com/leandrocp/lumis", rev = "0bc5e78aa1ad726fb0a2e4e6ba417fb556f74d86", default-features = false, features = ["all-languages", "rustler"], optional = true }
 lol_html = "3.0"
 parking_lot = "0.13"
 phf = { version = "0.14", features = ["macros"] }
@@ -36,6 +41,21 @@ shlex = "2.0.1"
 two-face = { version = "0.5", optional = true }
 typed-arena = "2.0"
 v_htmlescape = "1.0"
+
+[target.'cfg(not(target_os = "wasi"))'.dependencies]
+lumis-wasm-runtime = { version = "0.6.6", git = "https://github.com/leandrocp/lumis", rev = "0bc5e78aa1ad726fb0a2e4e6ba417fb556f74d86", optional = true }
+
+# Wasmtime cannot run inside WebAssembly, so a WASI build highlights with the
+# grammars `lumis` links statically, and lumis-wasm-runtime only lends its
+# limits. A WASI build always has both highlighters, which build.rs turns on:
+# ampoule builds with no feature flags, and the default features cannot carry
+# them because the plain precompiled NIF is built with the defaults.
+[target.'cfg(target_os = "wasi")'.dependencies]
+comrak = { version = "1.2", default-features = false, features = ["syntect"] }
+lumis = { version = "0.19.7", git = "https://github.com/leandrocp/lumis", rev = "0bc5e78aa1ad726fb0a2e4e6ba417fb556f74d86" }
+lumis-core = { version = "6.4.0", git = "https://github.com/leandrocp/lumis", rev = "0bc5e78aa1ad726fb0a2e4e6ba417fb556f74d86", default-features = false, features = ["all-languages", "rustler"] }
+lumis-wasm-runtime = { version = "0.6.6", git = "https://github.com/leandrocp/lumis", rev = "0bc5e78aa1ad726fb0a2e4e6ba417fb556f74d86", default-features = false }
+two-face = "0.5"
 
 [dev-dependencies]
 pretty_assertions = "1.4"

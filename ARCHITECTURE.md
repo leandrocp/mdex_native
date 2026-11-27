@@ -45,6 +45,14 @@ They don't share memory. Each NIF has its own [wasmtime] engine and Tree-sitter 
 
 This is on purpose. comrak calls the adapter synchronously inside the NIF call, and a NIF can't call back into Elixir halfway through, so the highlighter has to live in this library. Sharing one runtime would need either a native contract between the two NIFs ([`enif_dynamic_resource_call`][dyncall] or a C API) or fence highlighting moved out of the render and into Elixir. At these numbers, neither pays for itself.
 
+### WASI
+
+A build for `target_os = "wasi"` (`wasm32-wasip1-threads`) is how [ampoule] packs an application that uses mdex_native into a single binary. Ampoule builds the crate with `cargo rustc --target wasm32-wasip1-threads --crate-type staticlib` and no feature flags. Such a build always has both highlighters: [`build.rs`][build.rs] sets the `lumis` and `syntect` cfgs the code is gated on, and [`Cargo.toml`][cargo] pulls in their dependencies for that target. The default features can't carry them, because the plain precompiled NIF is built with the default features.
+
+Wasmtime can't run inside WebAssembly, so a WASI build has no parser packages and no store. The grammars are the ones the [`lumis`][lumis-crate] crate links statically, every language it has. [`lumis_runtime_wasi.rs`][lumis_runtime_wasi] replaces `lumis_runtime.rs` with the same interface, so the adapter and `lumis_render.rs` are shared. It highlights on one thread with an 8 MiB stack, and `configure_lumis_store` does nothing.
+
+Until a Lumis release builds for this target, the Lumis crates come from the [leandrocp/lumis#2123][lumis-2123] commit, for native builds too, since Cargo takes one source per dependency. The Rust workflow builds and tests the crate for `wasm32-wasip1-threads` under Wasmtime, with Rustler patched the way ampoule patches it.
+
 ## syntect
 
 The `syntect` feature uses comrak's [`SyntectAdapter`][syntect-adapter] with the syntax definitions and themes from [two-face], all compiled into the NIF. There is no runtime setup, no parser package and no data directory. The set of supported languages is fixed when the NIF is built.
@@ -72,6 +80,11 @@ The `syntect` feature uses comrak's [`SyntectAdapter`][syntect-adapter] with the
 [lumis_adapter]: native/mdex_native_nif/src/lumis_adapter.rs
 [lumis_runtime]: native/mdex_native_nif/src/lumis_runtime.rs
 [lumis_render]: native/mdex_native_nif/src/lumis_render.rs
+[lumis_runtime_wasi]: native/mdex_native_nif/src/lumis_runtime_wasi.rs
+[build.rs]: native/mdex_native_nif/build.rs
+[ampoule]: https://github.com/filipecabaco/ampoule
+[lumis-crate]: https://docs.rs/lumis
+[lumis-2123]: https://github.com/leandrocp/lumis/pull/2123
 [native.ex]: lib/mdex_native/native.ex
 [application.ex]: lib/mdex_native/application.ex
 [sanitization]: guides/sanitization.md
