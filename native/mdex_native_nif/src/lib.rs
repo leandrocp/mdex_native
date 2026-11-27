@@ -4,6 +4,14 @@
 #[macro_use]
 extern crate rustler;
 
+// A copy of the crate without build.rs would build the NIF without the
+// highlighter its feature asked for.
+#[cfg(any(
+    all(feature = "lumis", not(lumis)),
+    all(feature = "syntect", not(syntect))
+))]
+compile_error!("build.rs did not run: it sets the `lumis` and `syntect` cfgs");
+
 mod html_formatter;
 #[cfg(lumis)]
 mod lumis_adapter;
