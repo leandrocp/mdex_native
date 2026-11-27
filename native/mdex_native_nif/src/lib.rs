@@ -22,7 +22,7 @@ use comrak::plugins::syntect::{SyntectAdapter, SyntectAdapterBuilder};
 use comrak::{Anchorizer, Arena, Options};
 #[cfg(feature = "syntect")]
 use html_formatter::InlineCodeHighlighter;
-use html_formatter::{InlineCode, MdexFormatter};
+use html_formatter::{Highlighters, MdexFormatter};
 use lol_html::html_content::ContentType;
 use lol_html::{rewrite_str, text, RewriteStrSettings};
 #[cfg(feature = "lumis")]
@@ -265,7 +265,7 @@ fn markdown_to_html_with_options<'a>(
     let tagfilter = options.tagfilter();
     let time_limit = options.parse_time_limit();
     let memory_limit = options.parse_memory_limit();
-    let (comrak_options, lumis_adapter, inline_code, sanitize) = render_parts(options)?;
+    let (comrak_options, lumis_adapter, highlighters, sanitize) = render_parts(options)?;
     let escape_curly_braces_in_code = comrak_options.extension.phoenix_heex;
     let arena = Arena::new();
     let root = parse(&arena, md, &comrak_options, time_limit, memory_limit)?;
@@ -279,7 +279,7 @@ fn markdown_to_html_with_options<'a>(
             &mut buffer,
             &plugins,
             tagfilter,
-            inline_code.clone(),
+            highlighters,
         ),
         &lumis_adapter,
     )?;
@@ -294,7 +294,7 @@ fn markdown_to_xml_with_options<'a>(
 ) -> NifResult<Term<'a>> {
     let time_limit = options.parse_time_limit();
     let memory_limit = options.parse_memory_limit();
-    let (comrak_options, lumis_adapter, _inline_code, _sanitize) = render_parts(options)?;
+    let (comrak_options, lumis_adapter, _highlighters, _sanitize) = render_parts(options)?;
     let arena = Arena::new();
     let root = parse(&arena, md, &comrak_options, time_limit, memory_limit)?;
     let mut buffer = String::new();
@@ -328,7 +328,7 @@ fn document_to_commonmark_with_options<'a>(
 ) -> NifResult<Term<'a>> {
     let arena = Arena::new();
     let comrak_ast = document_term_to_comrak_ast(&arena, ex_document)?;
-    let (comrak_options, lumis_adapter, _inline_code, _sanitize) = render_parts(options)?;
+    let (comrak_options, lumis_adapter, _highlighters, _sanitize) = render_parts(options)?;
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
 
@@ -351,7 +351,7 @@ fn document_to_html<'a>(env: Env<'a>, ex_document: Term<'a>) -> NifResult<Term<'
         &options,
         &mut buffer,
         &Plugins::default(),
-        None,
+        Highlighters::default(),
     )
     .expect("writing to String is infallible");
     Ok(buffer.encode(env))
@@ -366,7 +366,7 @@ fn document_to_html_with_options<'a>(
     let tagfilter = options.tagfilter();
     let arena = Arena::new();
     let comrak_ast = document_term_to_comrak_ast(&arena, ex_document)?;
-    let (comrak_options, lumis_adapter, inline_code, sanitize) = render_parts(options)?;
+    let (comrak_options, lumis_adapter, highlighters, sanitize) = render_parts(options)?;
     let escape_curly_braces_in_code = comrak_options.extension.phoenix_heex;
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
@@ -378,7 +378,7 @@ fn document_to_html_with_options<'a>(
             &mut buffer,
             &plugins,
             tagfilter,
-            inline_code.clone(),
+            highlighters,
         ),
         &lumis_adapter,
     )?;
@@ -405,7 +405,7 @@ fn document_to_xml_with_options<'a>(
 ) -> NifResult<Term<'a>> {
     let arena = Arena::new();
     let comrak_ast = document_term_to_comrak_ast(&arena, ex_document)?;
-    let (comrak_options, lumis_adapter, _inline_code, _sanitize) = render_parts(options)?;
+    let (comrak_options, lumis_adapter, _highlighters, _sanitize) = render_parts(options)?;
     let mut buffer = String::new();
     let plugins = plugins(&lumis_adapter);
 
@@ -449,27 +449,27 @@ fn render_parts(
 ) -> NifResult<(
     Options<'static>,
     Option<CodeFenceSyntaxHighlighter>,
-    InlineCode,
+    Highlighters,
     Option<ExSanitizeOption>,
 )> {
     let comrak_options = options.comrak_options();
-    let (syntax_highlighter, inline_code) = match options.syntax_highlight {
+    let (syntax_highlighter, highlighters) = match options.syntax_highlight {
         Some(syntax_highlight) => {
             let enabled = syntax_highlight.inline_code;
             let highlighter = syntax_highlighter(syntax_highlight)?;
-            let inline_code = highlighter
+            let highlighters = highlighter
                 .as_ref()
-                .filter(|_| enabled)
-                .and_then(CodeFenceSyntaxHighlighter::inline_code);
-            (highlighter, inline_code)
+                .map(|highlighter| highlighter.highlighters(enabled))
+                .unwrap_or_default();
+            (highlighter, highlighters)
         }
-        None => (None, None),
+        None => (None, Highlighters::default()),
     };
 
     Ok((
         comrak_options,
         syntax_highlighter,
-        inline_code,
+        highlighters,
         options.sanitize,
     ))
 }
@@ -663,14 +663,25 @@ impl SyntaxHighlighterAdapter for CodeFenceSyntaxHighlighter {
 }
 
 impl CodeFenceSyntaxHighlighter {
-    fn inline_code(&self) -> InlineCode {
+    /// What the formatter needs from this highlighter: inline code, when
+    /// `inline_code` is on, and closing a Lumis header around a fence.
+    fn highlighters(&self, inline_code: bool) -> Highlighters {
         match self {
             #[cfg(feature = "lumis")]
-            Self::Lumis(adapter) => Some(adapter.clone()),
+            Self::Lumis(adapter) => Highlighters {
+                inline_code: inline_code.then(|| adapter.clone() as _),
+                code_block: Some(adapter.clone()),
+            },
             #[cfg(feature = "syntect")]
-            Self::Syntect(adapter) => Some(adapter.clone()),
+            Self::Syntect(adapter) => Highlighters {
+                inline_code: inline_code.then(|| adapter.clone() as _),
+                code_block: None,
+            },
             #[cfg(not(any(feature = "lumis", feature = "syntect")))]
-            _ => None,
+            _ => {
+                let _ = inline_code;
+                Highlighters::default()
+            }
         }
     }
 }
@@ -840,11 +851,67 @@ mod tests {
             options,
             &mut output,
             &Plugins::default(),
-            None,
+            Highlighters::default(),
         )
         .expect("writing to String is infallible");
 
         output
+    }
+
+    /// Comrak writes a fence's `</code></pre>` after the adapter, so a Lumis
+    /// header's close tag has to come from the formatter, after it, and only
+    /// for the fences Lumis rendered.
+    #[cfg(feature = "lumis")]
+    #[test]
+    fn a_lumis_header_wraps_each_fence() {
+        use lumis_core::elixir::{ExFormatterOption, ExHtmlElement, ExHtmlStructure};
+
+        let formatter = ExFormatterOption::HtmlLinked {
+            structure: ExHtmlStructure::Block,
+            pre_class: None,
+            pre_attrs: Vec::new(),
+            code_attrs: Vec::new(),
+            highlight_lines: None,
+            line_numbers: false,
+            header: Some(ExHtmlElement {
+                open_tag: "<div class=\"snippet\">".to_string(),
+                close_tag: "</div>".to_string(),
+            }),
+        };
+        let highlighter = Some(CodeFenceSyntaxHighlighter::Lumis(Arc::new(
+            LumisAdapter::new(formatter, false, false, Default::default()),
+        )));
+        let mut options = Options::default();
+        options.extension.math_code = true;
+        let arena = Arena::new();
+        let root = comrak::parse_document(
+            &arena,
+            "```text\na\n```\n\n`b`\n\n```math\nc\n```\n\n```text\nd\n```\n",
+            &options,
+        );
+        let mut output = String::new();
+        MdexFormatter::format_document_with_plugins(
+            root,
+            &options,
+            &mut output,
+            &plugins(&highlighter),
+            highlighter.as_ref().unwrap().highlighters(false),
+        )
+        .unwrap();
+
+        let fence = |text: &str| {
+            format!(
+                "<div class=\"snippet\"><pre class=\"lumis\"><code class=\"language-plaintext\" translate=\"no\" tabindex=\"0\"><span class=\"l-line\" data-line=\"1\">{text}</span></code></pre>\n</div>"
+            )
+        };
+        assert_eq!(
+            output,
+            format!(
+                "{}\n<p><code>b</code></p>\n<pre><code class=\"language-math\" data-math-style=\"display\">c\n</code></pre>\n{}",
+                fence("a"),
+                fence("d")
+            )
+        );
     }
 
     /// Comrak's adapter panics on a theme it has not loaded, so an unknown
@@ -881,7 +948,10 @@ mod tests {
                 &options,
                 &mut output,
                 &Plugins::default(),
-                Some(Arc::new(adapter)),
+                Highlighters {
+                    inline_code: Some(Arc::new(adapter)),
+                    code_block: None,
+                },
             )
             .unwrap();
             output

@@ -7,7 +7,7 @@ use crate::types::options::ExBudget;
 use comrak::adapters::{SyntaxHighlightMeta, SyntaxHighlighterAdapter};
 use lumis_core::elixir::ExFormatterOption;
 
-use crate::html_formatter::InlineCodeHighlighter;
+use crate::html_formatter::{CodeBlockCloser, InlineCodeHighlighter};
 use crate::lumis_render::{render_code_fence, render_inline_code};
 
 const POISONED: &str = "a Lumis adapter lock is poisoned";
@@ -71,6 +71,9 @@ pub struct LumisAdapter {
     word_diff: bool,
     budget: ExBudget,
     fence: Mutex<FenceState>,
+    /// The header close tag of the fence `write_highlighted` just wrote, which
+    /// has to come after the `</code></pre>` Comrak writes next.
+    close_tag: Mutex<Option<String>>,
     /// Comrak's adapter trait can only answer `fmt::Error`, which says nothing
     /// about why Lumis refused a fence. Park the reason here for the NIF to
     /// read once the render has unwound.
@@ -90,6 +93,7 @@ impl LumisAdapter {
             word_diff,
             budget,
             fence: Mutex::new(FenceState::default()),
+            close_tag: Mutex::new(None),
             failure: Mutex::new(None),
         }
     }
@@ -156,7 +160,26 @@ impl SyntaxHighlighterAdapter for LumisAdapter {
         )
         .map_err(|reason| self.fail(reason))?;
 
-        output.write_str(&highlighted)
+        *self
+            .close_tag
+            .lock()
+            .map_err(|_| self.fail(POISONED.into()))? = highlighted.close_tag;
+        output.write_str(&highlighted.html)
+    }
+}
+
+impl CodeBlockCloser for LumisAdapter {
+    fn close_code_block(&self, output: &mut dyn Write) -> fmt::Result {
+        let close_tag = self
+            .close_tag
+            .lock()
+            .map_err(|_| self.fail(POISONED.into()))?
+            .take();
+
+        match close_tag {
+            Some(close_tag) => output.write_str(&close_tag),
+            None => Ok(()),
+        }
     }
 }
 

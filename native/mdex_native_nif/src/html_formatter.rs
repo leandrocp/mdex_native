@@ -53,9 +53,23 @@ pub trait InlineCodeHighlighter {
     ) -> fmt::Result;
 }
 
-pub type InlineCode = Option<Arc<dyn InlineCodeHighlighter>>;
+/// Closes what a syntax highlighter opened around a fence outside its `<pre>`,
+/// such as a Lumis header, once Comrak has written the fence's `</code></pre>`.
+pub trait CodeBlockCloser {
+    fn close_code_block(&self, output: &mut dyn Write) -> fmt::Result;
+}
 
-create_formatter!(MdexFormatter<InlineCode>, {
+/// The highlighters a render passes to the formatter as its user data.
+#[derive(Clone, Default)]
+pub struct Highlighters {
+    pub inline_code: Option<Arc<dyn InlineCodeHighlighter>>,
+    pub code_block: Option<Arc<dyn CodeBlockCloser>>,
+}
+
+create_formatter!(MdexFormatter<Highlighters>, {
+    NodeValue::CodeBlock(_) => |context, node, entering| {
+        return render_code_block(context, node, entering);
+    },
     NodeValue::Code(ref nc) => |context, node, entering| {
         return render_code(context, node, entering, nc);
     },
@@ -75,11 +89,17 @@ impl MdexFormatter {
         output: &'o mut dyn Write,
         plugins: &'o comrak::options::Plugins<'o>,
         tagfilter: bool,
-        inline_code: InlineCode,
+        highlighters: Highlighters,
     ) -> fmt::Result {
         if !tagfilter || !options.render.r#unsafe || options.render.escape {
-            return Self::format_document_with_plugins(root, options, output, plugins, inline_code)
-                .map(drop);
+            return Self::format_document_with_plugins(
+                root,
+                options,
+                output,
+                plugins,
+                highlighters,
+            )
+            .map(drop);
         }
         html::format_document_with_formatter(
             root,
@@ -98,7 +118,7 @@ impl MdexFormatter {
                 }
                 Self::formatter(context, node, entering)
             },
-            inline_code,
+            highlighters,
         )
         .map(drop)
     }
@@ -135,8 +155,24 @@ fn written<'n, T>(context: &Context<T>, names: &[&'n str]) -> Vec<&'n str> {
 /// markdown-it-lumis do: a `language-*` class or `data-language` attribute, or
 /// else a trailing `{:lang}` marker, which is removed. Anything else, including
 /// `nohighlight`, keeps comrak's output.
+/// Renders a code block as Comrak does, then lets the syntax highlighter close
+/// whatever it opened around the fence, which Comrak's adapter cannot.
+fn render_code_block(
+    context: &mut Context<Highlighters>,
+    node: Node<'_>,
+    entering: bool,
+) -> Result<ChildRendering, fmt::Error> {
+    let rendering = html::format_node_default(context, node, entering)?;
+
+    if let (true, Some(closer)) = (entering, context.user.code_block.clone()) {
+        closer.close_code_block(context)?;
+    }
+
+    Ok(rendering)
+}
+
 fn render_code(
-    context: &mut Context<InlineCode>,
+    context: &mut Context<Highlighters>,
     node: Node<'_>,
     entering: bool,
     nc: &NodeCode,
@@ -144,6 +180,7 @@ fn render_code(
     let ast = node.data();
     let marked = context
         .user
+        .inline_code
         .clone()
         .zip(inline_code_language(&nc.literal, ast.attrs.as_deref()));
     let (Some((highlighter, (source, language))), true) = (marked, entering) else {
@@ -398,7 +435,7 @@ mod tests {
             options,
             &mut buffer,
             &Plugins::default(),
-            None,
+            Highlighters::default(),
         )
         .unwrap();
         buffer
@@ -454,7 +491,7 @@ mod tests {
                     options,
                     buffer,
                     &Plugins::default(),
-                    None,
+                    Highlighters::default(),
                 )
                 .map(drop)
             },
@@ -570,7 +607,10 @@ mod tests {
             &mut buffer,
             &Plugins::default(),
             false,
-            Some(Arc::new(Stub)),
+            Highlighters {
+                inline_code: Some(Arc::new(Stub)),
+                code_block: None,
+            },
         )
         .unwrap();
         buffer
