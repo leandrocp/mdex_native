@@ -9,7 +9,10 @@ mod html_formatter;
 mod lumis_adapter;
 #[cfg(feature = "lumis")]
 mod lumis_render;
-#[cfg(feature = "lumis")]
+#[cfg(all(feature = "lumis", not(target_os = "wasi")))]
+mod lumis_runtime;
+#[cfg(all(feature = "lumis", target_os = "wasi"))]
+#[path = "lumis_runtime_wasi.rs"]
 mod lumis_runtime;
 mod memory;
 mod types;

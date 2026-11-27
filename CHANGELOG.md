@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- Build the NIF for `wasm32-wasip1-threads`, with Lumis or Syntect, so [ampoule](https://github.com/filipecabaco/ampoule) can pack applications that use mdex_native into a single binary. Pick the highlighter for that build in the application's `ampoule.toml`, with `[nifs.mdex_native] features = ["lumis"]` or `["syntect"]`. Lumis highlights there with grammars linked into the NIF instead of `lumis_wasm_*` parsers.
+
+### Dependencies
+
+- Take `lumis-core` and `lumis-wasm-runtime` from the [leandrocp/lumis#2123](https://github.com/leandrocp/lumis/pull/2123) commit until a Lumis release has it. It is `lumis-core` 6.4.0 and `lumis-wasm-runtime` 0.6.6 with only a WASI-gated change.
+
 ## [0.3.4](https://github.com/leandrocp/mdex_native/compare/v0.3.3...v0.3.4) (2026-11-24)
 
 ### Features

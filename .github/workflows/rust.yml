@@ -6,9 +6,13 @@ on:
       - main
     paths:
       - "native/**"
+      - ".github/scripts/patch-rustler-wasi.py"
+      - ".github/workflows/rust.yml"
   pull_request:
     paths:
       - "native/**"
+      - ".github/scripts/patch-rustler-wasi.py"
+      - ".github/workflows/rust.yml"
   workflow_dispatch:
 
 jobs:
@@ -35,6 +39,58 @@ jobs:
         with:
           key: x86_64-pc-windows-gnu
       - run: cargo test --locked --lib --target x86_64-pc-windows-gnu --manifest-path native/mdex_native_nif/Cargo.toml
+
+  # Ampoule (https://github.com/filipecabaco/ampoule) builds this crate for
+  # wasm32-wasip1-threads, with the features an app sets in `[nifs.mdex_native]`
+  # of its ampoule.toml. Build and test it the same way, with the Rustler patch
+  # ampoule applies, and run the tests under Wasmtime 46, the last CLI release
+  # with wasi-threads.
+  test-wasi:
+    name: target wasm32-wasip1-threads
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      WASI_SDK_URL: https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-34/wasi-sdk-34.0-x86_64-linux.tar.gz
+      WASI_SDK_SHA256: b761e3a0721dbae9c09a0059e5fdb2bf917d1b4a8a7b430fb3b5aafb0984b2c4
+      WASMTIME_URL: https://github.com/bytecodealliance/wasmtime/releases/download/v46.0.0/wasmtime-v46.0.0-x86_64-linux.tar.xz
+      WASMTIME_SHA256: 2acc86341edd9ad8b6b8d0cbcea2bd0b1928b0b363c0a76f41ba56f33d9fd7bf
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          targets: wasm32-wasip1-threads
+          components: clippy
+      - uses: Swatinem/rust-cache@v2.9.3
+        with:
+          key: wasm32-wasip1-threads
+          workspaces: native/mdex_native_nif
+      - name: Install wasi-sdk and Wasmtime
+        run: |
+          curl --retry 3 -fsSL "$WASI_SDK_URL" -o "$RUNNER_TEMP/wasi-sdk.tar.gz"
+          curl --retry 3 -fsSL "$WASMTIME_URL" -o "$RUNNER_TEMP/wasmtime.tar.xz"
+          echo "$WASI_SDK_SHA256  $RUNNER_TEMP/wasi-sdk.tar.gz" | sha256sum -c
+          echo "$WASMTIME_SHA256  $RUNNER_TEMP/wasmtime.tar.xz" | sha256sum -c
+          mkdir "$RUNNER_TEMP/wasi-sdk" "$RUNNER_TEMP/wasmtime"
+          tar -xzf "$RUNNER_TEMP/wasi-sdk.tar.gz" --strip-components=1 -C "$RUNNER_TEMP/wasi-sdk"
+          tar -xJf "$RUNNER_TEMP/wasmtime.tar.xz" --strip-components=1 -C "$RUNNER_TEMP/wasmtime"
+          sdk="$RUNNER_TEMP/wasi-sdk"
+          {
+            echo "CC_wasm32_wasip1_threads=$sdk/bin/clang"
+            echo "CXX_wasm32_wasip1_threads=$sdk/bin/clang++"
+            echo "AR_wasm32_wasip1_threads=$sdk/bin/llvm-ar"
+            echo "CFLAGS_wasm32_wasip1_threads=--target=wasm32-wasip1-threads -pthread"
+            echo "CXXFLAGS_wasm32_wasip1_threads=--target=wasm32-wasip1-threads -pthread"
+            echo "CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER=$RUNNER_TEMP/wasmtime/wasmtime run -W threads=y,shared-memory=y -S threads=y"
+          } >> "$GITHUB_ENV"
+      - name: Patch Rustler as ampoule does
+        run: python3 .github/scripts/patch-rustler-wasi.py native/mdex_native_nif "$RUNNER_TEMP/rustler"
+      - name: Check without a highlighter
+        run: cargo check --target wasm32-wasip1-threads --manifest-path native/mdex_native_nif/Cargo.toml
+      - name: Clippy
+        run: cargo clippy --all-targets --features lumis,syntect --target wasm32-wasip1-threads --manifest-path native/mdex_native_nif/Cargo.toml -- -D warnings
+      - name: Test
+        run: cargo test --lib --features lumis,syntect --target wasm32-wasip1-threads --manifest-path native/mdex_native_nif/Cargo.toml
 
   lint:
     uses: leandrocp/github-actions/.github/workflows/rust-lint.yml@main

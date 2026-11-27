@@ -165,3 +165,22 @@ CPU, use legacy artifacts:
 ```elixir
 config :mdex_native, use_legacy_artifacts: true
 ```
+
+## Single binaries with ampoule
+
+[ampoule](https://github.com/filipecabaco/ampoule) rebuilds the NIF for
+`wasm32-wasip1-threads` when it packs your application. That needs an ampoule
+version that packs Rustler 0.39 NIFs and reads `[nifs.<app>]` from
+`ampoule.toml`, which no ampoule release does yet.
+
+Ampoule can't read `config :mdex_native, syntax_highlighter:`, so name the same
+highlighter in your `ampoule.toml`:
+
+```toml
+[nifs.mdex_native]
+features = ["lumis"]    # or ["syntect"]
+```
+
+Without it, the packed NIF has no highlighter. With Lumis, the packed NIF has
+every language Lumis supports built in, so the `lumis_wasm_*` parser
+dependencies aren't used.
