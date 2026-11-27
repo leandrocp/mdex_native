@@ -43,7 +43,6 @@ defmodule MDExNative.MixProject do
         examples
         guides
         native/mdex_native_nif/src
-        native/mdex_native_nif/build.rs
         native/mdex_native_nif/.cargo
         native/mdex_native_nif/Cargo.*
         native/mdex_native_nif/Cross.toml

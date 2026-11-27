@@ -47,9 +47,14 @@ This is on purpose. comrak calls the adapter synchronously inside the NIF call, 
 
 ### WASI
 
-A build for `target_os = "wasi"` (`wasm32-wasip1-threads`) is how [ampoule] packs an application that uses mdex_native into a single binary. Ampoule builds the crate with `cargo rustc --target wasm32-wasip1-threads --crate-type staticlib` and no feature flags. Such a build always has both highlighters: [`build.rs`][build.rs] sets the `lumis` and `syntect` cfgs the code is gated on, and [`Cargo.toml`][cargo] pulls in their dependencies for that target. The default features can't carry them, because the plain precompiled NIF is built with the default features.
+A build for `target_os = "wasi"` (`wasm32-wasip1-threads`) is how [ampoule] packs an application that uses mdex_native into a single binary. Ampoule builds the crate with `cargo rustc --target wasm32-wasip1-threads --crate-type staticlib`, with the features the application sets in its `ampoule.toml`. It doesn't see `config :mdex_native, syntax_highlighter:`, so an application that highlights repeats it there:
 
-Wasmtime can't run inside WebAssembly, so a WASI build has no parser packages and no store. The grammars are the ones the [`lumis`][lumis-crate] crate links statically, every language it has. [`lumis_runtime_wasi.rs`][lumis_runtime_wasi] replaces `lumis_runtime.rs` with the same interface, so the adapter and `lumis_render.rs` are shared. It highlights on one thread with an 8 MiB stack, and `configure_lumis_store` does nothing.
+```toml
+[nifs.mdex_native]
+features = ["lumis"]
+```
+
+Wasmtime can't run inside WebAssembly, so the `lumis` feature of a WASI build has no parser packages and no store; [`Cargo.toml`][cargo] swaps its dependencies for that target. The grammars are the ones the [`lumis`][lumis-crate] crate links statically, every language it has. [`lumis_runtime_wasi.rs`][lumis_runtime_wasi] replaces `lumis_runtime.rs` with the same interface, so the adapter and `lumis_render.rs` are shared. It highlights on one thread with an 8 MiB stack, and `configure_lumis_store` does nothing.
 
 Until a Lumis release builds for this target, the Lumis crates come from the [leandrocp/lumis#2123][lumis-2123] commit, for native builds too, since Cargo takes one source per dependency. The Rust workflow builds and tests the crate for `wasm32-wasip1-threads` under Wasmtime, with Rustler patched the way ampoule patches it.
 
@@ -81,7 +86,6 @@ The `syntect` feature uses comrak's [`SyntectAdapter`][syntect-adapter] with the
 [lumis_runtime]: native/mdex_native_nif/src/lumis_runtime.rs
 [lumis_render]: native/mdex_native_nif/src/lumis_render.rs
 [lumis_runtime_wasi]: native/mdex_native_nif/src/lumis_runtime_wasi.rs
-[build.rs]: native/mdex_native_nif/build.rs
 [ampoule]: https://github.com/filipecabaco/ampoule
 [lumis-crate]: https://docs.rs/lumis
 [lumis-2123]: https://github.com/leandrocp/lumis/pull/2123

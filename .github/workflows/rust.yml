@@ -41,9 +41,10 @@ jobs:
       - run: cargo test --locked --lib --target x86_64-pc-windows-gnu --manifest-path native/mdex_native_nif/Cargo.toml
 
   # Ampoule (https://github.com/filipecabaco/ampoule) builds this crate for
-  # wasm32-wasip1-threads with no feature flags. Build and test it the same
-  # way, with the Rustler patch ampoule applies, and run the tests under
-  # Wasmtime 46, the last CLI release with wasi-threads.
+  # wasm32-wasip1-threads, with the features an app sets in `[nifs.mdex_native]`
+  # of its ampoule.toml. Build and test it the same way, with the Rustler patch
+  # ampoule applies, and run the tests under Wasmtime 46, the last CLI release
+  # with wasi-threads.
   test-wasi:
     name: target wasm32-wasip1-threads
     runs-on: ubuntu-24.04
@@ -84,10 +85,12 @@ jobs:
           } >> "$GITHUB_ENV"
       - name: Patch Rustler as ampoule does
         run: python3 .github/scripts/patch-rustler-wasi.py native/mdex_native_nif "$RUNNER_TEMP/rustler"
+      - name: Check without a highlighter
+        run: cargo check --target wasm32-wasip1-threads --manifest-path native/mdex_native_nif/Cargo.toml
       - name: Clippy
-        run: cargo clippy --all-targets --target wasm32-wasip1-threads --manifest-path native/mdex_native_nif/Cargo.toml -- -D warnings
+        run: cargo clippy --all-targets --features lumis,syntect --target wasm32-wasip1-threads --manifest-path native/mdex_native_nif/Cargo.toml -- -D warnings
       - name: Test
-        run: cargo test --lib --target wasm32-wasip1-threads --manifest-path native/mdex_native_nif/Cargo.toml
+        run: cargo test --lib --features lumis,syntect --target wasm32-wasip1-threads --manifest-path native/mdex_native_nif/Cargo.toml
 
   lint:
     uses: leandrocp/github-actions/.github/workflows/rust-lint.yml@main

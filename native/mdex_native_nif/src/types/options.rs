@@ -1,12 +1,12 @@
-#[cfg(lumis)]
+#[cfg(feature = "lumis")]
 mod budget;
 mod sanitize;
 
-#[cfg(lumis)]
+#[cfg(feature = "lumis")]
 pub use budget::ExBudget;
 
 use comrak::options::{AlertStyleType, Extension, ListStyleType, Options, Parse, Render};
-#[cfg(lumis)]
+#[cfg(feature = "lumis")]
 use lumis_core::elixir::ExFormatterOption;
 use rustler::types::atom::{self, Atom};
 use rustler::{Decoder, NifResult, NifUnitEnum, Term};
@@ -632,24 +632,24 @@ pub enum ExSyntaxHighlightEngine {
 
 #[derive(Debug, Default)]
 pub struct ExLumisOptions {
-    #[cfg(lumis)]
+    #[cfg(feature = "lumis")]
     pub formatter: ExFormatterOption,
     // Lumis moved this off the formatter in 0.8; it arrives alongside it.
-    #[cfg(lumis)]
+    #[cfg(feature = "lumis")]
     pub rainbow_brackets: bool,
-    #[cfg(lumis)]
+    #[cfg(feature = "lumis")]
     pub word_diff: bool,
-    #[cfg(lumis)]
+    #[cfg(feature = "lumis")]
     pub budget: ExBudget,
 }
 
 #[derive(Debug, Default)]
 pub struct ExSyntectOptions {
-    #[cfg(syntect)]
+    #[cfg(feature = "syntect")]
     pub theme: Option<String>,
 }
 
-#[cfg(syntect)]
+#[cfg(feature = "syntect")]
 impl<'a> Decoder<'a> for ExSyntectOptions {
     fn decode(term: Term<'a>) -> NifResult<Self> {
         Ok(Self {
@@ -658,7 +658,7 @@ impl<'a> Decoder<'a> for ExSyntectOptions {
     }
 }
 
-#[cfg(not(syntect))]
+#[cfg(not(feature = "syntect"))]
 impl<'a> Decoder<'a> for ExSyntectOptions {
     fn decode(_term: Term<'a>) -> NifResult<Self> {
         Ok(Self {})
@@ -678,7 +678,7 @@ pub enum ExSyntaxHighlightEngineOptions {
 ///
 /// `context` names where the options sat in the caller's own call, so an error
 /// reads `invalid value for :syntax_highlight option: ...`.
-#[cfg(lumis)]
+#[cfg(feature = "lumis")]
 impl ExLumisOptions {
     fn from_term(term: Term<'_>, context: &str) -> NifResult<Self> {
         let options = lumis_core::elixir::ExLumisOptions::from_term(term)
@@ -693,7 +693,7 @@ impl ExLumisOptions {
     }
 }
 
-#[cfg(not(lumis))]
+#[cfg(not(feature = "lumis"))]
 impl ExLumisOptions {
     #[allow(clippy::unnecessary_wraps)]
     fn from_term(_term: Term<'_>, _context: &str) -> NifResult<Self> {
@@ -705,7 +705,7 @@ impl ExLumisOptions {
 pub struct ExSyntaxHighlightOptions {
     pub opts: ExSyntaxHighlightEngineOptions,
     /// Also highlight inline code that names its language. Lumis only.
-    #[cfg_attr(not(lumis), allow(dead_code))]
+    #[cfg_attr(not(feature = "lumis"), allow(dead_code))]
     pub inline_code: bool,
 }
 

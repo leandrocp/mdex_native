@@ -4,7 +4,7 @@
 
 ### Features
 
-- Build the NIF for `wasm32-wasip1-threads`, with both Lumis and Syntect, so [ampoule](https://github.com/filipecabaco/ampoule) can pack applications that use mdex_native into a single binary. Lumis highlights there with grammars linked into the NIF instead of `lumis_wasm_*` parsers.
+- Build the NIF for `wasm32-wasip1-threads`, with Lumis or Syntect, so [ampoule](https://github.com/filipecabaco/ampoule) can pack applications that use mdex_native into a single binary. Pick the highlighter for that build in the application's `ampoule.toml`, with `[nifs.mdex_native] features = ["lumis"]` or `["syntect"]`. Lumis highlights there with grammars linked into the NIF instead of `lumis_wasm_*` parsers.
 
 ### Dependencies
 

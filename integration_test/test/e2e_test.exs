@@ -75,7 +75,6 @@ defmodule MDExNative.Integration.E2ETest do
     copy_project_path!("checksum-Elixir.MDExNative.Native.exs", destination)
     copy_project_path!("native/mdex_native_nif/.cargo", destination)
     copy_project_path!("native/mdex_native_nif/src", destination)
-    copy_project_path!("native/mdex_native_nif/build.rs", destination)
     copy_project_path!("native/mdex_native_nif/Cargo.toml", destination)
     copy_project_path!("native/mdex_native_nif/Cargo.lock", destination)
     copy_project_path!("native/mdex_native_nif/Cross.toml", destination)

@@ -4,22 +4,14 @@
 #[macro_use]
 extern crate rustler;
 
-// A copy of the crate without build.rs would build the NIF without the
-// highlighter its feature asked for.
-#[cfg(any(
-    all(feature = "lumis", not(lumis)),
-    all(feature = "syntect", not(syntect))
-))]
-compile_error!("build.rs did not run: it sets the `lumis` and `syntect` cfgs");
-
 mod html_formatter;
-#[cfg(lumis)]
+#[cfg(feature = "lumis")]
 mod lumis_adapter;
-#[cfg(lumis)]
+#[cfg(feature = "lumis")]
 mod lumis_render;
-#[cfg(all(lumis, not(target_os = "wasi")))]
+#[cfg(all(feature = "lumis", not(target_os = "wasi")))]
 mod lumis_runtime;
-#[cfg(all(lumis, target_os = "wasi"))]
+#[cfg(all(feature = "lumis", target_os = "wasi"))]
 #[path = "lumis_runtime_wasi.rs"]
 mod lumis_runtime;
 mod memory;
@@ -28,19 +20,19 @@ mod types;
 use comrak::adapters::{SyntaxHighlightMeta, SyntaxHighlighterAdapter};
 use comrak::nodes::AstNode;
 use comrak::options::Plugins;
-#[cfg(syntect)]
+#[cfg(feature = "syntect")]
 use comrak::plugins::syntect::{SyntectAdapter, SyntectAdapterBuilder};
 use comrak::{Anchorizer, Arena, Options};
-#[cfg(syntect)]
+#[cfg(feature = "syntect")]
 use html_formatter::InlineCodeHighlighter;
 use html_formatter::{InlineCode, MdexFormatter};
 use lol_html::html_content::ContentType;
 use lol_html::{rewrite_str, text, RewriteStrSettings};
-#[cfg(lumis)]
+#[cfg(feature = "lumis")]
 use lumis_adapter::LumisAdapter;
 use rustler::types::list::ListIterator;
 use rustler::{Encoder, Env, NifResult, Term};
-#[cfg(any(lumis, syntect))]
+#[cfg(any(feature = "lumis", feature = "syntect"))]
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use types::{document::*, options::*};
@@ -490,7 +482,7 @@ fn syntax_highlighter(
 ) -> NifResult<Option<CodeFenceSyntaxHighlighter>> {
     match syntax_highlight.opts {
         ExSyntaxHighlightEngineOptions::Lumis(opts) => {
-            #[cfg(lumis)]
+            #[cfg(feature = "lumis")]
             {
                 Ok(Some(CodeFenceSyntaxHighlighter::Lumis(Arc::new(
                     LumisAdapter::new(
@@ -502,14 +494,14 @@ fn syntax_highlighter(
                 ))))
             }
 
-            #[cfg(not(lumis))]
+            #[cfg(not(feature = "lumis"))]
             {
                 let _ = opts;
                 Err(rustler::Error::Atom("lumis_not_enabled"))
             }
         }
         ExSyntaxHighlightEngineOptions::Syntect(opts) => {
-            #[cfg(syntect)]
+            #[cfg(feature = "syntect")]
             {
                 use once_cell::sync::Lazy;
                 use parking_lot::Mutex;
@@ -551,7 +543,7 @@ fn syntax_highlighter(
                 Ok(Some(CodeFenceSyntaxHighlighter::Syntect(adapter)))
             }
 
-            #[cfg(not(syntect))]
+            #[cfg(not(feature = "syntect"))]
             {
                 let _ = opts;
                 Err(rustler::Error::Atom("syntect_not_enabled"))
@@ -581,26 +573,26 @@ fn finish_render(
 impl CodeFenceSyntaxHighlighter {
     fn take_failure(&self) -> Option<String> {
         match self {
-            #[cfg(lumis)]
+            #[cfg(feature = "lumis")]
             Self::Lumis(adapter) => adapter.take_failure(),
-            #[cfg(syntect)]
+            #[cfg(feature = "syntect")]
             Self::Syntect(_) => None,
-            #[cfg(not(any(lumis, syntect)))]
+            #[cfg(not(any(feature = "lumis", feature = "syntect")))]
             _ => None,
         }
     }
 }
 
 enum CodeFenceSyntaxHighlighter {
-    #[cfg(lumis)]
+    #[cfg(feature = "lumis")]
     Lumis(Arc<LumisAdapter>),
-    #[cfg(syntect)]
+    #[cfg(feature = "syntect")]
     Syntect(Arc<SyntectAdapter>),
 }
 
 type TagAttributes<'a> = std::collections::BTreeMap<&'a str, std::borrow::Cow<'a, str>>;
 
-#[cfg(any(lumis, syntect))]
+#[cfg(any(feature = "lumis", feature = "syntect"))]
 impl SyntaxHighlighterAdapter for CodeFenceSyntaxHighlighter {
     fn write_highlighted(
         &self,
@@ -608,9 +600,9 @@ impl SyntaxHighlighterAdapter for CodeFenceSyntaxHighlighter {
         highlight: &SyntaxHighlightMeta<'_>,
     ) -> std::fmt::Result {
         match self {
-            #[cfg(lumis)]
+            #[cfg(feature = "lumis")]
             Self::Lumis(adapter) => adapter.write_highlighted(output, highlight),
-            #[cfg(syntect)]
+            #[cfg(feature = "syntect")]
             Self::Syntect(adapter) => adapter.write_highlighted(output, highlight),
         }
     }
@@ -622,9 +614,9 @@ impl SyntaxHighlighterAdapter for CodeFenceSyntaxHighlighter {
         attributes: TagAttributes<'_>,
     ) -> std::fmt::Result {
         match self {
-            #[cfg(lumis)]
+            #[cfg(feature = "lumis")]
             Self::Lumis(adapter) => adapter.write_pre_tag(output, highlight, attributes),
-            #[cfg(syntect)]
+            #[cfg(feature = "syntect")]
             Self::Syntect(adapter) => adapter.write_pre_tag(output, highlight, attributes),
         }
     }
@@ -636,15 +628,15 @@ impl SyntaxHighlighterAdapter for CodeFenceSyntaxHighlighter {
         attributes: TagAttributes<'_>,
     ) -> std::fmt::Result {
         match self {
-            #[cfg(lumis)]
+            #[cfg(feature = "lumis")]
             Self::Lumis(adapter) => adapter.write_code_tag(output, highlight, attributes),
-            #[cfg(syntect)]
+            #[cfg(feature = "syntect")]
             Self::Syntect(adapter) => adapter.write_code_tag(output, highlight, attributes),
         }
     }
 }
 
-#[cfg(not(any(lumis, syntect)))]
+#[cfg(not(any(feature = "lumis", feature = "syntect")))]
 impl SyntaxHighlighterAdapter for CodeFenceSyntaxHighlighter {
     fn write_highlighted(
         &self,
@@ -676,11 +668,11 @@ impl SyntaxHighlighterAdapter for CodeFenceSyntaxHighlighter {
 impl CodeFenceSyntaxHighlighter {
     fn inline_code(&self) -> InlineCode {
         match self {
-            #[cfg(lumis)]
+            #[cfg(feature = "lumis")]
             Self::Lumis(adapter) => Some(adapter.clone()),
-            #[cfg(syntect)]
+            #[cfg(feature = "syntect")]
             Self::Syntect(adapter) => Some(adapter.clone()),
-            #[cfg(not(any(lumis, syntect)))]
+            #[cfg(not(any(feature = "lumis", feature = "syntect")))]
             _ => None,
         }
     }
@@ -690,7 +682,7 @@ impl CodeFenceSyntaxHighlighter {
 /// exposes: the spans `write_highlighted` writes, and the one attribute
 /// `write_pre_tag` puts on a fence's `<pre>`, the theme's background or the
 /// `syntax-highlighting` class, merged here with the span's own attributes.
-#[cfg(syntect)]
+#[cfg(feature = "syntect")]
 impl InlineCodeHighlighter for SyntectAdapter {
     fn write_inline_code(
         &self,
@@ -860,7 +852,7 @@ mod tests {
 
     /// Comrak's adapter panics on a theme it has not loaded, so an unknown
     /// name gets no highlighter and the document renders as plain text.
-    #[cfg(syntect)]
+    #[cfg(feature = "syntect")]
     #[test]
     fn unknown_syntect_theme_renders_plain_text() {
         let highlighter = |theme: &str| {
@@ -877,7 +869,7 @@ mod tests {
         assert!(highlighter("InspiredGitHub").is_some());
     }
 
-    #[cfg(syntect)]
+    #[cfg(feature = "syntect")]
     #[test]
     fn highlights_inline_code_with_syntect() {
         let mut options = Options::default();
